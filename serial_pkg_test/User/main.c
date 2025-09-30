@@ -34,6 +34,12 @@ int main(void)
 			Serial_SensorData.depth += 5;
 			Serial_SensorData.temperature += 1;
 			
+			//Serial_SendSensorPacket(); // 发送传感器数据包
+			// 模拟传感器数据变化
+			Serial_SensorData.accel_x += 10;
+			Serial_SensorData.accel_y += 20;
+			Serial_SensorData.depth += 5;
+			Serial_SensorData.temperature += 1;
 			Serial_SendSensorPacket(); // 发送传感器数据包
 			Delay_ms(50);
 		}

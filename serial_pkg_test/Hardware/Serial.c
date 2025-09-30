@@ -225,8 +225,8 @@ uint8_t Serial_CRC8(uint8_t *data, uint8_t length)
   */
 void Serial_SendSensorPacket(void)
 {
-	// 包头2 + 类型1 + 长度1 + 数据16 + 校验1 + 包尾2 = 23字节
-    uint8_t packet[23];  
+	// 包头2 + 类型1 + 长度1 + 数据30 + 校验1 + 包尾2 = 37字节
+    uint8_t packet[37];  
     uint8_t index = 0;
     uint8_t crc;
     
