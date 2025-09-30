@@ -14,7 +14,7 @@
 
 // 数据类型
 #define PWM_DATA_LENGTH      0x0C    // 6个PWM值，每个2字节
-#define SENSOR_DATA_LENGTH   16    // 传感器数据长度
+#define SENSOR_DATA_LENGTH   30    // 传感器数据长度
 #define MAX_PACKET_SIZE      32    // 最大数据包大小
 
 // PWM接收数据结构
@@ -26,8 +26,11 @@ extern uint8_t Serial_TxPacket[MAX_PACKET_SIZE];  // 发送数据包缓冲区
 typedef struct {
     int16_t accel_x, accel_y, accel_z;    // 加速度计
     int16_t gyro_x, gyro_y, gyro_z;       // 陀螺仪
+    int16_t mag_x, mag_y, mag_z;          // 磁力计
+    int16_t angle_x, angle_y, angle_z;    // 姿态角
     int16_t depth;                        // 深度
     int16_t temperature;                  // 温度
+    int16_t humidity;                     // 湿度
 } SensorData_t;
 
 extern SensorData_t Serial_SensorData;

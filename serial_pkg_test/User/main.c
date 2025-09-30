@@ -24,6 +24,8 @@ int main(void)
 	{
 		KeyNum = Key_GetNum();
 		//if (KeyNum == 2) // 按键2按下，发送传感器数据
+		// 传感器数据接收
+
 		if(1)
 		{
 			// 模拟传感器数据变化

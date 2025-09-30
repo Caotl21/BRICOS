@@ -13,7 +13,10 @@ uint8_t Serial_TxPacket[MAX_PACKET_SIZE];          // 发送数据包缓冲区
 SensorData_t Serial_SensorData = {
     .accel_x = 100, .accel_y = 200, .accel_z = 300,
     .gyro_x = 10, .gyro_y = 20, .gyro_z = 30,
-    .depth = 1500, .temperature = 250
+    .mag_x = 100, .mag_y = 200, .mag_z = 300,
+    .angle_x = 10, .angle_y = 20, .angle_z = 30,
+    .depth = 1500, .temperature = 250,
+    .humidity = 50
 };
 
 /**
@@ -246,10 +249,24 @@ void Serial_SendSensorPacket(void)
     packet[index++] = (uint8_t)(Serial_SensorData.gyro_y & 0xFF);
     packet[index++] = (uint8_t)(Serial_SensorData.gyro_z >> 8);
     packet[index++] = (uint8_t)(Serial_SensorData.gyro_z & 0xFF);
+    packet[index++] = (uint8_t)(Serial_SensorData.mag_x >> 8);
+    packet[index++] = (uint8_t)(Serial_SensorData.mag_x & 0xFF);
+    packet[index++] = (uint8_t)(Serial_SensorData.mag_y >> 8);
+    packet[index++] = (uint8_t)(Serial_SensorData.mag_y & 0xFF);
+    packet[index++] = (uint8_t)(Serial_SensorData.mag_z >> 8);
+    packet[index++] = (uint8_t)(Serial_SensorData.mag_z & 0xFF);
+    packet[index++] = (uint8_t)(Serial_SensorData.angle_x >> 8);
+    packet[index++] = (uint8_t)(Serial_SensorData.angle_x & 0xFF);
+    packet[index++] = (uint8_t)(Serial_SensorData.angle_y >> 8);
+    packet[index++] = (uint8_t)(Serial_SensorData.angle_y & 0xFF);
+    packet[index++] = (uint8_t)(Serial_SensorData.angle_z >> 8);
+    packet[index++] = (uint8_t)(Serial_SensorData.angle_z & 0xFF);
     packet[index++] = (uint8_t)(Serial_SensorData.depth >> 8);
     packet[index++] = (uint8_t)(Serial_SensorData.depth & 0xFF);
     packet[index++] = (uint8_t)(Serial_SensorData.temperature >> 8);
     packet[index++] = (uint8_t)(Serial_SensorData.temperature & 0xFF);
+    packet[index++] = (uint8_t)(Serial_SensorData.humidity >> 8);
+    packet[index++] = (uint8_t)(Serial_SensorData.humidity & 0xFF);
     
     // 计算校验位（从数据类型开始到数据结束）
     crc = Serial_CRC8(&packet[2], index - 2);  // 跳过包头
