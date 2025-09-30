@@ -4,11 +4,15 @@
 #include <stdio.h>
 
 // 数据包协议定义
-#define PACKET_START_BYTE    0xAA
-#define PACKET_END_BYTE      0x55
-#define DATA_TYPE_PWM        0x01
-#define DATA_TYPE_SENSOR     0x02
+#define PACKET_START_BYTE1     0xAA
+#define PACKET_START_BYTE2     0xBB
+#define PACKET_END_BYTE1       0xCC
+#define PACKET_END_BYTE2       0xDD
+#define DATA_TYPE_PWM          0x01
+#define DATA_TYPE_SENSOR       0x02
 
+
+// 数据类型
 #define PWM_DATA_LENGTH      0x0C    // 6个PWM值，每个2字节
 #define SENSOR_DATA_LENGTH   16    // 传感器数据长度
 #define MAX_PACKET_SIZE      32    // 最大数据包大小
@@ -36,6 +40,7 @@ void Serial_SendNumber(uint32_t Number, uint8_t Length);
 void Serial_Printf(char *format, ...);
 
 void Serial_SendSensorPacket(void);
+
 uint8_t Serial_GetRxFlag(void);
 uint8_t Serial_CRC8(uint8_t *data, uint8_t length);
 

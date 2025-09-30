@@ -23,7 +23,8 @@ int main(void)
 	while (1)
 	{
 		KeyNum = Key_GetNum();
-		if (KeyNum == 2) // 按键2按下，发送传感器数据
+		//if (KeyNum == 2) // 按键2按下，发送传感器数据
+		if(1)
 		{
 			// 模拟传感器数据变化
 			Serial_SensorData.accel_x += 10;
@@ -32,6 +33,7 @@ int main(void)
 			Serial_SensorData.temperature += 1;
 			
 			Serial_SendSensorPacket(); // 发送传感器数据包
+			Delay_ms(50);
 		}
 		
 		if (Serial_GetRxFlag() == 1) // 接收到PWM数据包

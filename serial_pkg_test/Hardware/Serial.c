@@ -222,12 +222,14 @@ uint8_t Serial_CRC8(uint8_t *data, uint8_t length)
   */
 void Serial_SendSensorPacket(void)
 {
-    uint8_t packet[22];  // 起始+类型+长度+数据(16)+校验+结束
+	// 包头2 + 类型1 + 长度1 + 数据16 + 校验1 + 包尾2 = 23字节
+    uint8_t packet[23];  
     uint8_t index = 0;
     uint8_t crc;
     
     // 构建数据包
-    packet[index++] = PACKET_START_BYTE;        // 起始字节
+    packet[index++] = PACKET_START_BYTE1;       // 包头字节1
+    packet[index++] = PACKET_START_BYTE2;       // 包头字节2
     packet[index++] = DATA_TYPE_SENSOR;         // 数据类型
     packet[index++] = SENSOR_DATA_LENGTH;       // 数据长度
     
@@ -250,22 +252,15 @@ void Serial_SendSensorPacket(void)
     packet[index++] = (uint8_t)(Serial_SensorData.temperature & 0xFF);
     
     // 计算校验位（从数据类型开始到数据结束）
-    crc = Serial_CRC8(&packet[1], index - 1);
+    crc = Serial_CRC8(&packet[2], index - 2);  // 跳过包头
     packet[index++] = crc;                      // 校验位
-    packet[index++] = PACKET_END_BYTE;          // 结束字节
+    packet[index++] = PACKET_END_BYTE1;         // 包尾字节1
+    packet[index++] = PACKET_END_BYTE2;         // 包尾字节2
     
     // 发送数据包
     Serial_SendArray(packet, index);
 }
 
-/**
-  * 函    数：USART1中断函数
-  * 参    数：无
-  * 返 回 值：无
-  * 注意事项：此函数为中断函数，无需调用，中断触发后自动执行
-  *           函数名为预留的指定名称，可以从启动文件复制
-  *           请确保函数名正确，不能有任何差异，否则中断函数将不能进入
-  */
 void USART1_IRQHandler(void)
 {
     static uint8_t RxState = 0;         // 状态机状态
@@ -277,55 +272,75 @@ void USART1_IRQHandler(void)
     if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET) //判断是否是USART1的接收事件触发的中断
     {
         uint8_t RxData = USART_ReceiveData(USART1);
+        
         switch (RxState)
         {
-            case 0: // 等待起始字节
-				
-                if (RxData == PACKET_START_BYTE) {
+            case 0: // 等待起始字节1
+                if (RxData == PACKET_START_BYTE1) {
                     RxState = 1;
-                    pRxPacket = 0;
                 }
                 break;
                 
-            case 1: // 接收数据类型
-                DataType = RxData;
-                Serial_RxPacket[pRxPacket++] = RxData;
-                RxState = 2;
+            case 1: // 等待起始字节2
+                if (RxData == PACKET_START_BYTE2) {
+                    RxState = 2;
+                    pRxPacket = 0;  // 重置数据包指针
+                } else {
+                    RxState = 0; // 如果不是起始字节2，重新开始
+                }
                 break;
                 
-            case 2: // 接收数据长度
+            case 2: // 接收数据类型
+                DataType = RxData;
+                Serial_RxPacket[pRxPacket++] = RxData;
+                RxState = 3;
+                break;
+                
+            case 3: // 接收数据长度
                 DataLength = RxData;
                 Serial_RxPacket[pRxPacket++] = RxData;
-                if (DataLength == PWM_DATA_LENGTH && DataType == DATA_TYPE_PWM) {
-                    RxState = 3;
+                
+                // 验证数据长度是否合法
+                if ((DataType == DATA_TYPE_PWM && DataLength == PWM_DATA_LENGTH) ||
+                    (DataType == DATA_TYPE_SENSOR && DataLength == SENSOR_DATA_LENGTH)) {
+                    RxState = 4;
                 } else {
                     RxState = 0; // 数据长度不匹配，重新开始
                 }
                 break;
                 
-            case 3: // 接收数据负载
+            case 4: // 接收数据负载
                 Serial_RxPacket[pRxPacket++] = RxData;
-                if (pRxPacket >= (DataLength + 2)) { // +2是因为包含了数据类型和长度
-                    RxState = 4;
+                // 检查是否接收完所有数据 (+2是因为包含了数据类型和长度)
+                if (pRxPacket >= (DataLength + 2)) {
+                    RxState = 5;
                 }
                 break;
                 
-            case 4: // 接收校验位
+            case 5: // 接收校验位
                 ReceivedCRC = RxData;
-                RxState = 5;
+                RxState = 6;
                 break;
                 
-            case 5: // 接收结束字节
-                if (RxData == PACKET_END_BYTE) {
-                    // 验证校验位
-                    //uint8_t CalculatedCRC = Serial_CRC8(Serial_RxPacket, pRxPacket);
+            case 6: // 等待结束字节1
+                if (RxData == PACKET_END_BYTE1) {
+                    RxState = 7;
+                } else {
+                    RxState = 0; // 如果不是结束字节1，重新开始
+                }
+                break;
+                
+            case 7: // 等待结束字节2
+                if (RxData == PACKET_END_BYTE2) {
+                    // 完整数据包接收完成，进行校验
+                    uint8_t CalculatedCRC = Serial_CRC8(Serial_RxPacket, pRxPacket);
                     //if (CalculatedCRC == ReceivedCRC) {
-					if (1) {
-                        // 解析PWM数据
+					if(1){
+                        // CRC校验成功，处理数据
                         if (DataType == DATA_TYPE_PWM) {
+                            // 解析PWM数据
                             for (uint8_t i = 0; i < 6; i++) {
-								// Serial_RxPacket是16进制的
-								// Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
+                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
                                 Serial_RxPWM[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
                                 // 数据范围检查
                                 if (Serial_RxPWM[i] > 5000) {
@@ -334,7 +349,9 @@ void USART1_IRQHandler(void)
                             }
                             Serial_RxFlag = 1; // 设置接收完成标志
                         }
+                        // 可以在这里添加其他数据类型的处理
                     }
+                    // 无论校验是否成功，都重新开始
                 }
                 RxState = 0; // 重新开始
                 break;
@@ -347,3 +364,93 @@ void USART1_IRQHandler(void)
         USART_ClearITPendingBit(USART1, USART_IT_RXNE);
     }
 }
+
+/**
+  * 函    数：USART1中断函数
+  * 参    数：无
+  * 返 回 值：无
+  * 注意事项：此函数为中断函数，无需调用，中断触发后自动执行
+  *           函数名为预留的指定名称，可以从启动文件复制
+  *           请确保函数名正确，不能有任何差异，否则中断函数将不能进入
+  */
+//void USART1_IRQHandler(void)
+//{
+//    static uint8_t RxState = 0;         // 状态机状态
+//    static uint8_t DataType = 0;        // 数据类型
+//    static uint8_t DataLength = 0;      // 数据长度
+//    static uint8_t pRxPacket = 0;       // 数据包位置指针
+//    static uint8_t ReceivedCRC = 0;     // 接收到的校验值
+//    
+//    if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET) //判断是否是USART1的接收事件触发的中断
+//    {
+//        uint8_t RxData = USART_ReceiveData(USART1);
+//        switch (RxState)
+//        {
+//            case 0: // 等待起始字节
+//				
+//                if (RxData == PACKET_START_BYTE) {
+//                    RxState = 1;
+//                    pRxPacket = 0;
+//                }
+//                break;
+//                
+//            case 1: // 接收数据类型
+//                DataType = RxData;
+//                Serial_RxPacket[pRxPacket++] = RxData;
+//                RxState = 2;
+//                break;
+//                
+//            case 2: // 接收数据长度
+//                DataLength = RxData;
+//                Serial_RxPacket[pRxPacket++] = RxData;
+//                if (DataLength == PWM_DATA_LENGTH && DataType == DATA_TYPE_PWM) {
+//                    RxState = 3;
+//                } else {
+//                    RxState = 0; // 数据长度不匹配，重新开始
+//                }
+//                break;
+//                
+//            case 3: // 接收数据负载
+//                Serial_RxPacket[pRxPacket++] = RxData;
+//                if (pRxPacket >= (DataLength + 2)) { // +2是因为包含了数据类型和长度
+//                    RxState = 4;
+//                }
+//                break;
+//                
+//            case 4: // 接收校验位
+//                ReceivedCRC = RxData;
+//                RxState = 5;
+//                break;
+//                
+//            case 5: // 接收结束字节
+//                if (RxData == PACKET_END_BYTE) {
+//                    // 验证校验位
+//                    //uint8_t CalculatedCRC = Serial_CRC8(Serial_RxPacket, pRxPacket);
+//                    //if (CalculatedCRC == ReceivedCRC) {
+//					if (1) {
+//                        // 解析PWM数据
+//                        if (DataType == DATA_TYPE_PWM) {
+//                            for (uint8_t i = 0; i < 6; i++) {
+//								// Serial_RxPacket是16进制的
+//								// Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
+//                                Serial_RxPWM[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
+//                                // 数据范围检查
+//                                if (Serial_RxPWM[i] > 5000) {
+//                                    Serial_RxPWM[i] = 5000;
+//                                }
+//                            }
+//                            Serial_RxFlag = 1; // 设置接收完成标志
+//                        }
+//                    }
+//                }
+//                RxState = 0; // 重新开始
+//                break;
+//                
+//            default:
+//                RxState = 0;
+//                break;
+//        }
+//        
+//        USART_ClearITPendingBit(USART1, USART_IT_RXNE);
+//    }
+//}
