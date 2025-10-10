@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "cstdarg": "c",
+        "cstdio": "c",
+        "cstdint": "c"
+    }
+}

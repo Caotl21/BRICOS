@@ -1,0 +1,8 @@
+#ifndef __TIMER_H
+#define __TIMER_H
+
+void Timer_Init(void);
+uint16_t Timer_GetCounter(void);
+//void TIM2_IRQHandler(void);  // 添加中断处理函数声明
+
+#endif
