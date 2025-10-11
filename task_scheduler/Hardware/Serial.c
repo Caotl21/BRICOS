@@ -282,150 +282,150 @@ void Serial_SendSensorPacket(void)
 }
 
 // 不考虑状态机 在中断中只接收一个字节
-void USART1_IRQHandler(void)
-{
-	if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET)		//判断是否是USART1的接收事件触发的中断
-	{
-		Serial_RxData = USART_ReceiveData(USART1);				//读取数据寄存器，存放在接收的数据变量
-		Serial_RxFlag = 1;										//置接收标志位变量为1
-		USART_ClearITPendingBit(USART1, USART_IT_RXNE);			//清除USART1的RXNE标志位
-																//读取数据寄存器会自动清除此标志位
-																//如果已经读取了数据寄存器，也可以不执行此代码
-	}
-}
-
-
 //void USART1_IRQHandler(void)
 //{
-//    static uint8_t RxState = 0;         // 状态机状态
-//    static uint8_t DataType = 0;        // 数据类型
-//    static uint8_t DataLength = 0;      // 数据长度
-//    static uint8_t pRxPacket = 0;       // 数据包位置指针
-//    static uint8_t ReceivedCRC = 0;     // 接收到的校验值
-//    
-//    if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET) //判断是否是USART1的接收事件触发的中断
-//    {
-//        uint8_t RxData = USART_ReceiveData(USART1);
-//        
-//        switch (RxState)
-//        {
-//            case 0: // 等待起始字节1
-//                if (RxData == PACKET_START_BYTE1) {
-//                    RxState = 1;
-//                }
-//                break;
-//                
-//            case 1: // 等待起始字节2
-//                if (RxData == PACKET_START_BYTE2) {
-//                    RxState = 2;
-//                    pRxPacket = 0;  // 重置数据包指针
-//                } else {
-//                    RxState = 0; // 如果不是起始字节2，重新开始
-//                }
-//                break;
-//                
-//            case 2: // 接收数据类型
-//                DataType = RxData;
-//                Serial_RxPacket[pRxPacket++] = RxData;
-//                RxState = 3;
-//                break;
-//                
-//            case 3: // 接收数据长度
-//                DataLength = RxData;
-//                Serial_RxPacket[pRxPacket++] = RxData;
-//                
-//                // 验证数据长度是否合法
-//                if ((DataType == DATA_TYPE_Thrusters && DataLength == PWM_DATA_LENGTH) ||
-//                    (DataType == DATA_TYPE_SENSOR && DataLength == SENSOR_DATA_LENGTH) ||
-//                    (DataType == DATA_TYPE_SERVO && DataLength == SERVO_DATA_LENGTH)
-//                    (DataType == DATA_TYPE_LIGHT && DataLength == LIGHT_DATA_LENGTH)) {
-//                    RxState = 4;
-//                } else {
-//                    RxState = 0; // 数据长度不匹配，重新开始
-//                }
-//                break;
-//                
-//            case 4: // 接收数据负载
-//                Serial_RxPacket[pRxPacket++] = RxData;
-//                // 检查是否接收完所有数据 (+2是因为包含了数据类型和长度)
-//                if (pRxPacket >= (DataLength + 2)) {
-//                    RxState = 5;
-//                }
-//                break;
-//                
-//            case 5: // 接收校验位
-//                ReceivedCRC = RxData;
-//                RxState = 6;
-//                break;
-//                
-//            case 6: // 等待结束字节1
-//                if (RxData == PACKET_END_BYTE1) {
-//                    RxState = 7;
-//                } else {
-//                    RxState = 0; // 如果不是结束字节1，重新开始
-//                }
-//                break;
-//                
-//            case 7: // 等待结束字节2
-//                if (RxData == PACKET_END_BYTE2) {
-//                    // 完整数据包接收完成，进行校验
-//                    uint8_t CalculatedCRC = Serial_CRC8(Serial_RxPacket, pRxPacket);
-//                    //if (CalculatedCRC == ReceivedCRC) {
-//					if(1){
-//                        // CRC校验成功，处理数据
-//                        //解码推进器电机PWM
-//                        if (DataType == DATA_TYPE_Thrusters) {
-//                            // 解析PWM数据
-//                            for (uint8_t i = 0; i < 6; i++) {
-//                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
-//                                Serial_RxPWM_Thruster[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
-//                                // 数据范围检查
-//                                if (Serial_RxPWM_Thruster[i] > 5000) {
-//                                    Serial_RxPWM_Thruster[i] = 5000;
-//                                }
-//                            }
-//                            Serial_RxFlag = 1; // 设置接收完成标志
-//                        }
-//                        //解码舵机PWM
-//                        if (DataType == DATA_TYPE_SERVO) {
-//                            // 解析PWM数据
-//                            for (uint8_t i = 0; i < 2; i++) {
-//                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
-//                                Serial_RxPWM_Servo[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
-//                                // 数据范围检查
-//                                if (Serial_RxPWM_Servo[i] > 2500) {
-//                                    Serial_RxPWM_Servo[i] = 2500;
-//                                }
-//                            }
-//                            Serial_RxFlag = 1; // 设置接收完成标志
-//                        }
-//                        //解码探照灯PWM
-//                        if (DataType == DATA_TYPE_LIGHT) {
-//                            // 解析PWM数据
-//                            for (uint8_t i = 0; i < 2; i++) {
-//                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
-//                                Serial_RxPWM_Light[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
-//                                // 数据范围检查
-//                                if (Serial_RxPWM_Light[i] > 2500) {
-//                                    Serial_RxPWM_Light[i] = 2500;
-//                                }
-//                            }
-//                            Serial_RxFlag = 1; // 设置接收完成标志
-//                        }
-//                    }
-//                    // 无论校验是否成功，都重新开始
-//                }
-//                RxState = 0; // 重新开始
-//                break;
-//                
-//            default:
-//                RxState = 0;
-//                break;
-//        }
-//        
-//        USART_ClearITPendingBit(USART1, USART_IT_RXNE);
-//    }
+//	if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET)		//判断是否是USART1的接收事件触发的中断
+//	{
+//		Serial_RxData = USART_ReceiveData(USART1);				//读取数据寄存器，存放在接收的数据变量
+//		Serial_RxFlag = 1;										//置接收标志位变量为1
+//		USART_ClearITPendingBit(USART1, USART_IT_RXNE);			//清除USART1的RXNE标志位
+//																//读取数据寄存器会自动清除此标志位
+//																//如果已经读取了数据寄存器，也可以不执行此代码
+//	}
 //}
+
+
+void USART1_IRQHandler(void)
+{
+    static uint8_t RxState = 0;         // 状态机状态
+    static uint8_t DataType = 0;        // 数据类型
+    static uint8_t DataLength = 0;      // 数据长度
+    static uint8_t pRxPacket = 0;       // 数据包位置指针
+    static uint8_t ReceivedCRC = 0;     // 接收到的校验值
+    
+    if (USART_GetITStatus(USART1, USART_IT_RXNE) == SET) //判断是否是USART1的接收事件触发的中断
+    {
+        uint8_t RxData = USART_ReceiveData(USART1);
+        
+        switch (RxState)
+        {
+            case 0: // 等待起始字节1
+                if (RxData == PACKET_START_BYTE1) {
+                    RxState = 1;
+                }
+                break;
+                
+            case 1: // 等待起始字节2
+                if (RxData == PACKET_START_BYTE2) {
+                    RxState = 2;
+                    pRxPacket = 0;  // 重置数据包指针
+                } else {
+                    RxState = 0; // 如果不是起始字节2，重新开始
+                }
+                break;
+                
+            case 2: // 接收数据类型
+                DataType = RxData;
+                Serial_RxPacket[pRxPacket++] = RxData;
+                RxState = 3;
+                break;
+                
+            case 3: // 接收数据长度
+                DataLength = RxData;
+                Serial_RxPacket[pRxPacket++] = RxData;
+                
+                // 验证数据长度是否合法
+                if ((DataType == DATA_TYPE_Thrusters && DataLength == PWM_DATA_LENGTH) ||
+                    (DataType == DATA_TYPE_SENSOR && DataLength == SENSOR_DATA_LENGTH) ||
+                    (DataType == DATA_TYPE_SERVO && DataLength == SERVO_DATA_LENGTH) ||
+                    (DataType == DATA_TYPE_LIGHT && DataLength == LIGHT_DATA_LENGTH)) {
+                    RxState = 4;
+                } else {
+                    RxState = 0; // 数据长度不匹配，重新开始
+                }
+                break;
+                
+            case 4: // 接收数据负载
+                Serial_RxPacket[pRxPacket++] = RxData;
+                // 检查是否接收完所有数据 (+2是因为包含了数据类型和长度)
+                if (pRxPacket >= (DataLength + 2)) {
+                    RxState = 5;
+                }
+                break;
+                
+            case 5: // 接收校验位
+                ReceivedCRC = RxData;
+                RxState = 6;
+                break;
+                
+            case 6: // 等待结束字节1
+                if (RxData == PACKET_END_BYTE1) {
+                    RxState = 7;
+                } else {
+                    RxState = 0; // 如果不是结束字节1，重新开始
+                }
+                break;
+                
+            case 7: // 等待结束字节2
+                if (RxData == PACKET_END_BYTE2) {
+                    // 完整数据包接收完成，进行校验
+                    uint8_t CalculatedCRC = Serial_CRC8(Serial_RxPacket, pRxPacket);
+                    //if (CalculatedCRC == ReceivedCRC) {
+					if(1){
+                        // CRC校验成功，处理数据
+                        //解码推进器电机PWM
+                        if (DataType == DATA_TYPE_Thrusters) {
+                            // 解析PWM数据
+                            for (uint8_t i = 0; i < 6; i++) {
+                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
+                                Serial_RxPWM_Thruster[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
+                                // 数据范围检查
+                                if (Serial_RxPWM_Thruster[i] > 5000) {
+                                    Serial_RxPWM_Thruster[i] = 5000;
+                                }
+                            }
+                            Serial_RxFlag = 1; // 设置接收完成标志
+                        }
+                        //解码舵机PWM
+                        if (DataType == DATA_TYPE_SERVO) {
+                            // 解析PWM数据
+                            for (uint8_t i = 0; i < 2; i++) {
+                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
+                                Serial_RxPWM_Servo[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
+                                // 数据范围检查
+                                if (Serial_RxPWM_Servo[i] > 2500) {
+                                    Serial_RxPWM_Servo[i] = 2500;
+                                }
+                            }
+                            Serial_RxFlag = 1; // 设置接收完成标志
+                        }
+                        //解码探照灯PWM
+                        if (DataType == DATA_TYPE_LIGHT) {
+                            // 解析PWM数据
+                            for (uint8_t i = 0; i < 2; i++) {
+                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
+                                Serial_RxPWM_Light[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
+                                // 数据范围检查
+                                if (Serial_RxPWM_Light[i] > 2500) {
+                                    Serial_RxPWM_Light[i] = 2500;
+                                }
+                            }
+                            Serial_RxFlag = 1; // 设置接收完成标志
+                        }
+                    }
+                    // 无论校验是否成功，都重新开始
+                }
+                RxState = 0; // 重新开始
+                break;
+                
+            default:
+                RxState = 0;
+                break;
+        }
+        
+        USART_ClearITPendingBit(USART1, USART_IT_RXNE);
+    }
+}
 
 /**
   * 函    数：USART1中断函数

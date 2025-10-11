@@ -59,7 +59,7 @@ void TaskScheduler_Check(void)
 {
     // 调试 看是否进入该函数
     //Serial_Printf("TaskScheduler_Check\r\n");   
-    uint32_t current_time = GetSystemTick();
+    //uint32_t current_time = GetSystemTick();
     // 调试 看该函数的结果
     //Serial_Printf("Current time: %d\r\n", current_time);
 
@@ -70,6 +70,7 @@ void TaskScheduler_Check(void)
     
     // 检查周期性任务
     for(int i = 0; i < TASK_COUNT; i++) {
+		uint32_t current_time = GetSystemTick();
         TaskControlBlock_t* task = &task_table[i];
         
         if(!task->enabled || task->state == TASK_DISABLED) {
@@ -108,7 +109,7 @@ void TaskScheduler_Check(void)
 // 任务执行函数 - 只负责执行标志位对应的任务
 void TaskScheduler_Execute(void)
 {
-    uint32_t current_time = GetSystemTick();
+    //uint32_t current_time = GetSystemTick();
 
     // 按顺序检查并执行标志位对应的任务
     for(int i = 0; i < TASK_COUNT; i++) {
@@ -122,7 +123,7 @@ void TaskScheduler_Execute(void)
             // 执行任务
             task->state = TASK_RUNNING;
             task->task_func();
-            task->last_run_time = current_time;
+            task->last_run_time = GetSystemTick();
             task->run_count++;
             task->state = TASK_READY;
         }

@@ -138,7 +138,7 @@ void Task_1(void)
 void Task_2(void)
 {
     static uint32_t count = 0;
-    OLED_ShowNum(2, 1, count++, 4);
+    OLED_ShowNum(4, 1, count++, 4);
 }
 
 // 测试任务3：串口发送数据
@@ -148,7 +148,18 @@ void Task_3(void)
 }
 
 // 测试任务4：将读入的串口值显示在OLED上 设置一个缓存变量 只读取这个变量 在串口中断中改写这个变量
+//void Task_4(void)
+//{
+//    OLED_ShowHexNum(1, 1, Serial_RxData, 4);
+//}
+
+// 测试任务4：将读入的推进器PWM值显示在OLED上 设置一个缓存变量 只读取这个变量 在串口中断中改写这个变量
 void Task_4(void)
 {
-    OLED_ShowHexNum(1, 1, Serial_RxData, 4);
+    OLED_ShowNum(1, 1, Serial_RxPWM_Thruster[0], 4);
+    OLED_ShowNum(1, 6, Serial_RxPWM_Thruster[1], 4);
+    OLED_ShowNum(2, 1, Serial_RxPWM_Thruster[2], 4);
+    OLED_ShowNum(2, 6, Serial_RxPWM_Thruster[3], 4);
+    OLED_ShowNum(3, 1, Serial_RxPWM_Thruster[4], 4);
+    OLED_ShowNum(3, 6, Serial_RxPWM_Thruster[5], 4);
 }
