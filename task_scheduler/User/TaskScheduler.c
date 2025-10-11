@@ -57,20 +57,10 @@ void TaskScheduler_Init(void)
 // 任务检查函数 - 只负责检查和设置标志位
 void TaskScheduler_Check(void)
 {
-    // 调试 看是否进入该函数
-    //Serial_Printf("TaskScheduler_Check\r\n");   
-    //uint32_t current_time = GetSystemTick();
-    // 调试 看该函数的结果
-    //Serial_Printf("Current time: %d\r\n", current_time);
-
-    // 调试 显示当前时间 使用printf重定向函数 每秒显示一次
-    //if(current_time % 1000 == 0) {
-    //    Serial_Printf("Current time: %d\r\n", current_time);
-    //}
+    uint32_t current_time = GetSystemTick();  // 只获取一次时间
     
     // 检查周期性任务
     for(int i = 0; i < TASK_COUNT; i++) {
-		uint32_t current_time = GetSystemTick();
         TaskControlBlock_t* task = &task_table[i];
         
         if(!task->enabled || task->state == TASK_DISABLED) {
@@ -80,7 +70,7 @@ void TaskScheduler_Check(void)
         // 周期性任务检查
         if(task->period_ms > 0) {
             if((current_time - task->last_run_time) >= task->period_ms) {
-                g_task_flags |= (1 << task->id);  // 设置对应的任务标志位
+                g_task_flags |= (1 << task->id);
             }
         }
     }
@@ -90,40 +80,27 @@ void TaskScheduler_Check(void)
         g_task_flags |= TASK_FLAG_4;
         g_event_pwm_received = 0;
     }
-    
-    /*// 检查事件驱动任务
-    if(g_event_pwm_received && task_table[TASK_Thrusters_PWM_OUTPUT].enabled) {
-        g_task_flags |= TASK_FLAG_THRUSTERS_PWM;
-        g_event_pwm_received = 0;
-    }
-    if(g_event_pwm_received && task_table[TASK_Servo_PWM_OUTPUT].enabled) {
-        g_task_flags |= TASK_FLAG_SERVO_PWM;
-        g_event_pwm_received = 0;
-    }
-    if(g_event_pwm_received && task_table[TASK_Light_PWM_OUTPUT].enabled) {
-        g_task_flags |= TASK_FLAG_LIGHT_PWM;
-        g_event_pwm_received = 0;
-    }*/
 }
 
 // 任务执行函数 - 只负责执行标志位对应的任务
 void TaskScheduler_Execute(void)
 {
-    //uint32_t current_time = GetSystemTick();
+    uint32_t current_time = GetSystemTick();
 
     // 按顺序检查并执行标志位对应的任务
     for(int i = 0; i < TASK_COUNT; i++) {
         TaskControlBlock_t* task = &task_table[i];
         uint8_t task_flag = (1 << task->id);
-        
+        // 将所有任务的全局标志位和该任务标志位按位与
         if(g_task_flags & task_flag) {
             // 清除标志位
-            g_task_flags &= ~task_flag;
+            g_task_flags &= ~(1 << task->id);
             
             // 执行任务
             task->state = TASK_RUNNING;
             task->task_func();
-            task->last_run_time = GetSystemTick();
+            //task->last_run_time = GetSystemTick();
+            task->last_run_time = current_time;
             task->run_count++;
             task->state = TASK_READY;
         }
@@ -193,3 +170,4 @@ void TIM2_IRQHandler(void)
 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 	}
 }
+
