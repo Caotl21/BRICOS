@@ -2,7 +2,6 @@
 #include "Delay.h"
 #include "OLED.h"
 #include "Serial.h"
-#include "Key.h"
 #include "PWM.h"
 #include "LED.h"
 #include "servo.h"
@@ -28,9 +27,10 @@ static void AutoScanSensor(void);
 static void SensorUartSend(uint8_t *p_data, uint32_t uiSize);
 static void SensorDataUpdata(uint32_t uiReg, uint32_t uiRegNum);
 static void Delayms(uint16_t ucMs);
-/*********DHT11更新***********/
+/**********************DHT11更新********************/
 u8 temperature;
 u8 humidity;
+/***************************************************/
 
 int main(void)
 {
@@ -38,7 +38,6 @@ int main(void)
 	OLED_Init();		//OLED初始化
 	Key_Init();			//按键初始化
 	Serial_Init();		//串口初始化
-	//PWM_Init();
 	DHT11_Init();		//DHT11初始化
 	Servo_Init();		//舵机初始化
 	/******************JY901B****************/
@@ -54,12 +53,12 @@ int main(void)
 	int i;
 	/*显示静态字符串*/
 	//OLED_ShowString(1, 1, "PWM Values:");
-	//OLED_ShowString(3, 1, "Press Key2->Send");
 	while (1)
 	{
-		KeyNum = Key_GetNum();
-		//if (KeyNum == 2) // 按键2按下，发送传感器数据
 		DHT11_Read_Data(&temperature, &humidity);
+		
+		//JY901B_Update(fAcc, fGyro, fAngle, s_cDataUpdate);
+
 /************************************更新J901B数据********************************************/
 		if(s_cDataUpdate)			//模块自动上传数据，进行更新，通过SensorDataUpdate进行
 		{
@@ -93,11 +92,7 @@ int main(void)
 /******************************************end*************************************/
 		if(1)
 		{
-			// 模拟传感器数据变化
-//			Serial_SensorData.accel_x += 10;
-//			Serial_SensorData.accel_y += 20;
-//			Serial_SensorData.depth += 5;
-//			Serial_SensorData.temperature += 1;
+			//更新传感器数据阵列
 			Serial_SensorData.accel_x = (int16_t)(fAcc[0]*100);
 			Serial_SensorData.accel_y = (int16_t)(fAcc[1]*100);
 			Serial_SensorData.accel_z = (int16_t)(fAcc[2]*100);
@@ -119,14 +114,18 @@ int main(void)
 		if (Serial_GetRxFlag() == 1) // 接收到PWM数据包
 		{
 			// 显示6个PWM值
-			OLED_ShowNum(2, 1, Serial_RxPWM[0], 4);
-			Servo_yaw_SetAngle(Serial_RxPWM[0]);
-			OLED_ShowNum(2, 6, Serial_RxPWM[1], 4);
-			Servo_pitch_SetAngle(Serial_RxPWM[1]);
-			OLED_ShowNum(3, 1, Serial_RxPWM[2], 4);
-			OLED_ShowNum(3, 6, Serial_RxPWM[3], 4);
-			OLED_ShowNum(4, 1, Serial_RxPWM[4], 4);
-			OLED_ShowNum(4, 6, Serial_RxPWM[5], 4);
+			OLED_ShowNum(1, 1, Serial_RxPWM_Thruster[0], 4);
+			
+			OLED_ShowNum(1, 6, Serial_RxPWM_Thruster[1], 4);
+			
+			OLED_ShowNum(2, 1, Serial_RxPWM_Thruster[2], 4);
+			OLED_ShowNum(2, 6, Serial_RxPWM_Thruster[3], 4);
+			OLED_ShowNum(3, 1, Serial_RxPWM_Thruster[4], 4);
+			OLED_ShowNum(3, 6, Serial_RxPWM_Thruster[5], 4);
+			OLED_ShowNum(4, 1, Serial_RxPWM_Servo[0], 4);
+			Servo_yaw_SetAngle(Serial_RxPWM_Servo[0]);
+			OLED_ShowNum(4, 6, Serial_RxPWM_Servo[1], 4);
+			Servo_pitch_SetAngle(Serial_RxPWM_Servo[1]);
 		}
 		
 	}

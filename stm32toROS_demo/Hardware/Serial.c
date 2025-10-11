@@ -5,7 +5,8 @@
 #include "OLED.h"
 
 uint8_t Serial_RxFlag;					//定义接收数据包标志位
-uint16_t Serial_RxPWM[6] = {0};                    // 接收的PWM值数组
+uint16_t Serial_RxPWM_Thruster[6] = {0};                    // 接收的PWM值数组
+uint16_t Serial_RxPWM_Servo[2] = {0};        // 接收的舵机PWM值
 uint8_t Serial_RxPacket[MAX_PACKET_SIZE];          // 接收数据包缓冲区
 uint8_t Serial_TxPacket[MAX_PACKET_SIZE];          // 发送数据包缓冲区
 
@@ -318,8 +319,10 @@ void USART1_IRQHandler(void)
                 Serial_RxPacket[pRxPacket++] = RxData;
                 
                 // 验证数据长度是否合法
-                if ((DataType == DATA_TYPE_PWM && DataLength == PWM_DATA_LENGTH) ||
-                    (DataType == DATA_TYPE_SENSOR && DataLength == SENSOR_DATA_LENGTH)) {
+                if ((DataType == DATA_TYPE_Thrusters && DataLength == PWM_DATA_LENGTH) ||
+                    (DataType == DATA_TYPE_SENSOR && DataLength == SENSOR_DATA_LENGTH) ||
+                    (DataType == DATA_TYPE_SERVO && DataLength == SERVO_DATA_LENGTH)
+                    (DataType == DATA_TYPE_LIGHT && DataLength == LIGHT_DATA_LENGTH)) {
                     RxState = 4;
                 } else {
                     RxState = 0; // 数据长度不匹配，重新开始
@@ -354,19 +357,45 @@ void USART1_IRQHandler(void)
                     //if (CalculatedCRC == ReceivedCRC) {
 					if(1){
                         // CRC校验成功，处理数据
-                        if (DataType == DATA_TYPE_PWM) {
+                        //解码推进器电机PWM
+                        if (DataType == DATA_TYPE_Thrusters) {
                             // 解析PWM数据
                             for (uint8_t i = 0; i < 6; i++) {
                                 // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
-                                Serial_RxPWM[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
+                                Serial_RxPWM_Thruster[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
                                 // 数据范围检查
-                                if (Serial_RxPWM[i] > 5000) {
-                                    Serial_RxPWM[i] = 5000;
+                                if (Serial_RxPWM_Thruster[i] > 5000) {
+                                    Serial_RxPWM_Thruster[i] = 5000;
                                 }
                             }
                             Serial_RxFlag = 1; // 设置接收完成标志
                         }
-                        // 可以在这里添加其他数据类型的处理
+                        //解码舵机PWM
+                        if (DataType == DATA_TYPE_SERVO) {
+                            // 解析PWM数据
+                            for (uint8_t i = 0; i < 2; i++) {
+                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
+                                Serial_RxPWM_Servo[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
+                                // 数据范围检查
+                                if (Serial_RxPWM_Servo[i] > 2500) {
+                                    Serial_RxPWM_Servo[i] = 2500;
+                                }
+                            }
+                            Serial_RxFlag = 1; // 设置接收完成标志
+                        }
+                        //解码探照灯PWM
+                        if (DataType == DATA_TYPE_LIGHT) {
+                            // 解析PWM数据
+                            for (uint8_t i = 0; i < 2; i++) {
+                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
+                                Serial_RxPWM_Light[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
+                                // 数据范围检查
+                                if (Serial_RxPWM_Light[i] > 2500) {
+                                    Serial_RxPWM_Light[i] = 2500;
+                                }
+                            }
+                            Serial_RxFlag = 1; // 设置接收完成标志
+                        }
                     }
                     // 无论校验是否成功，都重新开始
                 }
