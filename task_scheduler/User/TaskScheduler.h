@@ -15,7 +15,8 @@
 //} TaskID_t;
 
 typedef enum {
-    TASK_1 = 0,
+    TASK_IM948_PROCESS = 0,
+    TASK_1,
     TASK_2,
     TASK_3,
     TASK_4,
@@ -44,6 +45,7 @@ typedef struct {
 // 事件标志
 extern volatile uint8_t g_event_pwm_received;
 extern volatile uint8_t g_event_sensor_ready;
+extern volatile uint8_t g_event_im948_received;
 // 任务执行标志位
 extern volatile uint8_t g_task_flags;
 
@@ -54,6 +56,7 @@ extern volatile uint8_t g_task_flags;
 //#define TASK_FLAG_THRUSTERS_PWM    (1 << TASK_Thrusters_PWM_OUTPUT)
 //#define TASK_FLAG_SERVO_PWM    (1 << TASK_Servo_PWM_OUTPUT)
 //#define TASK_FLAG_LIGHT_PWM    (1 << TASK_Light_PWM_OUTPUT)
+#define TASK_FLAG_IM948_PROCESS (1 << TASK_IM948_PROCESS)
 #define TASK_FLAG_1    (1 << TASK_1)
 #define TASK_FLAG_2    (1 << TASK_2)
 #define TASK_FLAG_3    (1 << TASK_3)

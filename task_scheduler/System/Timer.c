@@ -1,5 +1,7 @@
 #include "stm32f10x.h"                  // Device header
 #include "TaskScheduler.h"
+#include "im948_CMD.h"
+#include "Serial.h"
 
 /**
   * 函    数：定时中断初始化

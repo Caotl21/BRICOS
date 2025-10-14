@@ -1,5 +1,6 @@
 #include "TaskScheduler.h"
 #include "Delay.h"
+#include "im948_CMD.h"
 #include "Serial.h"
 #include "OLED.h"
 #include "servo.h"
@@ -12,6 +13,7 @@
 // 全局事件标志
 volatile uint8_t g_event_pwm_received = 0;
 volatile uint8_t g_event_sensor_ready = 0;
+volatile uint8_t g_event_im948_received = 0;
 
 // 任务执行标志位
 volatile uint8_t g_task_flags = 0;
@@ -30,6 +32,7 @@ static volatile uint32_t system_tick_ms = 0;
 //};
 
 static TaskControlBlock_t task_table[TASK_COUNT] = {
+    {TASK_IM948_PROCESS,  5,   0, Task_IM948_Process,    TASK_READY, 1, 0},  // 事件驱动
     {TASK_1,  500,  0, Task_1,  TASK_READY, 1, 0},
     {TASK_2,  2000,  0, Task_2,  TASK_READY, 1, 0},
     {TASK_3,  400, 0, Task_3,  TASK_READY, 1, 0},
@@ -58,9 +61,14 @@ void TaskScheduler_Init(void)
 void TaskScheduler_Check(void)
 {
     uint32_t current_time = GetSystemTick();  // 只获取一次时间
+	
+	if(g_event_im948_received && task_table[TASK_IM948_PROCESS].enabled) {
+        g_task_flags |= TASK_FLAG_IM948_PROCESS;
+        g_event_im948_received = 0;
+    }
     
     // 检查周期性任务
-    for(int i = 0; i < TASK_COUNT; i++) {
+    for(int i = 1; i < TASK_COUNT-1; i++) {
         TaskControlBlock_t* task = &task_table[i];
         
         if(!task->enabled || task->state == TASK_DISABLED) {

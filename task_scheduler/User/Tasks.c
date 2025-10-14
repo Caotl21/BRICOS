@@ -2,12 +2,14 @@
 #include "DHT11.h"
 #include "JY901B_UART.h"
 #include "wit_c_sdk.h"
+#include "im948_CMD.h"
 #include "Serial.h"
 #include "OLED.h"
 #include "servo.h"
 #include "Motor.h"
 #include "LED.h"
 #include "Delay.h"
+#include "im948_CMD.h"
 
 // 外部变量
 //extern float fAcc[3], fGyro[3], fAngle[3];
@@ -141,10 +143,16 @@ void Task_2(void)
     printf("count: %d\r\n", count++);
 }
 
-// 测试任务3：串口发送数据
+// 测试任务3：串口发送imu数据
 void Task_3(void)
 {
-    Serial_SendString("Hello World!\r\n");
+	if(isNewData_im948)
+    {
+        printf("AngleX:%.3f, AngleY:%.3f, AngleZ:%.3f\r\n", AngleX, AngleY, AngleZ);
+        printf("AccX:%.3f, AccY:%.3f, AccZ:%.3f, Accabs:%.3f\r\n", AccX, AccY, AccZ, Accabs);
+        printf("GyroX:%.3f, GyroY:%.3f, GyroZ:%.3f, Gyroabs:%.3f\r\n", GyroX, GyroY, GyroZ, Gyroabs);
+        printf("MagX:%.3f, MagY:%.3f, MagZ:%.3f, Magabs:%.3f\r\n", MagX, MagY, MagZ, Magabs);
+    }
 }
 
 // 测试任务4：将读入的串口值显示在OLED上 设置一个缓存变量 只读取这个变量 在串口中断中改写这个变量
@@ -152,10 +160,16 @@ void Task_4(void)
 {
     //OLED_ShowHexNum(1, 1, Serial_RxData, 4);
     // 打印当前的pwm接收标志位
-    //printf("g_event_pwm_received: %d\r\n", g_event_pwm_received);
-    uint16_t RxData = Serial_RxData;
+    printf("g_event_pwm_received: %d\r\n", g_event_pwm_received);
+    //uint16_t RxData = Serial_RxData;
     //printf("RxData: %x\r\n", RxData);
-    OLED_ShowHexNum(1, 1, RxData, 4);
+    //OLED_ShowHexNum(1, 1, RxData, 4);
+}
+
+void Task_IM948_Process(void)
+{
+    IM948_process();
+	//printf("g_event_pwm_received: %d\r\n", g_event_pwm_received);
 }
 
 // 测试任务4：将读入的推进器PWM值显示在OLED上 设置一个缓存变量 只读取这个变量 在串口中断中改写这个变量

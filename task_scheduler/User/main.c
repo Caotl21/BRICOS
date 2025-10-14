@@ -1,6 +1,7 @@
 #include "stm32f10x.h"
 #include "Delay.h"
 #include "OLED.h"
+#include "im948_CMD.h"
 #include "Serial.h"
 #include "PWM.h"
 #include "LED.h"
@@ -11,6 +12,7 @@
 #include "Motor.h"
 #include "TaskScheduler.h"
 #include "Tasks.h"
+
 
 /********************JY901B**************************/
 //#define ACC_UPDATE		0x01
@@ -43,6 +45,7 @@ int main(void)
 	//Servo_Init();		//舵机初始化
 	//Motor_Init();		//直流电机初始化
 	//Motor_Unlock();		//电调初始化
+	IM948_Init();
 
 	/******************JY901B****************/
 //	JY901B_UartInit(9600);			//初始化获取模块数据串口
@@ -64,10 +67,6 @@ int main(void)
 	while (1)
 	{
 		TaskScheduler_Run();
-//		Task_1();
-//		Task_2();
-//		Task_3();
-//		Task_4();
 	}	
 }
 
