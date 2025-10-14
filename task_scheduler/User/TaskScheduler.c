@@ -9,6 +9,7 @@
 #include "wit_c_sdk.h"
 #include "Tasks.h"
 #include "Timer.h"
+#include "Watchdog.h"
 
 // 全局事件标志
 volatile uint8_t g_event_pwm_received = 0;
@@ -44,7 +45,6 @@ void TaskScheduler_Init(void)
     // 初始化系统滴答定时器 (1ms中断)
     //SysTick_Config(SystemCoreClock / 1000);
     Timer_Init();
-
     
     // 初始化任务表
     for(int i = 0; i < TASK_COUNT; i++) {
@@ -121,6 +121,7 @@ void TaskScheduler_Run(void)
 
     TaskScheduler_Check();
     TaskScheduler_Execute();
+    Watchdog_Feed();
     /*uint32_t current_time = GetSystemTick();
     
     // 检查周期性任务

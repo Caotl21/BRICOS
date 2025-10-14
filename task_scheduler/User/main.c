@@ -12,6 +12,7 @@
 #include "Motor.h"
 #include "TaskScheduler.h"
 #include "Tasks.h"
+#include "Watchdog.h"
 
 
 /********************JY901B**************************/
@@ -63,6 +64,7 @@ int main(void)
     OLED_ShowString(1, 1, "System Ready");
     Delay_ms(1000);
     OLED_Clear();
+	Watchdog_Init();
 
 	while (1)
 	{
@@ -248,4 +250,5 @@ int main(void)
 //	printf("can not find sensor\r\n");
 //	printf("please check your connection\r\n");
 //}
+
 

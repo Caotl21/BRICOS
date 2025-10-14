@@ -136,11 +136,12 @@ void Task_1(void)
     LED1_Turn();
 }
 
-// 测试任务2：自增计次显示
+// 测试任务2：自增计次测试看门狗
 void Task_2(void)
 {
     static uint32_t count = 0;
     printf("count: %d\r\n", count++);
+	while(count>5);
 }
 
 // 测试任务3：串口发送imu数据
