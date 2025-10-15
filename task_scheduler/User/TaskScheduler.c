@@ -61,10 +61,14 @@ void TaskScheduler_Init(void)
 void TaskScheduler_Check(void)
 {
     uint32_t current_time = GetSystemTick();  // 只获取一次时间
-	
-	if(g_event_im948_received && task_table[TASK_IM948_PROCESS].enabled) {
-        g_task_flags |= TASK_FLAG_IM948_PROCESS;
-        g_event_im948_received = 0;
+
+    if(task_table[TASK_IM948_PROCESS].period_ms > 0){
+        if((current_time - task_table[TASK_IM948_PROCESS].last_run_time) >= task_table[TASK_IM948_PROCESS].period_ms) {
+            if(g_event_im948_received && task_table[TASK_IM948_PROCESS].enabled) {
+                g_task_flags |= TASK_FLAG_IM948_PROCESS;
+                g_event_im948_received = 0;
+            }
+        }
     }
     
     // 检查周期性任务

@@ -149,6 +149,7 @@ void Task_3(void)
 {
 	if(isNewData_im948)
     {
+        isNewData_im948 = 0;
         printf("AngleX:%.3f, AngleY:%.3f, AngleZ:%.3f\r\n", AngleX, AngleY, AngleZ);
         printf("AccX:%.3f, AccY:%.3f, AccZ:%.3f, Accabs:%.3f\r\n", AccX, AccY, AccZ, Accabs);
         printf("GyroX:%.3f, GyroY:%.3f, GyroZ:%.3f, Gyroabs:%.3f\r\n", GyroX, GyroY, GyroZ, Gyroabs);

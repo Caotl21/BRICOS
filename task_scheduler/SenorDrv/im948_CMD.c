@@ -794,6 +794,7 @@ static void Cmd_RxUnpack(U8 *buf, U8 DLen)
             tmpY = (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleAccel; L += 2; Dbp("\taY: %.3f\r\n", tmpY); // y加速度aY
             tmpZ = (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleAccel; L += 2; Dbp("\taZ: %.3f\r\n", tmpZ); // z加速度aZ
             tmpAbs = sqrt(pow2(tmpX) + pow2(tmpY) + pow2(tmpZ)); Dbp("\ta_abs: %.3f\r\n", tmpAbs); // 3轴合成的绝对值
+			AccX = tmpX; AccY = tmpY; AccZ = tmpZ; Accabs = tmpAbs;
         }
         if ((ctl & 0x0002) != 0)
         {// 加速度xyz 包含了重力 使用时需*scaleAccel m/s
@@ -801,7 +802,7 @@ static void Cmd_RxUnpack(U8 *buf, U8 DLen)
             tmpY = (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleAccel; L += 2; Dbp("\tAY: %.3f\r\n", tmpY); // y加速度AY
             tmpZ = (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleAccel; L += 2; Dbp("\tAZ: %.3f\r\n", tmpZ); // z加速度AZ
             tmpAbs = sqrt(pow2(tmpX) + pow2(tmpY) + pow2(tmpZ)); Dbp("\tA_abs: %.3f\r\n", tmpAbs); // 3轴合成的绝对值
-            AccX = tmpX; AccY = tmpY; AccZ = tmpZ; Accabs = tmpAbs;
+            
         }
         if ((ctl & 0x0004) != 0)
         {// 角速度xyz 使用时需*scaleAngleSpeed °/s
