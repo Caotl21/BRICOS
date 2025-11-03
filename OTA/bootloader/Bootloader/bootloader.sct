@@ -1,0 +1,15 @@
+; *************************************************************
+; *** Bootloader Scatter-Loading Description File ***
+; *************************************************************
+
+LR_IROM1 0x08000000 0x00004000  {    ; Bootloader区域: 16KB
+  ER_IROM1 0x08000000 0x00004000  {  ; load address = execution address
+   *.o (RESET, +First)
+   *(InRoot$$Sections)
+   .ANY (+RO)
+  }
+  RW_IRAM1 0x20000000 0x00005000  {  ; RW data: 20KB SRAM
+   .ANY (+RW +ZI)
+  }
+}
+
