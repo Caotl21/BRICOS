@@ -1,0 +1,1 @@
+该目录为bootloader中跳转的APP函数的源代码，请在keil工程中使用system_stm32f10x_app.c替换system_stm32f10x.c  分散文件始终使用app1.sct
