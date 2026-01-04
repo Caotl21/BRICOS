@@ -1,0 +1,26 @@
+#ifndef __TPYES_H
+#define __TPYES_H
+
+#include "stm32f4xx.h"
+#include "stm32f4xx_conf.h"
+
+#define FifoSize 2048  
+
+typedef signed char            S8;
+typedef unsigned char          U8;
+typedef signed short           S16;
+typedef unsigned short         U16;
+typedef signed long            S32;
+typedef unsigned long          U32;
+typedef float                  F32;
+
+typedef struct // ���� Fifo������
+{
+    U8 RxBuf[FifoSize];
+    volatile U16 In;
+    volatile U16 Out;
+    volatile U16 Cnt;
+}struct_UartFifo;
+
+#endif
+
