@@ -18,6 +18,7 @@ uint16_t Serial_RxPWM_Servo[2] = {0};        // 接收的舵机PWM值
 uint16_t Serial_RxPWM_Light[2] = {0};        // 接收的LED PWM值
 uint8_t Serial_RxPacket[MAX_PACKET_SIZE];          // 接收数据包缓冲区
 uint8_t Serial_TxPacket[MAX_PACKET_SIZE];          // 发送数据包缓冲区
+static void Thruster_SetPWM(volatile uint8_t *RxBuf);
 
 // 传感器数据（模拟数据）
 SensorData_t Serial_SensorData = {0};
@@ -609,7 +610,7 @@ void USART3_IRQHandler(void)
                 if (Serial_RxPWM_Control[3] == PWM_DATA_LENGTH)
                 {
                     // 记得填入影子寄存器
-                    Thruster_SerPWM(Serial_RxPWM_Control);
+                    Thruster_SetPWM(Serial_RxPWM_Control);
                 }
                 break;
             // 可以添加更多数据类型的处理
@@ -628,15 +629,15 @@ void USART3_IRQHandler(void)
     }
 }
 
-void Thruster_SerPWM(uint8_t *RxBuf)
+static void Thruster_SetPWM(volatile uint8_t *RxBuf)
 {
-    TIM3->CCR1 = (RxBuf[4] << 8) | RxBuf[5];  // Thruster 1
-    TIM3->CCR2 = (RxBuf[6] << 8) | RxBuf[7];  // Thruster 2
-    TIM3->CCR3 = (RxBuf[8] << 8) | RxBuf[9];  // Thruster 3
-    TIM3->CCR4 = (RxBuf[10] << 8) | RxBuf[11];  // Thruster 4
+    TIM3->CCR1 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // Thruster 1
+    TIM3->CCR2 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // Thruster 2
+    TIM3->CCR3 = (uint16_t)(RxBuf[8] << 8) | RxBuf[9];  // Thruster 3
+    TIM3->CCR4 = (uint16_t)(RxBuf[10] << 8) | RxBuf[11];  // Thruster 4
     
-    TIM4->CCR1 = (RxBuf[12] << 8) | RxBuf[13];  // Thruster 5
-    TIM4->CCR2 = (RxBuf[14] << 8) | RxBuf[15];  // Thruster 6
+    TIM4->CCR1 = (uint16_t)(RxBuf[12] << 8) | RxBuf[13];  // Thruster 5
+    TIM4->CCR2 = (uint16_t)(RxBuf[14] << 8) | RxBuf[15];  // Thruster 6
 
 }
 

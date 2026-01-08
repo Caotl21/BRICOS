@@ -36,3 +36,5 @@
 .\objects\dma.o: ..\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_fsmc.h
 .\objects\dma.o: ..\Hardware\Dma.h
 .\objects\dma.o: ..\Hardware\Types.h
+.\objects\dma.o: ..\Hardware\Serial.h
+.\objects\dma.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h

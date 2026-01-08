@@ -133,10 +133,6 @@ void Motor_SetPWM(uint16_t Compare[])
 	TIM_SetCompare2(TIM4, Compare[5]);
 }
 
-void Thruster_SetSpeed((uint8_t*) RX_PWM)
-{
-	TIM_SetCompare1(TIM3, (RX_PWM[4]<< 8 | RX_PWM[5]));		//设置CCR2的值
-}
 
 void LED_SetPWM(uint16_t Compare[])
 {

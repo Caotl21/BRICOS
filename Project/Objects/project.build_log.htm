@@ -21,24 +21,23 @@ Target DLL:      STLink\ST-LINKIII-KEIL_SWO.dll V3.0.1.0
 Dialog DLL:      TCM.DLL V1.32.0.0
  
 <h2>Project:</h2>
-D:\ctl\stm32\AUV_STM32-AUV_407_1230\AUV_STM32-AUV_407_1230\Project\project.uvprojx
+D:\ctl\stm32\AUV_STM32\Project\project.uvprojx
 Project File Date:  12/30/2025
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 5 (build 528)', folder: 'D:\Keil_v5\ARM\ARMCC\Bin'
 Build target 'Target 1'
-compiling TaskScheduler.c...
-compiling main.c...
-compiling Tasks.c...
-compiling im948_CMD.c...
-..\Hardware\IM948\im948_CMD.c(735): warning:  #550-D: variable "tmpU8"  was set but never used
-      U8 tmpU8;
-..\Hardware\IM948\im948_CMD.c(736): warning:  #550-D: variable "tmpU16"  was set but never used
-      U16 tmpU16;
-..\Hardware\IM948\im948_CMD.c: 2 warnings, 0 errors
+compiling Serial.c...
+..\Hardware\Serial.c(589): warning:  #550-D: variable "temp"  was set but never used
+      uint8_t temp;
+..\Hardware\Serial.c(447): warning: C4488E: write to variable 'packet' with offset out of bounds
+}
+..\Hardware\Serial.c(447): warning: C4488E: write to variable 'packet' with offset out of bounds
+}
+..\Hardware\Serial.c: 3 warnings, 0 errors
 linking...
-Program Size: Code=16068 RO-data=572 RW-data=484 ZI-data=4020  
-".\Objects\project.axf" - 0 Error(s), 2 Warning(s).
+Program Size: Code=16016 RO-data=572 RW-data=468 ZI-data=4036  
+".\Objects\project.axf" - 0 Error(s), 3 Warning(s).
 
 <h2>Software Packages used:</h2>
 
