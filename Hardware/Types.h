@@ -5,6 +5,7 @@
 #include "stm32f4xx_conf.h"
 
 #define FifoSize 2048  
+#define ControlSignal_RxBuf_Size 64
 
 typedef signed char            S8;
 typedef unsigned char          U8;

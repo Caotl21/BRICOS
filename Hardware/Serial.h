@@ -30,6 +30,7 @@
 
 
 extern struct_UartFifo Uart1Fifo;
+extern volatile uint8_t Serial_RxPWM_Control[64];
 
 #define IM948_Fifo_in(RxByte) if (FifoSize > Uart1Fifo.Cnt)\
                         {\

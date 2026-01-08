@@ -95,6 +95,20 @@ void PWM_Init(void)
 	
 	TIM_OC1Init(TIM9, &TIM_OCInitStructure);                        
 	TIM_OC2Init(TIM9, &TIM_OCInitStructure);
+
+	// -----------------------------------------------------------
+	// 开启 TIM3 的影子寄存器 (预装载)
+	// -----------------------------------------------------------
+	TIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Enable); // CH1
+	TIM_OC2PreloadConfig(TIM3, TIM_OCPreload_Enable); // CH2
+	TIM_OC3PreloadConfig(TIM3, TIM_OCPreload_Enable); // CH3
+	TIM_OC4PreloadConfig(TIM3, TIM_OCPreload_Enable); // CH4
+
+	// -----------------------------------------------------------
+	// 开启 TIM4 的影子寄存器 (预装载)
+	// -----------------------------------------------------------
+	TIM_OC1PreloadConfig(TIM4, TIM_OCPreload_Enable); // CH1
+	TIM_OC2PreloadConfig(TIM4, TIM_OCPreload_Enable); // CH2
 	
 	/*TIM使能*/
 	TIM_Cmd(TIM3, ENABLE);			//使能TIM3，定时器开始运行
@@ -117,6 +131,11 @@ void Motor_SetPWM(uint16_t Compare[])
 	TIM_SetCompare4(TIM3, Compare[3]);
 	TIM_SetCompare1(TIM4, Compare[4]);
 	TIM_SetCompare2(TIM4, Compare[5]);
+}
+
+void Thruster_SetSpeed((uint8_t*) RX_PWM)
+{
+	TIM_SetCompare1(TIM3, (RX_PWM[4]<< 8 | RX_PWM[5]));		//设置CCR2的值
 }
 
 void LED_SetPWM(uint16_t Compare[])
