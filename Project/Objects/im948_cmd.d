@@ -1,10 +1,10 @@
 .\objects\im948_cmd.o: ..\Hardware\IM948\im948_CMD.c
 .\objects\im948_cmd.o: ..\Hardware\IM948\im948_CMD.h
-.\objects\im948_cmd.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
-.\objects\im948_cmd.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+.\objects\im948_cmd.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+.\objects\im948_cmd.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 .\objects\im948_cmd.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\im948_cmd.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\im948_cmd.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\im948_cmd.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\im948_cmd.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\im948_cmd.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\im948_cmd.o: ..\Libraries\CMSIS\Include\core_cmSimd.h

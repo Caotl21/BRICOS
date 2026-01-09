@@ -1,8 +1,8 @@
 .\objects\jy901b.o: ..\Hardware\JY901B\JY901B.c
-.\objects\jy901b.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+.\objects\jy901b.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 .\objects\jy901b.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\jy901b.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\jy901b.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\jy901b.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\jy901b.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\jy901b.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\jy901b.o: ..\Libraries\CMSIS\Include\core_cmSimd.h
@@ -36,9 +36,10 @@
 .\objects\jy901b.o: ..\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_dcmi.h
 .\objects\jy901b.o: ..\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_fsmc.h
 .\objects\jy901b.o: ..\Hardware\JY901B\wit_c_sdk.h
-.\objects\jy901b.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+.\objects\jy901b.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 .\objects\jy901b.o: ..\Hardware\JY901B\REG.h
 .\objects\jy901b.o: ..\Hardware\JY901B\JY901B_UART.h
 .\objects\jy901b.o: ..\System\Delay.h
 .\objects\jy901b.o: ..\Hardware\JY901B\JY901B.h
+.\objects\jy901b.o: ..\Hardware\Types.h
 .\objects\jy901b.o: ..\User\TaskScheduler.h

@@ -1,7 +1,7 @@
 .\objects\main.o: ..\User\main.c
 .\objects\main.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\main.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\main.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\main.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\main.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\main.o: ..\Libraries\CMSIS\Include\core_cmSimd.h
@@ -38,7 +38,7 @@
 .\objects\main.o: ..\System\Timer.h
 .\objects\main.o: ..\Hardware\LED.h
 .\objects\main.o: ..\Hardware\Serial.h
-.\objects\main.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+.\objects\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 .\objects\main.o: ..\Hardware\Types.h
 .\objects\main.o: ..\Hardware\DHT11\DHT11.h
 .\objects\main.o: ..\Hardware\OLED.h
@@ -50,5 +50,5 @@
 .\objects\main.o: ..\User\TaskScheduler.h
 .\objects\main.o: ..\Hardware\AD.h
 .\objects\main.o: ..\Hardware\IM948\im948_CMD.h
-.\objects\main.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+.\objects\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 .\objects\main.o: ..\Hardware\Dma.h

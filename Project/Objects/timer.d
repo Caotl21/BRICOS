@@ -1,7 +1,7 @@
 .\objects\timer.o: ..\System\Timer.c
 .\objects\timer.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\timer.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\timer.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\timer.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\timer.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\timer.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\timer.o: ..\Libraries\CMSIS\Include\core_cmSimd.h

@@ -14,7 +14,7 @@
 #include "AD.h"
 #include "im948_CMD.h"
 #include "Dma.h"
-
+#include "Types.h"
 
 int main()
 {
@@ -22,23 +22,27 @@ int main()
 	/*模块初始化*/
 	LED_Init();
 	USART1_DMA_Init();
+	USART3_DMA_Init();
 	Serial_Init();
 	DHT11_Init();
 	//OLED_Init();
 	MS5837_init();
 	PWM_Init();
+	USART2_DMA_Init();
 	JY901B_Init();
 	AD_Init();
 	IM948_Init();
+	Ctl_WatchDog_Timer_Init();
 	//OLED_ShowString(1, 1, "Ready");
 	// 初始化任务调度器
-	TaskScheduler_Init();	
+		
 	// 显示启动信息
     //OLED_ShowString(1, 1, "System Ready");
-    Delay_ms(1000);
+    Delay_ms(DELAY_TIME);
     //OLED_Clear();	
 	Watchdog_Init();
 	printf("hello world!");
+	TaskScheduler_Init();
 	while(1)
 	{
 		TaskScheduler_Run();

@@ -1,7 +1,7 @@
 .\objects\ad.o: ..\Hardware\AD.c
 .\objects\ad.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\ad.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\ad.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\ad.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\ad.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\ad.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\ad.o: ..\Libraries\CMSIS\Include\core_cmSimd.h

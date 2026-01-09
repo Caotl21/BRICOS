@@ -1,7 +1,7 @@
 .\objects\pwm.o: ..\Hardware\Motor\PWM.c
 .\objects\pwm.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\pwm.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\pwm.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\pwm.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\pwm.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\pwm.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\pwm.o: ..\Libraries\CMSIS\Include\core_cmSimd.h

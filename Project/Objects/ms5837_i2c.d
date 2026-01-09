@@ -1,7 +1,7 @@
 .\objects\ms5837_i2c.o: ..\Hardware\MS5837\MS5837_I2C.c
 .\objects\ms5837_i2c.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\ms5837_i2c.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\ms5837_i2c.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\ms5837_i2c.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\ms5837_i2c.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\ms5837_i2c.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\ms5837_i2c.o: ..\Libraries\CMSIS\Include\core_cmSimd.h

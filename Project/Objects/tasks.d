@@ -2,7 +2,7 @@
 .\objects\tasks.o: ..\User\TaskScheduler.h
 .\objects\tasks.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\tasks.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\tasks.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\tasks.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\tasks.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\tasks.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\tasks.o: ..\Libraries\CMSIS\Include\core_cmSimd.h
@@ -38,11 +38,11 @@
 .\objects\tasks.o: ..\Hardware\DHT11\DHT11.h
 .\objects\tasks.o: ..\Hardware\JY901B\JY901B_UART.h
 .\objects\tasks.o: ..\Hardware\JY901B\wit_c_sdk.h
-.\objects\tasks.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
-.\objects\tasks.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+.\objects\tasks.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+.\objects\tasks.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 .\objects\tasks.o: ..\Hardware\JY901B\REG.h
 .\objects\tasks.o: ..\Hardware\IM948\im948_CMD.h
-.\objects\tasks.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+.\objects\tasks.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 .\objects\tasks.o: ..\Hardware\Serial.h
 .\objects\tasks.o: ..\Hardware\Types.h
 .\objects\tasks.o: ..\Hardware\OLED.h

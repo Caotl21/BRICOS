@@ -2,7 +2,7 @@
 .\objects\taskscheduler.o: ..\User\TaskScheduler.h
 .\objects\taskscheduler.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\taskscheduler.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\taskscheduler.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\taskscheduler.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\taskscheduler.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\taskscheduler.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\taskscheduler.o: ..\Libraries\CMSIS\Include\core_cmSimd.h
@@ -37,15 +37,15 @@
 .\objects\taskscheduler.o: ..\Libraries\STM32F4xx_StdPeriph_Driver\inc\stm32f4xx_fsmc.h
 .\objects\taskscheduler.o: ..\System\Delay.h
 .\objects\taskscheduler.o: ..\Hardware\IM948\im948_CMD.h
-.\objects\taskscheduler.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
-.\objects\taskscheduler.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
+.\objects\taskscheduler.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+.\objects\taskscheduler.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 .\objects\taskscheduler.o: ..\Hardware\Serial.h
 .\objects\taskscheduler.o: ..\Hardware\Types.h
 .\objects\taskscheduler.o: ..\Hardware\OLED.h
 .\objects\taskscheduler.o: ..\Hardware\DHT11\DHT11.h
 .\objects\taskscheduler.o: ..\Hardware\JY901B\JY901B_UART.h
 .\objects\taskscheduler.o: ..\Hardware\JY901B\wit_c_sdk.h
-.\objects\taskscheduler.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+.\objects\taskscheduler.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
 .\objects\taskscheduler.o: ..\Hardware\JY901B\REG.h
 .\objects\taskscheduler.o: ..\User\Tasks.h
 .\objects\taskscheduler.o: ..\System\Timer.h

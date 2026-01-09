@@ -20,9 +20,9 @@
 #define DATA_TYPE_SLOW		   0x06
 
 // ��������
-#define PWM_DATA_LENGTH      0x0C    // 6��PWMֵ��ÿ��2�ֽ�
+#define THRUSTER_DATA_LENGTH      0x0C    // 6��PWMֵ��ÿ��2�ֽ�
 #define SENSOR_DATA_LENGTH   30    // ���������ݳ���
-#define FAST_SENSOR_DATA_LENGTH   40
+#define FAST_SENSOR_DATA_LENGTH   42
 #define SLOW_SENSOR_DATA_LENGTH   10
 #define SERVO_DATA_LENGTH    0x04    // 2�����PWMֵ��ÿ��2�ֽ�
 #define LIGHT_DATA_LENGTH    0x04    // 2��LEDֵ��4�ֽ�
@@ -51,12 +51,13 @@ extern uint8_t Serial_TxPacket[MAX_PACKET_SIZE];  // �������ݰ��
 extern uint8_t Serial_RxData;
 extern volatile uint8_t g_event_im948_received;
 
+extern uint8_t Serial_RxFlag;
 
 // ���������ݽṹ
 typedef struct {
     int16_t accel_x1, accel_y1, accel_z1;    // JY901B数据
     int16_t gyro_x1, gyro_y1, gyro_z1;        
-    int16_t angle_x1, angle_y1, angle_z1;     
+    int16_t Wquat_1, Xquat_1, Yquat_1, Zquat_1;     
 	int16_t accel_x2, accel_y2, accel_z2;    // IM948数据
     int16_t gyro_x2, gyro_y2, gyro_z2;       
     int16_t Wquat_2, Xquat_2, Yquat_2, Zquat_2;

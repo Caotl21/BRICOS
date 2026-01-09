@@ -2,7 +2,7 @@
 .\objects\watchdog.o: ..\Hardware\Watchdog.h
 .\objects\watchdog.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\watchdog.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\watchdog.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\watchdog.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\watchdog.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\watchdog.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\watchdog.o: ..\Libraries\CMSIS\Include\core_cmSimd.h

@@ -5,7 +5,8 @@
 
 // 任务ID定义
 typedef enum {
-    JY901B_TASK = 0,
+	TASK_JY901_DMA_PDATA_POLL = 0,
+    JY901B_TASK,
 	TASK_DMA_PDATA_POLL,
 	TASK_IM948_PROCESS,
 	MS5837_TASK,
@@ -13,7 +14,6 @@ typedef enum {
     Voltage_TASK,
 	UART_SEND_FAST_TASK,
 	UART_SEND_SLOW_TASK,
-	UART_RECE_TASK,
 	TASK_COUNT
 } TaskID_t;
 
@@ -42,7 +42,9 @@ extern volatile uint8_t g_event_sensor_ready;
 extern volatile uint8_t g_event_im948_received;
 extern volatile uint8_t g_event_JY901B_received;
 // 任务执行标志位
-extern volatile uint8_t g_task_flags;
+extern volatile uint16_t g_task_flags;
+
+static volatile uint32_t system_tick_ms;
 
 // 任务标志位定义
 //#define TASK_FLAG_SENSOR_DATA   (1 << TASK_SENSOR_DATA)

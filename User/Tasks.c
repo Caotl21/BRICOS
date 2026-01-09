@@ -21,7 +21,7 @@
 u8 temperature = 0;
 u8 humidity = 0;
 float Mea_Temp,Mea_Press,Mea_Depth;
-float fAcc[3], fGyro[3], fAngle[3];
+float fAcc[3], fGyro[3], fQuater[4];
 float voltage;
 float current;
 
@@ -60,19 +60,42 @@ void Task_DMA_pdata_poll(void)
 //任务：IM948数据读取
 void Task_IM948_Process(void)
 {
+//	int current_time = GetSystemTick();
+//	printf("\r\n%d ",current_time);
     IM948_process();
 	//printf("g_event_pwm_received: %d\r\n", g_event_im948_received);
+}
+
+//任务：JY901数据缓存区指针更新
+void Task_JY901_DMA_pdata_poll(void)
+{
+	//printf("1");
+    // 读取寄存器，开销极小
+	static uint16_t JY901_last_dma_cnt = JY901BFifoSize;
+    uint16_t current_dma_cnt = DMA_GetCurrDataCounter(DMA1_Stream5);
+//    printf("current_dma_cnt is:%d\r\n",current_dma_cnt);
+//	printf("JY901_last_dma_cnt is:%d\r\n",JY901_last_dma_cnt);
+	if (current_dma_cnt != JY901_last_dma_cnt)
+    {
+        // 仅仅更新 In 指针，其他什么都不做
+        JY901BFifo.In = JY901BFifoSize - current_dma_cnt;
+//		printf("JY901BFifo.In is:%d\r\n",JY901BFifo.In);
+		if (JY901BFifo.In == JY901BFifoSize) JY901BFifo.In = 0; // 防止读取到 0 瞬间导致的越界
+        JY901_last_dma_cnt = current_dma_cnt;
+    }
 }
 
 // 任务：JY901B数据读取
 void JY901B_Task(void)
 {
-
+	int current_time = GetSystemTick();
+//	printf("\r\nt:%d ",current_time);
+	//printf("1");
 	JY901B_process();
-	JY901B_GetData(fAcc,fGyro,fAngle);
+	JY901B_GetData(fAcc,fGyro,fQuater);
 
 //		printf("\r\n%d ",current_time);
-//		printf("%f\r\n",fAngle[0]);
+//		printf("%f\r\n",fQuater[0]);
 	
 }
 
@@ -200,9 +223,10 @@ void Uart_send_fast_Task(void)
 		Serial_SensorData.gyro_x1 = (int16_t)(fGyro[0]*100);
 		Serial_SensorData.gyro_y1 = (int16_t)(fGyro[1]*100);
 		Serial_SensorData.gyro_z1 = (int16_t)(fGyro[2]*100);
-		Serial_SensorData.angle_x1 = (int16_t)(fAngle[0]*100);
-		Serial_SensorData.angle_y1 = (int16_t)(fAngle[1]*100);
-		Serial_SensorData.angle_z1 = (int16_t)(fAngle[2]*100);
+		Serial_SensorData.Wquat_1 = (int16_t)(fQuater[0]*100);
+		Serial_SensorData.Xquat_1 = (int16_t)(fQuater[1]*100);
+		Serial_SensorData.Yquat_1 = (int16_t)(fQuater[2]*100);
+		Serial_SensorData.Zquat_1 = (int16_t)(fQuater[3]*100);
 		Serial_SensorData.accel_x2 = (int16_t)(AccX_im948*100);
 		Serial_SensorData.accel_y2 = (int16_t)(AccY_im948*100);
 		Serial_SensorData.accel_z2 = (int16_t)(AccZ_im948*100);
@@ -230,11 +254,6 @@ void Uart_send_slow_Task(void)
 	
 	// 发送传感器数据包
 	Slow_Serial_SendSensorPacket();	
-}
-
-void Uart_Rece_Task(void)
-{
-	
 }
 
 
@@ -271,6 +290,5 @@ void Uart_Rece_Task(void)
 //        Serial_ClearRxFlag();
 //    }*/
 //}
-
 
 

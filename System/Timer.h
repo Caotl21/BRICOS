@@ -4,6 +4,6 @@
 void Timer_Init(void);
 uint16_t Timer_GetCounter(void);
 //void TIM2_IRQHandler(void);  // 添加中断处理函数声明
-void DHT11_Timer_Init(void);
+void Ctl_WatchDog_Timer_Init(void);
 
 #endif

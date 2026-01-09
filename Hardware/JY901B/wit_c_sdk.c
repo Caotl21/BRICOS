@@ -108,12 +108,12 @@ static void CopeWitData(uint8_t ucIndex, uint16_t *p_data, uint32_t uiLen)
         case WIT_ANGLE: uiReg1 = Roll;  uiReg1Len = 3;  uiReg2 = VERSION;  uiReg2Len = 1;  break;
         case WIT_TIME:  uiReg1 = YYMM;	break;
         case WIT_GYRO:  uiReg1 = GX;  uiLen = 3;break;
-        case WIT_MAGNETIC: uiReg1 = HX;  uiLen = 3; isNewData_JY901B = 1;break;
+        case WIT_MAGNETIC: uiReg1 = HX;  uiLen = 3; break;
         case WIT_DPORT: uiReg1 = D0Status;  break;
         case WIT_PRESS: uiReg1 = PressureL;  break;
         case WIT_GPS:   uiReg1 = LonL;  break;
         case WIT_VELOCITY: uiReg1 = GPSHeight;  break;
-        case WIT_QUATER:    uiReg1 = q0;  break;
+        case WIT_QUATER:    uiReg1 = q0; isNewData_JY901B = 1;  break;
         case WIT_GSA:   uiReg1 = SVNUM;  break;
         case WIT_REGVALUE:  uiReg1 = s_uiReadRegIndex;  break;
 		default:

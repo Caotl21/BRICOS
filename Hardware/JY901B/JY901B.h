@@ -1,23 +1,24 @@
 #ifndef __JY901B_H
 #define __JY901B_H
 
+#include "Types.h"
+
 extern volatile char s_cDataUpdate;
 extern volatile char s_cCmd;
 
-#define JY901BFifoSize 100   // 队列最大容量
-typedef struct 
-{
-    u8 JY901BRxBuf[JY901BFifoSize];
-    volatile u8 In;
-    volatile u8 Out;
-    volatile u8 Cnt;
-}struct_JY901BFifo;			//定义队列类型
+
 extern struct_JY901BFifo JY901BFifo;
-#define JY901BFifo_in(RxByte) JY901BFifo.JY901BRxBuf[JY901BFifo.Cnt++] = (RxByte);\
-                            if(JY901BFifo.Cnt >= JY901BFifoSize)\
-                            {\
-                                JY901BFifo.Cnt = 0;\
-                            }
+//#define JY901BFifo_in(RxByte) JY901BFifo.JY901BRxBuf[JY901BFifo.Cnt++] = (RxByte);\
+//                            if(JY901BFifo.Cnt >= JY901BFifoSize)\
+//                            {\
+//                                JY901BFifo.Cnt = 0;\
+//                            }
+#define JY901BFifo_in(RxByte) if(JY901BFifoSize > JY901BFifo.Cnt)\
+								{\
+									JY901BFifo.JY901BRxBuf[JY901BFifo.In] = RxByte;\
+									if(++JY901BFifo.In>=JY901BFifoSize) JY901BFifo.In=0;\
+									JY901BFifo.Cnt++;\
+								}
 
 void JY901B_Init(void);
 void CopeCmdData(unsigned char ucData);

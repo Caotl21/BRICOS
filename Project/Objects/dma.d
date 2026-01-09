@@ -1,7 +1,7 @@
 .\objects\dma.o: ..\Hardware\Dma.c
 .\objects\dma.o: ..\Libraries\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h
 .\objects\dma.o: ..\Libraries\CMSIS\Include\core_cm4.h
-.\objects\dma.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+.\objects\dma.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
 .\objects\dma.o: ..\Libraries\CMSIS\Include\core_cmInstr.h
 .\objects\dma.o: ..\Libraries\CMSIS\Include\core_cmFunc.h
 .\objects\dma.o: ..\Libraries\CMSIS\Include\core_cmSimd.h
@@ -37,4 +37,4 @@
 .\objects\dma.o: ..\Hardware\Dma.h
 .\objects\dma.o: ..\Hardware\Types.h
 .\objects\dma.o: ..\Hardware\Serial.h
-.\objects\dma.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+.\objects\dma.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h

@@ -10,7 +10,7 @@
 
 #define ACC_UPDATE		0x01
 #define GYRO_UPDATE		0x02
-#define ANGLE_UPDATE	0x04
+#define QUATER_UPDATE	0x04
 #define MAG_UPDATE		0x08
 #define READ_UPDATE		0x80
 
@@ -182,7 +182,7 @@ void SensorDataUpdata(uint32_t uiReg, uint32_t uiRegNum)
 //            case Roll:
 //            case Pitch:
             case Yaw:
-				s_cDataUpdate |= ANGLE_UPDATE;
+				s_cDataUpdate |= QUATER_UPDATE;
             break;
             default:
 				s_cDataUpdate |= READ_UPDATE;
@@ -242,20 +242,24 @@ void JY901B_Init(void)
 }
 /**
   * 函    数：处理JY901B的数据来获取数据
-  * 参    数：fAcc[]加速度计信息，fGyro[]陀螺仪信息，fAngle[]角度信息
+  * 参    数：fAcc[]加速度计信息，fGyro[]陀螺仪信息，fQuater[]四元数信息
   * 返 回 值：无
   */
-void JY901B_GetData(float fAcc[],float fGyro[],float fAngle[])
+void JY901B_GetData(float fAcc[],float fGyro[],float fQuater[])
 {
 	if(s_cDataUpdate)
 	{
 
-		u8 i;
+		uint8_t i;
 		for(i = 0; i < 3; i++)
 		{
 			fAcc[i] = sReg[AX+i] / 32768.0f * 16.0f;
 			fGyro[i] = sReg[GX+i] / 32768.0f * 2000.0f;
-			fAngle[i] = sReg[Roll+i] / 32768.0f * 180.0f;
+			//fAngle[i] = sReg[Roll+i] / 32768.0f * 180.0f;
+		}
+		for(i = 0; i < 4; i++)
+		{
+			fQuater[i] = sReg[q0+i] / 32768.0f;
 		}
 		if(s_cDataUpdate & ACC_UPDATE)
 		{
@@ -267,10 +271,10 @@ void JY901B_GetData(float fAcc[],float fGyro[],float fAngle[])
 			//printf("gyro:%.3f %.3f %.3f\r\n", fGyro[0], fGyro[1], fGyro[2]);
 			s_cDataUpdate &= ~GYRO_UPDATE;
 		}
-		if(s_cDataUpdate & ANGLE_UPDATE)
+		if(s_cDataUpdate & QUATER_UPDATE)
 		{
 			//printf("angle:%.3f %.3f %.3f\r\n", fAngle[0], fAngle[1], fAngle[2]);
-			s_cDataUpdate &= ~ANGLE_UPDATE;
+			s_cDataUpdate &= ~QUATER_UPDATE;
 		}
 		if(s_cDataUpdate & MAG_UPDATE)
 		{
@@ -294,59 +298,92 @@ static uint8_t __CaliSum(uint8_t *data, uint32_t len)
   */
 void JY901B_process(void)
 {
+	int current_time = GetSystemTick();
+	
+	uint16_t usData[4];
+	uint8_t ucSum;
+	uint8_t data_temp[11] = {0};
+	uint16_t cnt_temp = 0;	//辅助赋值，并且刚好记录最后的Out值
 	//由于有多组数据包，因此不能只进行一次数据包处理
-    while(JY901BFifo.Cnt > 0)
+	if (JY901BFifo.In == JY901BFifo.Out){
+		printf("empty!");
+		return;
+	}
+	else if(JY901BFifo.In > JY901BFifo.Out) 
+	{JY901BFifo.Cnt = JY901BFifo.In - JY901BFifo.Out;}
+	else
+	{JY901BFifo.Cnt = JY901BFifoSize + JY901BFifo.In - JY901BFifo.Out;}
+	//printf("In:%d  Out:%d   cnt:%d\r\n",JY901BFifo.In,JY901BFifo.Out,JY901BFifo.Cnt);
+	
+	
+	while(JY901BFifo.Cnt >= 11)
         {
-            uint16_t usData[4];
-			uint8_t ucSum;
 			//1.检测包头
-            while(JY901BFifo.JY901BRxBuf[0] != 0x55 && JY901BFifo.Cnt>0)
+            while(JY901BFifo.JY901BRxBuf[JY901BFifo.Out] != 0x55 && JY901BFifo.Cnt>0)
             {
                __disable_irq();
                 JY901BFifo.Cnt--;
 				__enable_irq();
-                memcpy(JY901BFifo.JY901BRxBuf, &JY901BFifo.JY901BRxBuf[1], JY901BFifo.Cnt);
+				if(++JY901BFifo.Out>=JY901BFifoSize) JY901BFifo.Out=0;
 			}
 			//队列数据满足一个包的长度，进行处理
             if(JY901BFifo.Cnt >= 11)
             {
+				for(int i=0;i<11;i++)
+				{
+					//先记录下一个数据的序号
+					cnt_temp = JY901BFifo.Out + i;
+					//如果超出了判断范围
+					if(cnt_temp >= JY901BFifoSize) 
+						cnt_temp = cnt_temp - JY901BFifoSize;
+					data_temp[i] = JY901BFifo.JY901BRxBuf[cnt_temp];
+				}
 				//校验
-                ucSum = __CaliSum(JY901BFifo.JY901BRxBuf, 10);
-                if(ucSum != JY901BFifo.JY901BRxBuf[10])
+                ucSum = __CaliSum(data_temp, 10);
+                if(ucSum != data_temp[10])
                 {
                     __disable_irq();
 					JY901BFifo.Cnt--;
 					__enable_irq();
-                    memcpy(JY901BFifo.JY901BRxBuf, &JY901BFifo.JY901BRxBuf[1], JY901BFifo.Cnt);
+					if(++JY901BFifo.Out>=JY901BFifoSize) JY901BFifo.Out=0;
                     //不能退出，因为还要重新判断包头
                 }
 				else//没问题开始提取数据
 				{
-					usData[0] = ((uint16_t)JY901BFifo.JY901BRxBuf[3] << 8) | (uint16_t)JY901BFifo.JY901BRxBuf[2];
-					usData[1] = ((uint16_t)JY901BFifo.JY901BRxBuf[5] << 8) | (uint16_t)JY901BFifo.JY901BRxBuf[4];
-					usData[2] = ((uint16_t)JY901BFifo.JY901BRxBuf[7] << 8) | (uint16_t)JY901BFifo.JY901BRxBuf[6];
-					usData[3] = ((uint16_t)JY901BFifo.JY901BRxBuf[9] << 8) | (uint16_t)JY901BFifo.JY901BRxBuf[8];
-					CopeWitData_user(JY901BFifo.JY901BRxBuf[1], usData, 4);
+					usData[0] = ((uint16_t)data_temp[3] << 8) | (uint16_t)data_temp[2];
+					usData[1] = ((uint16_t)data_temp[5] << 8) | (uint16_t)data_temp[4];
+					usData[2] = ((uint16_t)data_temp[7] << 8) | (uint16_t)data_temp[6];
+					usData[3] = ((uint16_t)data_temp[9] << 8) | (uint16_t)data_temp[8];
+					CopeWitData_user(data_temp[1], usData, 4);
+					
 					JY901BFifo.Cnt = JY901BFifo.Cnt - 11;
-					memcpy(JY901BFifo.JY901BRxBuf, &JY901BFifo.JY901BRxBuf[11], JY901BFifo.Cnt);
+					JY901BFifo.Out = cnt_temp + 1;
+					if(JY901BFifo.Out>=JY901BFifoSize) JY901BFifo.Out=0;
 					//如果数据不到11个字节了，那就不处理了等下次处理
-					if(JY901BFifo.Cnt < 11) return;
+					if(JY901BFifo.Cnt < 11) 
+					{
+						//int last_time = GetSystemTick();
+						//printf("time1:%d\r\n",last_time - current_time);
+						return;
+					}
 					//JY901BFifo.Cnt = 0;
 				}
 				//将数据存储
             }
         }
+		//int last_time = GetSystemTick();
+		//printf("time2:%d\r\n",last_time - current_time);
 		
 }
 void USART2_IRQHandler(void)
 {
-	unsigned char ucTemp;
-	if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
-	{
-		ucTemp = USART_ReceiveData(USART2);
-		JY901BFifo_in(ucTemp);//接收来自JY901B的数据并保存数据
-		//WitSerialDataIn(ucTemp);
-		g_event_JY901B_received = 1;
-		USART_ClearITPendingBit(USART2, USART_IT_RXNE);
-	}
+//	unsigned char ucTemp;
+//	if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
+//	{
+//		ucTemp = USART_ReceiveData(USART2);
+//		JY901BFifo_in(ucTemp);//接收来自JY901B的数据并保存数据
+//		//WitSerialDataIn(ucTemp);
+//		g_event_JY901B_received = 1;
+//		USART_ClearITPendingBit(USART2, USART_IT_RXNE);
+//	}
 }

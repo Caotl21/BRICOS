@@ -4,6 +4,7 @@
 #include "stm32f4xx.h"
 #include "Serial.h"
 
+
 extern u8 temperature;
 extern u8 humidity;
 
@@ -23,9 +24,9 @@ void Voltage_Task(void);
 
 void Uart_send_fast_Task(void);
 void Uart_send_slow_Task(void);
-void Uart_Rece_Task(void);
 
 void Task_IM948_Process(void);
 void Task_DMA_pdata_poll(void);
+void Task_JY901_DMA_pdata_poll(void);
 
 #endif
