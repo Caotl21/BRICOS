@@ -114,13 +114,26 @@ void AD_Init(void)
 	ADC_SoftwareStartConv(ADC3);	//软件触发ADC开始工作，由于ADC处于连续转换模式，故触发一次后ADC就可以一直连续不断地工作
 }
 
+//float current_Getdata(void)
+//{
+//	return  (AD_Value[0] / 4096.0) * 3.3 * R_change;
+//}
+
+//float voltage_Getdata(void)
+//{
+//	return  (AD_Value[1] / 4096.0) * 3.3 * R_change;
+//}
+
+//大洋科技提供，对应的电流和电压计算
 float current_Getdata(void)
 {
-	return  (AD_Value[0] / 4096.0) * 3.3 * R_change;
+	float voltage_I=0;
+	voltage_I = (AD_Value[1] / 4096.0) * 3.3 ;
+	return (10 * (voltage_I - 2.5));
 }
 
 float voltage_Getdata(void)
 {
-	return  (AD_Value[1] / 4096.0) * 3.3 * R_change;
+	int R_voltage = 11;
+	return  (AD_Value[0] / 4096.0) * 3.3 * R_voltage;
 }
-

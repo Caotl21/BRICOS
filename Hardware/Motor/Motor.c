@@ -66,9 +66,9 @@ void Servo_SetSpeed(uint16_t pulse_width[], uint8_t num)
   * 参    数：无
   * 返 回 值：无
   */
-void Motor_Unlock(void)
+void ESC_Init(void)
 {
-	OLED_ShowString(2, 1, "locking");
+	//OLED_ShowString(2, 1, "locking");
     
     // 发送中性信号1500us，持续2秒
 	for(int i = 0; i < motor_num; i++)
@@ -85,5 +85,5 @@ void Motor_Unlock(void)
 //    Delay_ms(500);
     
     // LED2点亮表示解锁完成
-    OLED_ShowString(2,1,"locked ");
+    //OLED_ShowString(2,1,"locked ");
 }

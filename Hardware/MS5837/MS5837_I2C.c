@@ -65,7 +65,7 @@ uint8_t MS5837I2C_R_SDA(void)
 //初始化软件iic的引脚
 void MS5837I2C_Init(void)
 {
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOG,ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB,ENABLE);
 	
 	GPIO_InitTypeDef GPIO_InitStructure;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;

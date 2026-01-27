@@ -28,6 +28,7 @@ int main()
 	//OLED_Init();
 	MS5837_init();
 	PWM_Init();
+	ESC_Init();
 	USART2_DMA_Init();
 	JY901B_Init();
 	AD_Init();

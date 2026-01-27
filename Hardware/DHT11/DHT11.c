@@ -107,25 +107,21 @@ u8 DHT11_Read_Data(u8 *temp,u8 *humi)
 {        
  	u8 buf[5];
 	u8 i;
-	DHT11_Rst();
+	//DHT11_Rst();
 	//执行Rst
-//	switch(dht11_delay_flag)
-//	{
-//		case 0:
-//			DHT11_IO_OUT(); 	//SET OUTPUT
-//			DHT11_DQ_OUT_0; 	//拉低DQ
-//			dht11_delay_flag = 1;
-//			TIM_Cmd(TIM3, ENABLE);
-//			return 0;
-//		case 1:
-//			return 0;
-//		case 2:
-//			DHT11_DQ_OUT_1; 	//DQ=1 
-//			Delay_us(30);     	//主机拉高20~40us
-//			dht11_delay_flag = 0;
-//			
-//		break;
-//	}
+	switch(dht11_delay_flag)
+	{
+		case 0:
+			DHT11_IO_OUT(); 	//SET OUTPUT
+			DHT11_DQ_OUT_0; 	//拉低DQ
+			dht11_delay_flag = 1;
+			return 0;
+		case 1:
+			DHT11_DQ_OUT_1; 	//DQ=1 
+			Delay_us(30);     	//主机拉高20~40us
+			dht11_delay_flag = 0;
+		break;
+	}
 	
 	if(DHT11_Check()==0)
 	{

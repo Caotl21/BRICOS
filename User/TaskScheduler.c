@@ -31,7 +31,7 @@ static TaskControlBlock_t task_table[TASK_COUNT] = {
 	{TASK_DMA_PDATA_POLL,  20,   0, Task_DMA_pdata_poll,    TASK_READY, 1, 0},
 	{TASK_IM948_PROCESS,  20,   0, Task_IM948_Process,    TASK_READY, 1, 0},
 	{MS5837_TASK,  100,  0, MS5837_Task,  TASK_READY, 1, 0},
-    {DHT11_TASK,  2000, 0, DHT11_Task,  TASK_READY, 1, 0},
+    {DHT11_TASK,  20, 0, DHT11_Task,  TASK_READY, 1, 0},
     {Voltage_TASK,  5000,   0, Voltage_Task,  TASK_READY, 1, 0},
 	{UART_SEND_FAST_TASK, 20, 0, Uart_send_fast_Task, TASK_READY,1,0},
 	{UART_SEND_SLOW_TASK, 2000, 0, Uart_send_slow_Task, TASK_READY,1,0},
@@ -162,3 +162,18 @@ void TIM2_IRQHandler(void)
 	}
 }
 
+//将各个任务状态都修改为不可运行状态
+void Task_Disable(void)
+{
+	for(int i = 0; i < TASK_COUNT; i++) {
+        task_table[i].state = TASK_DISABLED;
+    }
+}
+
+//将各个任务状态都修改为可运行状态
+void Task_Enable(void)
+{
+	for(int i = 0; i < TASK_COUNT; i++) {
+        task_table[i].state = TASK_READY;
+    }	
+}

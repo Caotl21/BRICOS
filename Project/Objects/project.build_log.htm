@@ -21,16 +21,19 @@ Target DLL:      STLink\ST-LINKIII-KEIL_SWO.dll V3.0.1.0
 Dialog DLL:      TCM.DLL V1.32.0.0
  
 <h2>Project:</h2>
-E:\研究生\研一\AUV\STM32F407_Code\AUV_STM32-AUV_407_0106\Project\project.uvprojx
+E:\研究生\研一\AUV\STM32F407_Code\AUV_STM32-AUV_407_0127\Project\project.uvprojx
 Project File Date:  01/08/2026
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 5 (build 528)', folder: 'C:\Keil_v5\ARM\ARMCC\Bin'
 Build target 'Target 1'
-compiling main.c...
+compiling AD.c...
+..\Hardware\AD.c(132): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  	return (10 * (voltage_I - 2.5));
+..\Hardware\AD.c: 1 warning, 0 errors
 linking...
-Program Size: Code=16696 RO-data=572 RW-data=468 ZI-data=5940  
-".\Objects\project.axf" - 0 Error(s), 0 Warning(s).
+Program Size: Code=14960 RO-data=572 RW-data=476 ZI-data=5956  
+".\Objects\project.axf" - 0 Error(s), 1 Warning(s).
 
 <h2>Software Packages used:</h2>
 

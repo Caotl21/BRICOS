@@ -11,6 +11,6 @@ extern uint8_t servo_num;
 void Motor_SetSpeed(uint16_t pulse_width[], uint8_t num);
 void LED_SetSpeed(uint16_t pulse_width[], uint8_t num);
 void Servo_SetSpeed(uint16_t pulse_width[], uint8_t num);
-void Motor_Unlock(void);
+void ESC_Init(void);
 
 #endif

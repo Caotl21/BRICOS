@@ -64,4 +64,7 @@ void TaskScheduler_Run(void);
 uint32_t GetSystemTick(void);
 void SystemTick_Increment(void);
 
+void Task_Disable(void);
+void Task_Enable(void);
+
 #endif

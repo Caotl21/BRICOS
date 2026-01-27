@@ -5,6 +5,8 @@
 //#include "im948_CMD.h"
 //#include "Serial.h"
 
+
+
 /*************************移植后更改*********************************/
 //定时器时钟源TIMxCLK = 2 * PCLK1
 //        PCLK1 = HCLK / 4
@@ -119,21 +121,3 @@ void Ctl_WatchDog_Timer_Init(void)
 	TIM_Cmd(TIM5, ENABLE);			//使能TIM5，定时器开始运行
 }
 
-void TIM5_IRQHandler(void)
-{
-	if (TIM_GetITStatus(TIM5, TIM_IT_Update) == SET)
-	{
-		TIM3->CCR1 = 0;  // Thruster 1
-		TIM3->CCR2 = 0;  // Thruster 2
-		TIM3->CCR3 = 0;  // Thruster 3
-		TIM3->CCR4 = 0;  // Thruster 4
-		TIM4->CCR1 = 0;  // Thruster 5
-		TIM4->CCR2 = 0;  // Thruster 6
-		TIM4->CCR3 = 0;  // LED 1
-		TIM4->CCR4 = 0;  // LED 2
-		TIM9->CCR1 = 0;  // servo 1
-		TIM9->CCR2 = 0;  // servo 2
-		TIM_ClearITPendingBit(TIM5, TIM_IT_Update);
-	}
-
-}

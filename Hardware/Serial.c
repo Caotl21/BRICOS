@@ -3,10 +3,11 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include "Serial.h"
+#include "TaskScheduler.h"
 //#include "im948_CMD.h"
 //#include "Serial.h"
 //#include "OLED.h"
-//#include "TaskScheduler.h"
+
 //#include "JY901B.h"
 
 
@@ -20,9 +21,18 @@ uint16_t Serial_RxPWM_Light[2] = {0};        // 接收的LED PWM值
 uint8_t Serial_RxPacket[MAX_PACKET_SIZE];          // 接收数据包缓冲区
 uint8_t Serial_TxPacket[MAX_PACKET_SIZE];          // 发送数据包缓冲区
 
+static void Emergency_Process();
+static void Recovery_Process();
+static void Control_SetPWM(volatile uint8_t *RxBuf);
 static void Thruster_SetPWM(volatile uint8_t *RxBuf);
 static void Servo_SetPWM(volatile uint8_t *RxBuf);
 static void Light_SetPWM(volatile uint8_t *RxBuf);
+
+static uint8_t emergency_flag = 0;
+
+#define PWM_DEFAULT 1500
+#define PWM_MAX 1800
+
 
 // 传感器数据（模拟数据）
 SensorData_t Serial_SensorData = {0};
@@ -189,8 +199,8 @@ void Serial_Init(void)
 
     // 设置优先级：调试串口优先级稍微低一点，不要打断 IMU 的数据读取
     NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1; // 抢占优先级 2 (较低)
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0; // 抢占优先级 2 (较低)
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
 
@@ -808,34 +818,60 @@ void USART3_IRQHandler(void)
             DMA_Cmd(DMA1_Stream1, ENABLE);
             return; // 如果包头不对，直接返回
         }
-
-        switch(Serial_RxPWM_Control[2]) // 根据数据类型处理
-        {
-            case DATA_TYPE_Thrusters:
-                if (Serial_RxPWM_Control[3] == THRUSTER_DATA_LENGTH)
-                {
-                    // CCR寄存器，自动装入影子寄存器中
-                    Thruster_SetPWM(Serial_RxPWM_Control);
-                }
-                break;
-            // 可以添加更多数据类型的处理
-			case DATA_TYPE_SERVO:
-                if (Serial_RxPWM_Control[3] == SERVO_DATA_LENGTH)
-                {
-                    Servo_SetPWM(Serial_RxPWM_Control);
-                }
-                break;		
-			case DATA_TYPE_LIGHT:
-				if (Serial_RxPWM_Control[3] == LIGHT_DATA_LENGTH)
+		if(Serial_RxPWM_Control[2] == CONTROL_DATA)
+		{
+			if (Serial_RxPWM_Control[3] == CONTROL_DATA_LENGTH)
+			{
+				//正常pwm的数值的高八位不会到0xFF，到了证明是紧急指令
+				if(Serial_RxPWM_Control[4] != 0xFF && Serial_RxPWM_Control[4] != 0xEF && emergency_flag == 0)
 				{
-					Light_SetPWM(Serial_RxPWM_Control);
+					// CCR寄存器，自动装入影子寄存器中
+					Control_SetPWM(Serial_RxPWM_Control + 4);
 				}
-				break;
-            default:
-				TIM4->CCR3 = 0;  // LED 1
-				TIM4->CCR4 = 0;  // LED 2
-                break;
-        }
+				else
+				{
+					//进入紧急状态
+					if(Serial_RxPWM_Control[4] == 0xFF)
+					{
+						Emergency_Process();
+					}
+					//恢复状态
+					if(Serial_RxPWM_Control[4] == 0xEF)
+					{
+						Recovery_Process();
+					}
+				}
+			}
+				
+		}
+		
+//        switch(Serial_RxPWM_Control[2]) // 根据数据类型处理
+//        {
+//            case DATA_TYPE_Thrusters:
+//                if (Serial_RxPWM_Control[3] == THRUSTER_DATA_LENGTH)
+//                {
+//                    // CCR寄存器，自动装入影子寄存器中
+//                    Thruster_SetPWM(Serial_RxPWM_Control);
+//                }
+//                break;
+//            // 可以添加更多数据类型的处理
+//			case DATA_TYPE_SERVO:
+//                if (Serial_RxPWM_Control[3] == SERVO_DATA_LENGTH)
+//                {
+//                    Servo_SetPWM(Serial_RxPWM_Control);
+//                }
+//                break;		
+//			case DATA_TYPE_LIGHT:
+//				if (Serial_RxPWM_Control[3] == LIGHT_DATA_LENGTH)
+//				{
+//					Light_SetPWM(Serial_RxPWM_Control);
+//				}
+//				break;
+//            default:
+//				TIM4->CCR3 = 0;  // LED 1
+//				TIM4->CCR4 = 0;  // LED 2
+//                break;
+//        }
         
         // DMA重置
         DMA1->LIFCR = (uint32_t)(0x3D << 6);
@@ -848,24 +884,94 @@ void USART3_IRQHandler(void)
     }
 }
 
+//紧急任务处理
+static void Emergency_Process()
+{
+	//标记进入紧急状态
+	emergency_flag = 1;
+	//停止任务
+	Task_Disable();
+	//设置使得机器人往上移动
+	TIM_Cmd(TIM5, DISABLE);		//关闭看门狗功能
+	TIM3->CCR1 = PWM_DEFAULT;  // Thruster 1
+	TIM3->CCR2 = PWM_DEFAULT;  // Thruster 2
+	TIM3->CCR3 = PWM_DEFAULT;  // Thruster 3
+	TIM3->CCR4 = PWM_DEFAULT;  // Thruster 4
+	TIM4->CCR1 = PWM_MAX;  // Thruster 5
+	TIM4->CCR2 = PWM_MAX;  // Thruster 6
+}
+
+//恢复任务
+static void Recovery_Process()
+{
+	//退出紧急状态
+	emergency_flag = 0;
+	//开始任务
+	Task_Enable();
+	//开启看门狗功能
+	TIM_Cmd(TIM5, ENABLE);
+}
+
+static void Control_SetPWM(volatile uint8_t *RxBuf)
+{
+	TIM3->CCR1 = (uint16_t)(RxBuf[0] << 8) | RxBuf[1];  // Thruster 1
+    TIM3->CCR2 = (uint16_t)(RxBuf[2] << 8) | RxBuf[3];  // Thruster 2
+    TIM3->CCR3 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // Thruster 3
+    TIM3->CCR4 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // Thruster 4
+    
+    TIM4->CCR1 = (uint16_t)(RxBuf[8] << 8) | RxBuf[9];  // Thruster 5
+    TIM4->CCR2 = (uint16_t)(RxBuf[10] << 8) | RxBuf[11];  // Thruster 6
+	
+	TIM9->CCR1 = (uint16_t)(RxBuf[12] << 8) | RxBuf[13];  // servo 1
+    TIM9->CCR2 = (uint16_t)(RxBuf[14] << 8) | RxBuf[15];  // servo 2
+	
+}
 static void Thruster_SetPWM(volatile uint8_t *RxBuf)
 {
-    TIM3->CCR1 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // Thruster 1
-    TIM3->CCR2 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // Thruster 2
-    TIM3->CCR3 = (uint16_t)(RxBuf[8] << 8) | RxBuf[9];  // Thruster 3
-    TIM3->CCR4 = (uint16_t)(RxBuf[10] << 8) | RxBuf[11];  // Thruster 4
+//    TIM3->CCR1 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // Thruster 1
+//    TIM3->CCR2 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // Thruster 2
+//    TIM3->CCR3 = (uint16_t)(RxBuf[8] << 8) | RxBuf[9];  // Thruster 3
+//    TIM3->CCR4 = (uint16_t)(RxBuf[10] << 8) | RxBuf[11];  // Thruster 4
+//    
+//    TIM4->CCR1 = (uint16_t)(RxBuf[12] << 8) | RxBuf[13];  // Thruster 5
+//    TIM4->CCR2 = (uint16_t)(RxBuf[14] << 8) | RxBuf[15];  // Thruster 6
+	TIM3->CCR1 = (uint16_t)(RxBuf[0] << 8) | RxBuf[1];  // Thruster 1
+    TIM3->CCR2 = (uint16_t)(RxBuf[2] << 8) | RxBuf[3];  // Thruster 2
+    TIM3->CCR3 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // Thruster 3
+    TIM3->CCR4 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // Thruster 4
     
-    TIM4->CCR1 = (uint16_t)(RxBuf[12] << 8) | RxBuf[13];  // Thruster 5
-    TIM4->CCR2 = (uint16_t)(RxBuf[14] << 8) | RxBuf[15];  // Thruster 6
+    TIM4->CCR1 = (uint16_t)(RxBuf[8] << 8) | RxBuf[9];  // Thruster 5
+    TIM4->CCR2 = (uint16_t)(RxBuf[10] << 8) | RxBuf[11];  // Thruster 6
 
 }
 static void Servo_SetPWM(volatile uint8_t *RxBuf)
 {
-    TIM9->CCR1 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // servo 1
-    TIM9->CCR2 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // servo 2
+//    TIM9->CCR1 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // servo 1
+//    TIM9->CCR2 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // servo 2
+    TIM9->CCR1 = (uint16_t)(RxBuf[0] << 8) | RxBuf[1];  // servo 1
+    TIM9->CCR2 = (uint16_t)(RxBuf[2] << 8) | RxBuf[3];  // servo 2
 }
 static void Light_SetPWM(volatile uint8_t *RxBuf)
 {
 	TIM4->CCR3 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // LED 1
     TIM4->CCR4 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // LED 2
+}
+
+void TIM5_IRQHandler(void)
+{
+	if (TIM_GetITStatus(TIM5, TIM_IT_Update) == SET)
+	{
+		TIM3->CCR1 = PWM_DEFAULT;  // Thruster 1
+		TIM3->CCR2 = PWM_DEFAULT;  // Thruster 2
+		TIM3->CCR3 = PWM_DEFAULT;  // Thruster 3
+		TIM3->CCR4 = PWM_DEFAULT;  // Thruster 4
+		TIM4->CCR1 = PWM_DEFAULT;  // Thruster 5
+		TIM4->CCR2 = PWM_DEFAULT;  // Thruster 6
+		TIM4->CCR3 = PWM_DEFAULT;  // LED 1
+		TIM4->CCR4 = PWM_DEFAULT;  // LED 2
+		TIM9->CCR1 = PWM_DEFAULT;  // servo 1
+		TIM9->CCR2 = PWM_DEFAULT;  // servo 2
+		TIM_ClearITPendingBit(TIM5, TIM_IT_Update);
+	}
+
 }

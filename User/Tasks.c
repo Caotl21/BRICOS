@@ -25,6 +25,15 @@ float fAcc[3], fGyro[3], fQuater[4];
 float voltage;
 float current;
 
+//四元数的共轭
+//#define QW 0.7071
+//#define QX_HAT 0
+//#define QY_HAT 0
+//#define QZ_HAT -0.7071
+#define QW 0
+#define QX_HAT 0.7071
+#define QY_HAT -0.7071
+#define QZ_HAT 0
 //标志位
 
 
@@ -93,7 +102,29 @@ void JY901B_Task(void)
 	//printf("1");
 	JY901B_process();
 	JY901B_GetData(fAcc,fGyro,fQuater);
-
+//	if(1)
+//	{
+//		float temp = 0;
+//		temp = fAcc[0];
+//		fAcc[0] = -fAcc[1];
+//		fAcc[1] = -temp;
+//		fAcc[2] = -fAcc[2];
+//		temp = fGyro[0];
+//		fGyro[0] = -fGyro[1];
+//		fGyro[1] = -temp;
+//		fGyro[2] = -fGyro[2];
+//		float w_temp=fQuater[0];
+//		float x_temp=fQuater[1];
+//		float y_temp=fQuater[2];
+//		float z_temp=fQuater[3];
+//		fQuater[0] = w_temp*QW - x_temp*QX_HAT - y_temp*QY_HAT - z_temp* QZ_HAT;
+//		fQuater[1] = w_temp*QX_HAT + x_temp*QW + y_temp*QZ_HAT - z_temp* QY_HAT;
+//		fQuater[2] = w_temp*QY_HAT + y_temp*QW + z_temp*QX_HAT - x_temp* QZ_HAT;
+//		fQuater[3] = w_temp*QZ_HAT + z_temp*QW + x_temp*QY_HAT - y_temp* QX_HAT;
+//		float invN = 1.0f / sqrtf(fQuater[0]*fQuater[0] + fQuater[1]*fQuater[1] + 
+//                          fQuater[2]*fQuater[2] + fQuater[3]*fQuater[3]);
+//		fQuater[0] *= invN; fQuater[1] *= invN; fQuater[2] *= invN; fQuater[3] *= invN;
+//	}
 //		printf("\r\n%d ",current_time);
 //		printf("%f\r\n",fQuater[0]);
 	

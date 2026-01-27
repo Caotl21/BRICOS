@@ -18,6 +18,7 @@
 #define DATA_TYPE_LIGHT        0x04
 #define DATA_TYPE_FAST		   0x05
 #define DATA_TYPE_SLOW		   0x06
+#define CONTROL_DATA 		   0x01
 
 // ��������
 #define THRUSTER_DATA_LENGTH      0x0C    // 6��PWMֵ��ÿ��2�ֽ�
@@ -27,6 +28,8 @@
 #define SERVO_DATA_LENGTH    0x04    // 2�����PWMֵ��ÿ��2�ֽ�
 #define LIGHT_DATA_LENGTH    0x04    // 2��LEDֵ��4�ֽ�
 #define MAX_PACKET_SIZE      32    // ������ݰ���С
+#define CONTROL_DATA_LENGTH 0x10
+
 
 
 extern struct_UartFifo Uart1Fifo;
