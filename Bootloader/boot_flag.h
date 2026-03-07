@@ -15,7 +15,7 @@ typedef struct
     uint8_t  boot_attempts;
     uint8_t  need_copy;
     uint8_t  ota_complete;
-    uint8_t  reserved1;
+    uint8_t  enter_bootloader;
     uint32_t app1_version;
     uint32_t app2_version;
     uint32_t app1_crc;
@@ -27,6 +27,8 @@ typedef struct
 void BootFlag_Read(BootFlag_t *out);
 int32_t BootFlag_Save(BootFlag_t *flag);
 void BootFlag_MarkBootSuccess(void);
+void BootFlag_RequestEnterBootloader(void);
+uint8_t BootFlag_CheckAndClearEnterBootloader(void);
 
 #endif
 

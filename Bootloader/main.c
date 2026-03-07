@@ -87,6 +87,12 @@ int main(void)
         Serial_SendString("\r\n");
     }
 
+    if(BootFlag_CheckAndClearEnterBootloader())
+    {
+        Serial_SendString("\r\n>>> Enter Bootloader Requested <<<\r\n");
+        Bootloader_CommandLoop();
+    }
+
     /* 等待3秒检测是否进入Bootloader模式 */
     Serial_SendString("Send 'B' within 3s to enter Bootloader mode...\r\n");
 

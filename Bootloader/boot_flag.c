@@ -62,17 +62,17 @@ void BootFlag_Read(BootFlag_t *out)
     else
     {
         /* 未初始化，填充默认值 */
-        out->valid_flag    = APP_VALID_FLAG;
-        out->boot_attempts = 0;
-        out->need_copy     = 0;
-        out->ota_complete  = 0;
-        out->reserved1     = 0;
-        out->app1_version  = 0;
-        out->app2_version  = 0;
-        out->app1_crc      = 0;
-        out->app2_crc      = 0;
-        out->boot_count    = 0;
-        out->reserved2     = 0;
+        out->valid_flag         = APP_VALID_FLAG;
+        out->boot_attempts      = 0;
+        out->need_copy          = 0;
+        out->ota_complete       = 0;
+        out->enter_bootloader   = 0;
+        out->app1_version       = 0;
+        out->app2_version       = 0;
+        out->app1_crc           = 0;
+        out->app2_crc           = 0;
+        out->boot_count         = 0;
+        out->reserved2          = 0;
     }
 }
 
@@ -105,4 +105,37 @@ void BootFlag_MarkBootSuccess(void)
         BootFlag_Save(&boot_flag);
     }
 }
+
+/**
+ * @brief  检查并清除进入Bootloader的请求标志
+ * @retval 1:需要进入Bootloader, 0:不需要
+ */
+uint8_t BootFlag_CheckAndClearEnterBootloader(void)
+{
+    BootFlag_t boot_flag;
+
+    BootFlag_Read(&boot_flag);
+    if (boot_flag.enter_bootloader == 0)
+    {
+        return 0;
+    }
+
+    boot_flag.enter_bootloader = 0;
+    BootFlag_Save(&boot_flag);
+    return 1;
+}
+
+/**
+ * @brief  请求进入Bootloader
+ */
+void BootFlag_RequestEnterBootloader(void)
+{
+    BootFlag_t boot_flag;
+    
+    BootFlag_Read(&boot_flag);
+    boot_flag.enter_bootloader = 1;
+    BootFlag_Save(&boot_flag);
+}
+
+
 

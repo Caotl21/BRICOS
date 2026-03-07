@@ -29,6 +29,7 @@ CRC16 = 0x43
 
 PACKET_SIZE = 128
 PACKET_1K_SIZE = 1024
+OTA_TRIGGER = bytes([0x12, 0x34, 0x56, 0x78])
 
 
 class SerialConsole:
@@ -131,6 +132,18 @@ def build_header_payload(file_path: Path) -> bytes:
     return payload.ljust(PACKET_SIZE, b"\0")
 
 
+def wait_for_boot_menu_withinapp(cmd_port: serial.Serial, console: SerialConsole, seconds: float) -> None:
+    print("Waiting for bootloader menu on USART1...")
+    deadline = time.monotonic() + seconds
+
+    while time.monotonic() < deadline:
+        time.sleep(0.05)
+        console.poll()
+        if console.contains("READY") or console.contains("Commands:"):
+            return
+
+    raise TimeoutError("Bootloader menu was not detected on the command UART")
+
 def wait_for_boot_menu(cmd_port: serial.Serial, console: SerialConsole, seconds: float) -> None:
     print("Reset the board now. Sending 'B' repeatedly on the command UART...")
     deadline = time.monotonic() + seconds
@@ -209,6 +222,12 @@ def transfer_file(
     print("Ymodem transfer finished.")
 
 
+def send_ota_trigger(data_port: serial.Serial) -> None:
+    print("Sending OTA trigger to APP on USART2...")
+    data_port.write(OTA_TRIGGER)
+    data_port.flush()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Send APP image to STM32 bootloader over two UARTs")
     parser.add_argument("--cmd-port", required=True, help="Command/debug UART, typically USART1 (for example COM5)")
@@ -238,10 +257,22 @@ def main() -> int:
 
         console = SerialConsole(cmd_port, "cmd")
 
-        wait_for_boot_menu(cmd_port, console, args.boot_window)
+        send_ota_trigger(data_port)
+
+        time.sleep(0.5)
+
+        cmd_port.reset_input_buffer()
+        data_port.reset_input_buffer()
+
+        wait_for_boot_menu_withinapp(cmd_port, console, args.boot_window)
+
+        #wait_for_boot_menu(cmd_port, console, args.boot_window)
         print("Bootloader menu detected, sending command '2'...")
         send_command(cmd_port, b"2", console)
         transfer_file(data_port, file_path, console, args.retries)
+
+        print("Sending OTA trigger...")
+        send_ota_trigger(data_port)
 
         print("Waiting for final bootloader output...")
         time.sleep(1.0)
