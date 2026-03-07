@@ -528,7 +528,7 @@ static void Bootloader_ShowSystemInfo(void)
 static int32_t Process_YmodemDownload(uint8_t app_num)
 {
     FileInfo_t file_info;
-    int32_t packet_length;
+    int32_t packet_length = 0;
     uint32_t app_addr;
     uint32_t app_max_size;
     uint32_t errors = 0;
@@ -556,13 +556,6 @@ static int32_t Process_YmodemDownload(uint8_t app_num)
 
     UART_SendString("\r\nWaiting for file (Ymodem)...\r\n");
 
-    /* 发送'C'表示准备接收(使用CRC16) */
-    for (uint32_t i = 0; i < 3; i++)
-    {
-        Ymodem_SendByte('C');
-        Delay_ms(500);
-    }
-
     /* 擦除APP2区域 */
     UART_SendString("Erasing APP2...\r\n");
     if (FLASH_If_Erase(APP2_ADDR, APP2_SIZE) != FLASH_COMPLETE)
@@ -573,98 +566,142 @@ static int32_t Process_YmodemDownload(uint8_t app_num)
     }
     UART_SendString("Erase APP2 done.\r\n");
 
-    /* 接收文件数据包循环 */
+    /* 首包握手：每次发送一个'C'后立刻等待header，不要先连续发多个'C' */
     while (1)
     {
-        result = Ymodem_ReceivePacket(g_ymodem_packet_data, &packet_length, 1000);
+        Ymodem_SendByte(CRC16);
+        result = Ymodem_ReceivePacket(g_ymodem_packet_data, &packet_length, YMODEM_PACKET_TIMEOUT);
 
-        if (result == 0)
+        if (result == YMODEM_OK)
         {
             errors = 0;
-
-            if (packet_length == 0)
-            {
-                Ymodem_SendByte(ACK);
-                break;
-            }
-
-            if (packets_received == 0)
-            {
-                if (g_ymodem_packet_data[0] != 0)
-                {
-                    Ymodem_ParseFileInfo(g_ymodem_packet_data, &file_info);
-                    file_size = file_info.file_size;
-
-                    UART_SendString("File: ");
-                    UART_SendString((const char *)file_info.file_name);
-                    UART_SendString("\r\nSize: ");
-                    UART_SendInt(file_size);
-                    UART_SendString(" bytes\r\n");
-
-                    if (file_size > app_max_size)
-                    {
-                        UART_SendString("File too large!\r\n");
-                        Ymodem_Abort();
-                        Bootloader_FinishOTA(0);
-                        return -3;
-                    }
-                }
-
-                Ymodem_SendByte(ACK);
-                Ymodem_SendByte('C');
-                packets_received++;
-            }
-            else
-            {
-                uint32_t write_len = packet_length;
-
-                if (bytes_written + write_len > file_size)
-                {
-                    write_len = file_size - bytes_written;
-                }
-
-                if (FLASH_If_Write(app_addr + bytes_written,
-                                   (uint32_t *)g_ymodem_packet_data,
-                                   write_len) != FLASH_COMPLETE)
-                {
-                    UART_SendString("Flash write error!\r\n");
-                    Ymodem_Abort();
-                    Bootloader_FinishOTA(0);
-                    return -4;
-                }
-
-                bytes_written += write_len;
-                packets_received++;
-
-                Ymodem_SendByte(ACK);
-
-                if ((packets_received % 10) == 0)
-                {
-                    Ymodem_SendByte('.');
-                }
-            }
+            break;
         }
-        else if (result == -1)
+
+        if (result == YMODEM_ABORT)
         {
             UART_SendString("\r\nAborted by sender.\r\n");
             Bootloader_FinishOTA(0);
             return -5;
         }
+
+        errors++;
+        if (errors > MAX_ERRORS)
+        {
+            UART_SendString("\r\nToo many errors waiting for header!\r\n");
+            Ymodem_Abort();
+            Bootloader_FinishOTA(0);
+            return -6;
+        }
+    }
+
+    while (1)
+    {
+        errors = 0;
+
+        if (packet_length == 0)
+        {
+            Ymodem_SendByte(ACK);
+            break;
+        }
+
+        if (packets_received == 0)
+        {
+            if (g_ymodem_packet_data[0] == 0)
+            {
+                UART_SendString("Empty header packet.\r\n");
+                Ymodem_Abort();
+                Bootloader_FinishOTA(0);
+                return -3;
+            }
+
+            if (Ymodem_ParseFileInfo(g_ymodem_packet_data, &file_info) != YMODEM_OK)
+            {
+                UART_SendString("Invalid file header.\r\n");
+                Ymodem_Abort();
+                Bootloader_FinishOTA(0);
+                return -3;
+            }
+
+            file_size = file_info.file_size;
+
+            UART_SendString("File: ");
+            UART_SendString((const char *)file_info.file_name);
+            UART_SendString("\r\nSize: ");
+            UART_SendInt(file_size);
+            UART_SendString(" bytes\r\n");
+
+            if ((file_size == 0) || (file_size > app_max_size))
+            {
+                UART_SendString("File size invalid!\r\n");
+                Ymodem_Abort();
+                Bootloader_FinishOTA(0);
+                return -3;
+            }
+
+            Ymodem_SendByte(ACK);
+            Ymodem_SendByte(CRC16);
+            packets_received++;
+        }
         else
         {
+            uint32_t write_len = (uint32_t)packet_length;
+
+            if (bytes_written + write_len > file_size)
+            {
+                write_len = file_size - bytes_written;
+            }
+
+            if (FLASH_If_Write(app_addr + bytes_written,
+                               (uint32_t *)g_ymodem_packet_data,
+                               write_len) != FLASH_COMPLETE)
+            {
+                UART_SendString("Flash write error!\r\n");
+                Ymodem_Abort();
+                Bootloader_FinishOTA(0);
+                return -4;
+            }
+
+            bytes_written += write_len;
+            packets_received++;
+
+            Ymodem_SendByte(ACK);
+
+            if ((packets_received % 10U) == 0U)
+            {
+                UART_SendByte('=');
+            }
+        }
+
+        while (1)
+        {
+            result = Ymodem_ReceivePacket(g_ymodem_packet_data, &packet_length, YMODEM_PACKET_TIMEOUT);
+
+            if (result == YMODEM_OK)
+            {
+                break;
+            }
+
+            if (result == YMODEM_ABORT)
+            {
+                UART_SendString("\r\nAborted by sender.\r\n");
+                Bootloader_FinishOTA(0);
+                return -5;
+            }
+
             errors++;
-            if (errors > 5)
+            if (errors > MAX_ERRORS)
             {
                 UART_SendString("\r\nToo many errors!\r\n");
                 Ymodem_Abort();
                 Bootloader_FinishOTA(0);
                 return -6;
             }
+
             Ymodem_SendByte(NAK);
         }
     }
 
-    /* 下载完成 */
     UART_SendString("\r\n\r\nDownload complete!\r\n");
     UART_SendString("Total bytes: ");
     UART_SendInt(bytes_written);
@@ -681,7 +718,6 @@ static int32_t Process_YmodemDownload(uint8_t app_num)
 
     UART_SendString("OTA success! Rebooting...\r\n");
     Delay_ms(500);
-
     NVIC_SystemReset();
 
     return 0;
