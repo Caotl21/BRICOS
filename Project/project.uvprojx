@@ -16,7 +16,7 @@
         <TargetCommonOption>
           <Device>STM32F407ZGTx</Device>
           <Vendor>STMicroelectronics</Vendor>
-          <PackID>Keil.STM32F4xx_DFP.2.17.1</PackID>
+          <PackID>Keil.STM32F4xx_DFP.2.17.0</PackID>
           <PackURL>https://www.keil.com/pack/</PackURL>
           <Cpu>IRAM(0x20000000,0x00020000) IRAM2(0x10000000,0x00010000) IROM(0x08000000,0x00100000) CPUTYPE("Cortex-M4") FPU2 CLOCK(12000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
@@ -52,7 +52,7 @@
           <OutputName>project</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
-          <CreateHexFile>0</CreateHexFile>
+          <CreateHexFile>1</CreateHexFile>
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
           <ListingPath>.\Listings\</ListingPath>
@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>USE_STDPERIPH_DRIVER,STM32F40_41xxx</Define>
               <Undefine></Undefine>
-              <IncludePath>..\Libraries\STM32F4xx_StdPeriph_Driver\inc;..\Libraries\CMSIS\Include;..\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\User;..\System;..\Hardware;..\Hardware\DHT11;..\Hardware\MS5837;..\Hardware\JY901B;..\Hardware\Motor;..\Hardware\IM948</IncludePath>
+              <IncludePath>..\Libraries\STM32F4xx_StdPeriph_Driver\inc;..\Libraries\CMSIS\Include;..\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\User;..\System;..\Hardware;..\Bootloader</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -358,7 +358,7 @@
             </VariousControls>
           </Aads>
           <LDads>
-            <umfTarg>1</umfTarg>
+            <umfTarg>0</umfTarg>
             <Ropi>0</Ropi>
             <Rwpi>0</Rwpi>
             <noStLib>0</noStLib>
@@ -367,7 +367,7 @@
             <TextAddressRange>0x08000000</TextAddressRange>
             <DataAddressRange>0x20000000</DataAddressRange>
             <pXoBase></pXoBase>
-            <ScatterFile></ScatterFile>
+            <ScatterFile>..\Bootloader\bootloader.sct</ScatterFile>
             <IncludeLibs></IncludeLibs>
             <IncludeLibsPath></IncludeLibsPath>
             <Misc></Misc>
@@ -611,11 +611,6 @@
           <GroupName>USER</GroupName>
           <Files>
             <File>
-              <FileName>main.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\main.c</FilePath>
-            </File>
-            <File>
               <FileName>stm32f4xx_it.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\stm32f4xx_it.c</FilePath>
@@ -631,24 +626,9 @@
               <FilePath>..\User\stm32f4xx_it.h</FilePath>
             </File>
             <File>
-              <FileName>TaskScheduler.c</FileName>
+              <FileName>main.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\TaskScheduler.c</FilePath>
-            </File>
-            <File>
-              <FileName>TaskScheduler.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\TaskScheduler.h</FilePath>
-            </File>
-            <File>
-              <FileName>Tasks.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\Tasks.c</FilePath>
-            </File>
-            <File>
-              <FileName>Tasks.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\Tasks.h</FilePath>
+              <FilePath>..\Bootloader\main.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -668,31 +648,11 @@
               <FileType>1</FileType>
               <FilePath>..\System\Delay.c</FilePath>
             </File>
-            <File>
-              <FileName>Timer.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\System\Timer.c</FilePath>
-            </File>
-            <File>
-              <FileName>Timer.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\System\Timer.h</FilePath>
-            </File>
           </Files>
         </Group>
         <Group>
           <GroupName>Hardware</GroupName>
           <Files>
-            <File>
-              <FileName>LED.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\LED.c</FilePath>
-            </File>
-            <File>
-              <FileName>LED.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\LED.h</FilePath>
-            </File>
             <File>
               <FileName>Serial.c</FileName>
               <FileType>1</FileType>
@@ -704,41 +664,6 @@
               <FilePath>..\Hardware\Serial.h</FilePath>
             </File>
             <File>
-              <FileName>OLED.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\OLED.c</FilePath>
-            </File>
-            <File>
-              <FileName>OLED.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\OLED.h</FilePath>
-            </File>
-            <File>
-              <FileName>OLED_Font.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\OLED_Font.h</FilePath>
-            </File>
-            <File>
-              <FileName>AD.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\AD.c</FilePath>
-            </File>
-            <File>
-              <FileName>AD.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\AD.h</FilePath>
-            </File>
-            <File>
-              <FileName>Watchdog.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\Watchdog.c</FilePath>
-            </File>
-            <File>
-              <FileName>Watchdog.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\Watchdog.h</FilePath>
-            </File>
-            <File>
               <FileName>flash.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Hardware\flash.c</FilePath>
@@ -748,130 +673,55 @@
               <FileType>5</FileType>
               <FilePath>..\Hardware\flash.h</FilePath>
             </File>
-            <File>
-              <FileName>Types.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\Types.h</FilePath>
-            </File>
-            <File>
-              <FileName>Dma.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\Dma.c</FilePath>
-            </File>
-            <File>
-              <FileName>Dma.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\Dma.h</FilePath>
-            </File>
           </Files>
         </Group>
         <Group>
-          <GroupName>DHT11</GroupName>
+          <GroupName>Bootloader</GroupName>
           <Files>
             <File>
-              <FileName>DHT11.c</FileName>
+              <FileName>bootloader.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Hardware\DHT11\DHT11.c</FilePath>
+              <FilePath>..\Bootloader\bootloader.c</FilePath>
             </File>
             <File>
-              <FileName>DHT11.h</FileName>
+              <FileName>bootloader.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Hardware\DHT11\DHT11.h</FilePath>
+              <FilePath>..\Bootloader\bootloader.h</FilePath>
             </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>MS5837</GroupName>
-          <Files>
             <File>
-              <FileName>MS5837_I2C.c</FileName>
+              <FileName>flash_if.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Hardware\MS5837\MS5837_I2C.c</FilePath>
+              <FilePath>..\Bootloader\flash_if.c</FilePath>
             </File>
             <File>
-              <FileName>MS5837_I2C.h</FileName>
+              <FileName>flash_if.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Hardware\MS5837\MS5837_I2C.h</FilePath>
+              <FilePath>..\Bootloader\flash_if.h</FilePath>
             </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>JY901B</GroupName>
-          <Files>
             <File>
-              <FileName>JY901B.c</FileName>
+              <FileName>flash_layout.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Bootloader\flash_layout.h</FilePath>
+            </File>
+            <File>
+              <FileName>ymodem.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Hardware\JY901B\JY901B.c</FilePath>
+              <FilePath>..\Bootloader\ymodem.c</FilePath>
             </File>
             <File>
-              <FileName>JY901B.h</FileName>
+              <FileName>ymodem.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Hardware\JY901B\JY901B.h</FilePath>
+              <FilePath>..\Bootloader\ymodem.h</FilePath>
             </File>
             <File>
-              <FileName>JY901B_UART.c</FileName>
+              <FileName>boot_flag.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Hardware\JY901B\JY901B_UART.c</FilePath>
+              <FilePath>..\Bootloader\boot_flag.c</FilePath>
             </File>
             <File>
-              <FileName>JY901B_UART.h</FileName>
+              <FileName>boot_flag.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Hardware\JY901B\JY901B_UART.h</FilePath>
-            </File>
-            <File>
-              <FileName>REG.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\JY901B\REG.h</FilePath>
-            </File>
-            <File>
-              <FileName>wit_c_sdk.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\JY901B\wit_c_sdk.c</FilePath>
-            </File>
-            <File>
-              <FileName>wit_c_sdk.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\JY901B\wit_c_sdk.h</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>Motor</GroupName>
-          <Files>
-            <File>
-              <FileName>Motor.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\Motor\Motor.c</FilePath>
-            </File>
-            <File>
-              <FileName>Motor.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\Motor\Motor.h</FilePath>
-            </File>
-            <File>
-              <FileName>PWM.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\Motor\PWM.c</FilePath>
-            </File>
-            <File>
-              <FileName>PWM.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\Motor\PWM.h</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>IM948</GroupName>
-          <Files>
-            <File>
-              <FileName>im948_CMD.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\IM948\im948_CMD.c</FilePath>
-            </File>
-            <File>
-              <FileName>im948_CMD.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\IM948\im948_CMD.h</FilePath>
+              <FilePath>..\Bootloader\boot_flag.h</FilePath>
             </File>
           </Files>
         </Group>

@@ -44,6 +44,8 @@ void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
 
+uint32_t Timebase_GetTickMs(void);
+
 #ifdef __cplusplus
 }
 #endif

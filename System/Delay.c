@@ -1,47 +1,66 @@
-#include "stm32f4xx.h"
+#include "Delay.h"
+#include "stm32f4xx_rcc.h"
+#include "stm32f4xx_tim.h"
 
-/**
-  * @brief  微秒级延时
-  * @param  xus 延时时长，范围：0~233015
-  * @retval 无
-  */
-
-void Delay_us(unsigned int n)
+static uint32_t Delay_GetTIM2Clock(void)
 {
-	SysTick->CTRL = 0; // Disable SysTick
-	SysTick->LOAD = n * 21 - 1; // Count from 255 to 0 (256 cycles)，0算一次，所以要减1
-	SysTick->VAL = 0; // Clear current value as well as count fla
-	
-	// 0位控制使能，2位控制选择FCLK（1）还是STCLK（1），这里选择stclk
-	SysTick->CTRL = 1; // Enable SysTick timer with processor clock
-	//SysTick->CTRL  = SysTick_CTRL_CLKSOURCE_Msk|SysTick_CTRL_ENABLE_Msk;
-	
-	while ((SysTick->CTRL & 0x00010000)==0);// Wait until count flag is set，控制寄存器的第16位用于检测是否计数结束
-	SysTick->CTRL = 0; // Disable SysTick
+    RCC_ClocksTypeDef clocks;
+
+    RCC_GetClocksFreq(&clocks);
+
+    if ((RCC->CFGR & RCC_CFGR_PPRE1) == 0x00000000U)
+    {
+        return clocks.PCLK1_Frequency;
+    }
+
+    return clocks.PCLK1_Frequency * 2U;
 }
 
-/**
-  * @brief  毫秒级延时
-  * @param  xms 延时时长，范围：0~4294967295
-  * @retval 无
-  */
-void Delay_ms(uint32_t xms)
+void Delay_Init(void)
 {
-	while(xms--)
-	{
-		Delay_us(1000);
-	}
+    TIM_TimeBaseInitTypeDef tim_init;
+    uint32_t tim_clk;
+    uint16_t prescaler;
+
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+
+    TIM_DeInit(TIM2);
+
+    tim_clk = Delay_GetTIM2Clock();
+    prescaler = (uint16_t)((tim_clk / 1000000U) - 1U);
+
+    tim_init.TIM_Prescaler = prescaler;
+    tim_init.TIM_CounterMode = TIM_CounterMode_Up;
+    tim_init.TIM_Period = 0xFFFFFFFFU;
+    tim_init.TIM_ClockDivision = TIM_CKD_DIV1;
+    tim_init.TIM_RepetitionCounter = 0;
+
+    TIM_TimeBaseInit(TIM2, &tim_init);
+    TIM_SetCounter(TIM2, 0);
+    TIM_Cmd(TIM2, ENABLE);
 }
- 
-/**
-  * @brief  秒级延时
-  * @param  xs 延时时长，范围：0~4294967295
-  * @retval 无
-  */
-void Delay_s(uint32_t xs)
+
+void Delay_us(uint32_t us)
 {
-	while(xs--)
-	{
-		Delay_ms(1000);
-	}
-} 
+    uint32_t start = TIM_GetCounter(TIM2);
+
+    while ((uint32_t)(TIM_GetCounter(TIM2) - start) < us)
+    {
+    }
+}
+
+void Delay_ms(uint32_t ms)
+{
+    while (ms--)
+    {
+        Delay_us(1000U);
+    }
+}
+
+void Delay_s(uint32_t s)
+{
+    while (s--)
+    {
+        Delay_ms(1000U);
+    }
+}

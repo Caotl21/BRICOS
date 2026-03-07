@@ -23,7 +23,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_it.h"
 #include "stm32f4xx_conf.h"
-#include "LED.h"
+#include "ymodem.h"
 
 /** @addtogroup Template_Project
   * @{
@@ -39,6 +39,14 @@
 /******************************************************************************/
 /*            Cortex-M4 Processor Exceptions Handlers                         */
 /******************************************************************************/
+
+static volatile uint32_t g_ms_tick = 0;
+
+uint32_t Timebase_GetTickMs(void)
+{
+    return g_ms_tick;
+}
+
 
 /**
   * @brief  This function handles NMI exception.
@@ -135,7 +143,8 @@ void PendSV_Handler(void)
   */
 void SysTick_Handler(void)
 {
-
+    g_ms_tick++;
+    Ymodem_IncTick();
 }
 
 /******************************************************************************/

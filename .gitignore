@@ -1,1 +1,27 @@
 Thrusters_test
+
+# Build directories
+Project/Objects/
+Project/Listings/
+
+# Linker / compiler outputs
+*.axf
+*.elf
+*.o
+*.d
+*.crf
+*.dep
+*.map
+*.lnp
+*.iex
+
+# Generated reports
+Project/Objects/*.htm
+Project/Listings/*.map
+
+# Temporary / backup
+*.bak
+*.tmp
+
+# User-specific Keil UI state
+Project/*.uvguix.*
