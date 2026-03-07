@@ -666,11 +666,6 @@ static int32_t Process_YmodemDownload(uint8_t app_num)
             packets_received++;
 
             Ymodem_SendByte(ACK);
-
-            if ((packets_received % 10U) == 0U)
-            {
-                UART_SendByte('=');
-            }
         }
 
         while (1)
