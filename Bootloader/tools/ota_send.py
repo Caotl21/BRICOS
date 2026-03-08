@@ -17,6 +17,8 @@ import time
 from pathlib import Path
 
 import serial
+import gpiod
+from gpiod.line import Direction, Value
 
 
 SOH = 0x01
@@ -123,6 +125,29 @@ def send_packet(port: serial.Serial, seq: int, payload: bytes) -> None:
 
     port.write(packet)
     port.flush()
+    
+
+def hardware_reset_stm32(chip_path, line_offset):
+    # 使用新版 v2.x 语法
+    with gpiod.request_lines(
+        chip_path,
+        consumer="OTA-Reset",
+        config={
+            line_offset: gpiod.LineSettings(
+                direction=Direction.OUTPUT, 
+                output_value=Value.ACTIVE  # 初始设为高电平(1)
+            )
+        },
+    ) as request:
+        print(f"Pulsing reset on {chip_path} line {line_offset}...")
+        
+        # 1. 拉低电平触发复位 (Value.INACTIVE 在低电平有效配置下通常是 0)
+        request.set_value(line_offset, Value.INACTIVE) 
+        time.sleep(0.1)
+        
+        # 2. 拉高电平释放复位
+        request.set_value(line_offset, Value.ACTIVE)
+        print("Reset released.")
 
 
 def build_header_payload(file_path: Path) -> bytes:
@@ -132,20 +157,43 @@ def build_header_payload(file_path: Path) -> bytes:
     return payload.ljust(PACKET_SIZE, b"\0")
 
 
-def wait_for_boot_menu_withinapp(cmd_port: serial.Serial, console: SerialConsole, seconds: float) -> None:
+def enter_bootloader_by_app_trigger(
+    cmd_port: serial.Serial,
+    data_port: serial.Serial,
+    console: SerialConsole,
+    seconds: float,
+) -> None:
+    print("Sending OTA trigger to APP on USART2...")
+    data_port.write(OTA_TRIGGER)
+    data_port.flush()
+
+    time.sleep(0.5)
+
+    cmd_port.reset_input_buffer()
+    data_port.reset_input_buffer()
+
     print("Waiting for bootloader menu on USART1...")
     deadline = time.monotonic() + seconds
-
     while time.monotonic() < deadline:
         time.sleep(0.05)
         console.poll()
         if console.contains("READY") or console.contains("Commands:"):
             return
 
-    raise TimeoutError("Bootloader menu was not detected on the command UART")
+    raise TimeoutError("Bootloader menu was not detected after APP trigger")
 
-def wait_for_boot_menu(cmd_port: serial.Serial, console: SerialConsole, seconds: float) -> None:
-    print("Reset the board now. Sending 'B' repeatedly on the command UART...")
+def enter_bootloader_by_hw_reset(
+    cmd_port: serial.Serial,
+    console: SerialConsole,
+    seconds: float,
+    gpiochip: str,
+    line_offset: int,
+    hold_ms: float,
+    active_low: bool,
+) -> None:
+    hardware_reset_stm32(gpiochip, line_offset)
+
+    print("Waiting for bootloader menu and sending 'B' repeatedly on USART1...")
     deadline = time.monotonic() + seconds
 
     while time.monotonic() < deadline:
@@ -156,8 +204,32 @@ def wait_for_boot_menu(cmd_port: serial.Serial, console: SerialConsole, seconds:
         if console.contains("READY") or console.contains("Commands:"):
             return
 
-    raise TimeoutError("Bootloader menu was not detected on the command UART")
+    raise TimeoutError("Bootloader menu was not detected after hardware reset")
 
+def enter_bootloader(
+    args: argparse.Namespace,
+    cmd_port: serial.Serial,
+    data_port: serial.Serial,
+    console: SerialConsole,
+) -> None:
+    if args.mode == "app-trigger":
+        enter_bootloader_by_app_trigger(cmd_port, data_port, console, args.boot_window)
+        return
+    if args.mode == "hw-reset":
+        if not args.reset_gpiochip or args.reset_line is None:
+            raise RuntimeError("hw-reset mode requires --reset-gpiochip and --reset-line")
+        enter_bootloader_by_hw_reset(
+            cmd_port,
+            console,
+            args.boot_window,
+            args.reset_gpiochip,
+            args.reset_line,
+            args.reset_hold_ms,
+            args.reset_active_low,
+        )
+        return
+    
+    raise RuntimeError(f"Unsupported bootloader entry mode: {args.mode}")
 
 def send_command(cmd_port: serial.Serial, command: bytes, console: SerialConsole) -> None:
     cmd_port.write(command)
@@ -222,20 +294,22 @@ def transfer_file(
     print("Ymodem transfer finished.")
 
 
-def send_ota_trigger(data_port: serial.Serial) -> None:
-    print("Sending OTA trigger to APP on USART2...")
-    data_port.write(OTA_TRIGGER)
-    data_port.flush()
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Send APP image to STM32 bootloader over two UARTs")
-    parser.add_argument("--cmd-port", required=True, help="Command/debug UART, typically USART1 (for example COM5)")
-    parser.add_argument("--data-port", required=True, help="Ymodem UART, typically USART2 (for example COM6)")
+    parser.add_argument("--mode", choices=["app-trigger", "hw-reset"], default="app-trigger")
+    parser.add_argument("--cmd-port", required=True, help="Command/debug UART, typically USART1")
+    parser.add_argument("--data-port", required=True, help="Ymodem UART, typically USART2")
     parser.add_argument("--file", required=True, help="APP image to send, usually the APP1 .bin file")
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate for both UARTs")
-    parser.add_argument("--boot-window", type=float, default=4.0, help="Seconds to keep sending 'B' while you reset the board")
+    parser.add_argument("--boot-window", type=float, default=4.0, help="Timeout for entering bootloader")
     parser.add_argument("--retries", type=int, default=10, help="Retries per Ymodem data block")
+
+    parser.add_argument("--reset-gpiochip", help="GPIO chip path for hw-reset mode, for example /dev/gpiochip0")
+    parser.add_argument("--reset-line", type=int, help="GPIO line offset for hw-reset mode")
+    parser.add_argument("--reset-hold-ms", type=float, default=80.0, help="Reset pulse width in ms")
+    parser.add_argument("--reset-active-low", action="store_true", default=True, help="Reset line is active low")
+    parser.add_argument("--reset-active-high", action="store_false", dest="reset_active_low", help="Reset line is active high")
+
     return parser.parse_args()
 
 
@@ -257,22 +331,11 @@ def main() -> int:
 
         console = SerialConsole(cmd_port, "cmd")
 
-        send_ota_trigger(data_port)
+        enter_bootloader(args, cmd_port, data_port, console)
 
-        time.sleep(0.5)
-
-        cmd_port.reset_input_buffer()
-        data_port.reset_input_buffer()
-
-        wait_for_boot_menu_withinapp(cmd_port, console, args.boot_window)
-
-        #wait_for_boot_menu(cmd_port, console, args.boot_window)
         print("Bootloader menu detected, sending command '2'...")
         send_command(cmd_port, b"2", console)
         transfer_file(data_port, file_path, console, args.retries)
-
-        print("Sending OTA trigger...")
-        send_ota_trigger(data_port)
 
         print("Waiting for final bootloader output...")
         time.sleep(1.0)
