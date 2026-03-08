@@ -9,7 +9,7 @@
 #include "stm32f4xx_it.h"
 #include "Delay.h"
 
-#define BOOTLOADER_TIMEOUT      3000    /* Bootloader超时时间(ms) */
+#define BOOTLOADER_TIMEOUT      100    /* Bootloader超时时间(ms) */
 #define DOWNLOAD_BUFFER_SIZE    (2 * 1024)
 
 /**
@@ -35,7 +35,7 @@ static uint8_t Check_BootloaderMode(void)
 
     start_tick = Timebase_GetTickMs();
 
-    /* 3秒内检查USART1是否收到 'B' */
+    /* 100ms内检查USART1是否收到 'B' */
     while ((Timebase_GetTickMs() - start_tick) < BOOTLOADER_TIMEOUT)
     {
         if (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) != RESET)
@@ -57,7 +57,7 @@ static uint8_t Check_BootloaderMode(void)
  *
  * 启动流程：
  *   1. 初始化外设 (SysTick, UART)
- *   2. 等待3秒，检测 USART1/USART2 是否收到 'B'
+ *   2. 等待100ms，检测 USART1/USART2 是否收到 'B'
  *   3. 收到 'B'  → 进入Bootloader命令模式（支持各种测试命令）
  *   4. 超时      → 执行正常 Bootloader 流程 (检查Flag、拷贝、跳转APP1)
  *   5. 若APP无效 → 自动进入命令模式等待OTA
@@ -93,8 +93,8 @@ int main(void)
         Bootloader_CommandLoop();
     }
 
-    /* 等待3秒检测是否进入Bootloader模式 */
-    Serial_SendString("Send 'B' within 3s to enter Bootloader mode...\r\n");
+    /* 等待100ms检测是否进入Bootloader模式 */
+    Serial_SendString("Send 'B' to enter Bootloader mode...\r\n");
 
     if (Check_BootloaderMode())
     {
