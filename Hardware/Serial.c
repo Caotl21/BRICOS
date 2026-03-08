@@ -4,11 +4,7 @@
 #include <stdarg.h>
 #include "Serial.h"
 #include "TaskScheduler.h"
-//#include "im948_CMD.h"
-//#include "Serial.h"
-//#include "OLED.h"
-
-//#include "JY901B.h"
+#include "boot_flag.h"
 
 
 uint8_t Serial_RxData;		//定义串口接收的数据变量
@@ -32,6 +28,11 @@ static uint8_t emergency_flag = 0;
 
 #define PWM_DEFAULT 1500
 #define PWM_MAX 1800
+
+#define OTA_1 0x12
+#define OTA_2 0x34
+#define OTA_3 0x56
+#define OTA_4 0x78
 
 
 // 传感器数据（模拟数据）
@@ -195,7 +196,7 @@ void Serial_Init(void)
 	USART_ITConfig(USART3, USART_IT_IDLE, ENABLE);				//开启USART1空闲中断 
 
     // 5. 中断配置 (用于接收电脑发的指令)
-//    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
+//  USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
 
     // 设置优先级：调试串口优先级稍微低一点，不要打断 IMU 的数据读取
     NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
@@ -584,216 +585,40 @@ void Slow_Serial_SendSensorPacket(void)
 
 void USART1_IRQHandler(void)
 {
-//    uint8_t temp;
-//    
-//    // 检测空闲中断
-//    if(USART_GetITStatus(USART1, USART_IT_IDLE) != RESET)
-//    {
-//        // 1. 清除 IDLE 标志 (读取 SR 后读取 DR 序列)
-//        temp = USART1->SR;
-//        temp = USART1->DR; 
-//        
-//        // 2. 计算当前 DMA 写到哪里了
-//        // DMA_GetCurrDataCounter 返回的是“剩余传输量” (从 FifoSize 减到 0)
-//        // 所以：当前位置 = 总大小 - 剩余大小
-//        // 在循环模式下，这个逻辑是自动回环的
-//        Uart1Fifo.In = FifoSize - DMA_GetCurrDataCounter(DMA2_Stream2);
-//        
-//        // 3. 通知消费者任务 (置位事件标志)
-//        // 此时，Uart1Fifo.RxBuf 里的数据已经由 DMA 填好了，In 指针也更新了
-//        g_event_im948_received = 1;
-//        
-//        // 不需要清除 PendingBit，上面的 SR+DR 读取操作已经清除了
-//    }
+
 }
 
-//void USART1_IRQHandler(void)
-//{
-//    if (USART_GetFlagStatus(USART1, USART_IT_RXNE) == SET)
-//    {
-//		
-//        U16 RxByte = USART_ReceiveData(USART1);
-//		//Cmd_GetPkt(RxByte);
-//        IM948_Fifo_in(RxByte);
-//		g_event_im948_received = 1;
-//		//printf("get new data!");
-//		
-//        USART_ClearITPendingBit(USART1, USART_IT_RXNE);
-//    }
-//}
+void USART2_IRQHandler(void)
+{
+    uint8_t rx_byte;
+    static uint8_t ota_state = 0; // 0: 等待包头1, 1: 等待包头2, 2: 接收数据
+    // 检测接收中断
+    if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)
+    {
+        rx_byte = USART_ReceiveData(USART2); // 读取接收到的数据
 
-/**
-  * 函    数：USART3中断函数
-  * 参    数：无
-  * 返 回 值：无
-  * 注意事项：此函数为中断函数，无需调用，中断触发后自动执行
-  *           函数名为预留的指定名称，可以从启动文件复制
-  *           请确保函数名正确，不能有任何差异，否则中断函数将不能进入
-  */
-//void USART3_IRQHandler(void)
-//{
-//	if (USART_GetITStatus(USART3, USART_IT_RXNE) == SET)		//判断是否是USART3的接收事件触发的中断
-//	{
-//		Serial_RxData = USART_ReceiveData(USART3);				//读取数据寄存器，存放在接收的数据变量
-//		Serial_RxFlag = 1;										//置接收标志位变量为1
-//		g_event_pwm_received = 1;
-//		
-//		USART_ClearITPendingBit(USART3, USART_IT_RXNE);			//清除USART3的RXNE标志位
-//																//读取数据寄存器会自动清除此标志位
-//																//如果已经读取了数据寄存器，也可以不执行此代码
-//	}
-//}
-//void UART4_IRQHandler(void)
-//{
-//    if (USART_GetFlagStatus(UART4, USART_IT_RXNE) == SET)
-//    {
-//		
-//        U16 RxByte = USART_ReceiveData(UART4);
-//		//Cmd_GetPkt(RxByte);
-//        Fifo_in(RxByte);
-//        g_event_im948_received = 1;
-//		
-//        USART_ClearITPendingBit(UART4, USART_IT_RXNE);
-//    }
-//}
-
-
-//}
-
-
-//void USART3_IRQHandler(void)
-//{
-//    static uint8_t RxState = 0;         // 状态机状态
-//    static uint8_t DataType = 0;        // 数据类型
-//    static uint8_t DataLength = 0;      // 数据长度
-//    static uint8_t pRxPacket = 0;       // 数据包位置指针
-//    static uint8_t ReceivedCRC = 0;     // 接收到的校验值
-//    
-//    if (USART_GetITStatus(USART3, USART_IT_RXNE) == SET) //判断是否是USART3的接收事件触发的中断
-//    {
-//        uint8_t RxData = USART_ReceiveData(USART3);
-//        
-//        switch (RxState)
-//        {
-//            case 0: // 等待起始字节1
-//                if (RxData == PACKET_START_BYTE1) {
-//                    RxState = 1;
-//                }
-//                break;
-//                
-//            case 1: // 等待起始字节2
-//                if (RxData == PACKET_START_BYTE2) {
-//                    RxState = 2;
-//                    pRxPacket = 0;  // 重置数据包指针
-//                } else {
-//                    RxState = 0; // 如果不是起始字节2，重新开始
-//                }
-//                break;
-//                
-//            case 2: // 接收数据类型
-//                DataType = RxData;
-//                Serial_RxPacket[pRxPacket++] = RxData;
-//                RxState = 3;
-//                break;
-//                
-//            case 3: // 接收数据长度
-//                DataLength = RxData;
-//                Serial_RxPacket[pRxPacket++] = RxData;
-//                
-//                // 验证数据长度是否合法
-//                if ((DataType == DATA_TYPE_Thrusters && DataLength == THRUSTER_DATA_LENGTH) ||
-//                    (DataType == DATA_TYPE_SENSOR && DataLength == SENSOR_DATA_LENGTH) ||
-//                    (DataType == DATA_TYPE_SERVO && DataLength == SERVO_DATA_LENGTH) ||
-//                    (DataType == DATA_TYPE_LIGHT && DataLength == LIGHT_DATA_LENGTH)) {
-//                    RxState = 4;
-//                } else {
-//                    RxState = 0; // 数据长度不匹配，重新开始
-//                }
-//                break;
-//                
-//            case 4: // 接收数据负载
-//                Serial_RxPacket[pRxPacket++] = RxData;
-//                // 检查是否接收完所有数据 (+2是因为包含了数据类型和长度)
-//                if (pRxPacket >= (DataLength + 2)) {
-//                    RxState = 5;
-//                }
-//                break;
-//                
-//            case 5: // 接收校验位
-//                ReceivedCRC = RxData;
-//                RxState = 6;
-//                break;
-//                
-//            case 6: // 等待结束字节1
-//                if (RxData == PACKET_END_BYTE1) {
-//                    RxState = 7;
-//                } else {
-//                    RxState = 0; // 如果不是结束字节1，重新开始
-//                }
-//                break;
-//                
-//            case 7: // 等待结束字节2
-//                if (RxData == PACKET_END_BYTE2) {
-//                    // 完整数据包接收完成，进行校验
-//                    uint8_t CalculatedCRC = Serial_CRC8(Serial_RxPacket, pRxPacket);
-//                    //if (CalculatedCRC == ReceivedCRC) {
-//					if(1){
-//                        // CRC校验成功，处理数据
-//                        //解码推进器电机PWM
-//                        if (DataType == DATA_TYPE_Thrusters) {
-//                            // 解析PWM数据
-//                            for (uint8_t i = 0; i < 6; i++) {
-//                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
-//                                Serial_RxPWM_Thruster[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
-//                                // 数据范围检查
-//                                if (Serial_RxPWM_Thruster[i] > 5000) {
-//                                    Serial_RxPWM_Thruster[i] = 5000;
-//                                }
-//                            }
-//                            Serial_RxFlag = 1; // 设置接收完成标志
-//                        }
-//                        //解码舵机PWM
-//                        if (DataType == DATA_TYPE_SERVO) {
-//                            // 解析PWM数据
-//                            for (uint8_t i = 0; i < 2; i++) {
-//                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
-//                                Serial_RxPWM_Servo[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
-//                                // 数据范围检查
-//                                if (Serial_RxPWM_Servo[i] > 2500) {
-//                                    Serial_RxPWM_Servo[i] = 2500;
-//                                }
-//                            }
-//                            Serial_RxFlag = 1; // 设置接收完成标志
-//							
-//                        }
-//                        //解码探照灯PWM
-//                        if (DataType == DATA_TYPE_LIGHT) {
-//                            // 解析PWM数据
-//                            for (uint8_t i = 0; i < 2; i++) {
-//                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
-//                                Serial_RxPWM_Light[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
-//                                // 数据范围检查
-//                                if (Serial_RxPWM_Light[i] > 2500) {
-//                                    Serial_RxPWM_Light[i] = 2500;
-//                                }
-//                            }
-//                            Serial_RxFlag = 1; // 设置接收完成标志
-//                        }
-//                    }
-//                    // 无论校验是否成功，都重新开始
-//                }
-//                RxState = 0; // 重新开始
-//                break;
-//                
-//            default:
-//                RxState = 0;
-//                break;
-//        }
-//        
-//        USART_ClearITPendingBit(USART3, USART_IT_RXNE);
-//    }
-//}
-
+        switch(ota_state)
+        {
+        case 0:
+            ota_state = (rx_byte == OTA_1) ? 1 : 0; // 等待包头1
+            break;
+        case 1:
+            ota_state = (rx_byte == OTA_2) ? 2 : 0; // 等待包头2
+            break;
+        case 2:
+            ota_state = (rx_byte == OTA_3) ? 3 : 0; // 等待包头2
+            break;
+        case 3:
+            if(rx_byte == OTA_4)
+            {
+                BootFlag_RequestEnterBootloader();
+                NVIC_SystemReset(); // 触发系统复位，进入 Bootloader
+            }
+			ota_state = 0;
+			break;
+        }
+    }  
+}
 
 void USART3_IRQHandler(void)
 {
@@ -844,34 +669,6 @@ void USART3_IRQHandler(void)
 			}
 				
 		}
-		
-//        switch(Serial_RxPWM_Control[2]) // 根据数据类型处理
-//        {
-//            case DATA_TYPE_Thrusters:
-//                if (Serial_RxPWM_Control[3] == THRUSTER_DATA_LENGTH)
-//                {
-//                    // CCR寄存器，自动装入影子寄存器中
-//                    Thruster_SetPWM(Serial_RxPWM_Control);
-//                }
-//                break;
-//            // 可以添加更多数据类型的处理
-//			case DATA_TYPE_SERVO:
-//                if (Serial_RxPWM_Control[3] == SERVO_DATA_LENGTH)
-//                {
-//                    Servo_SetPWM(Serial_RxPWM_Control);
-//                }
-//                break;		
-//			case DATA_TYPE_LIGHT:
-//				if (Serial_RxPWM_Control[3] == LIGHT_DATA_LENGTH)
-//				{
-//					Light_SetPWM(Serial_RxPWM_Control);
-//				}
-//				break;
-//            default:
-//				TIM4->CCR3 = 0;  // LED 1
-//				TIM4->CCR4 = 0;  // LED 2
-//                break;
-//        }
         
         // DMA重置
         DMA1->LIFCR = (uint32_t)(0x3D << 6);

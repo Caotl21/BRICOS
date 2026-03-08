@@ -15,37 +15,38 @@
 #include "im948_CMD.h"
 #include "Dma.h"
 #include "Types.h"
+#include "boot_flag.h"
 
 int main()
 {
 	//NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
-	/*Ä£¿é³õÊ¼»¯*/
-	LED_Init();
-	USART1_DMA_Init();
-	USART3_DMA_Init();
+	//LED_Init();
+	//USART1_DMA_Init();
+	//USART3_DMA_Init();
 	Serial_Init();
-	DHT11_Init();
-	//OLED_Init();
-	MS5837_init();
-	PWM_Init();
-	ESC_Init();
-	USART2_DMA_Init();
-	JY901B_Init();
-	AD_Init();
-	IM948_Init();
-	Ctl_WatchDog_Timer_Init();
-	//OLED_ShowString(1, 1, "Ready");
-	// ³õÊ¼»¯ÈÎÎñµ÷¶ÈÆ÷
+	USART2_Init(115200);
+//	DHT11_Init();
+//	MS5837_init();
+//	PWM_Init();
+//	ESC_Init();
+//	USART2_DMA_Init();
+//	JY901B_Init();
+//	AD_Init();
+//	IM948_Init();
+//	Ctl_WatchDog_Timer_Init();
+	
+	BootFlag_MarkBootSuccess();
+	// ï¿½ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 		
-	// ÏÔÊ¾Æô¶¯ÐÅÏ¢
-    //OLED_ShowString(1, 1, "System Ready");
+	// ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢
     Delay_ms(DELAY_TIME);
     //OLED_Clear();	
-	Watchdog_Init();
-	printf("hello world!");
-	TaskScheduler_Init();
+	//Watchdog_Init();
+	printf("This is APP1!\r\n");
+	//TaskScheduler_Init();
 	while(1)
 	{
-		TaskScheduler_Run();
+		printf("This is APP1!\r\n");
+		//TaskScheduler_Run();
 	}
 }
