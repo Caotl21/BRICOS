@@ -2,7 +2,20 @@
 
 用于 STM32F407 的双分区 Bootloader。
 - 支持通过 Ymodem 协议进行 OTA 升级
+- 支持软件复位/硬件复位两种升级模式
 - 采用独立 Boot Flag 机制记录升级状态和启动状态
+
+## Python OTA 工具
+提供了一个基于 Python 的 OTA 升级工具，支持通过串口发送 Ymodem 数据进行升级。
+- 依赖 `pyserial` 和 `libgpiod` 库
+- 支持两种触发模式：APP 触发和硬件复位触发 对于硬件触发，需要指定 GPIO 芯片和线号来控制复位引脚
+- 脚本使用示例：
+```bash
+// 通过软件复位触发 OTA 升级
+python3 ota_send.py --mode app-trigger --cmd-port /dev/ttyUSB0 --data-port /dev/ttyUSB1 --file app4test.bin
+// 通过硬件复位触发 OTA 升级
+python3 ota_send.py --mode hw-reset   --cmd-port /dev/ttyUSB0   --data-port /dev/ttyUSB1   --file app4test.bin   --reset-gpiochip /dev/gpiochip1   --reset-line 27
+```
 
 ## Flash Layout
 
@@ -17,11 +30,11 @@
 
 上电后 Bootloader 按以下顺序决定是否进入升级模式：
 
-1. 检查软件请求标志  
+1. 软件复位模式：检查软件请求标志  
 如果 APP 之前设置了 `enter_bootloader`，则直接进入 Bootloader 菜单。
 
-2. 检查串口命令  
-上电后 3 秒内，如果 `USART1` 收到字符 `B`，则进入 Bootloader 菜单。
+2. 硬件复位模式：检查串口命令  
+上电后 100 毫秒内，如果 `USART1` 收到字符 `B`，则进入 Bootloader 菜单。
 
 3. 正常启动 APP  
 若未请求进入 Bootloader，则执行正常启动流程：
