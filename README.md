@@ -11,10 +11,8 @@
 - 支持两种触发模式：APP 触发和硬件复位触发 对于硬件触发，需要指定 GPIO 芯片和线号来控制复位引脚
 - 脚本使用示例：
 ```bash
-// 通过软件复位触发 OTA 升级
-python3 ota_send.py --mode app-trigger --cmd-port /dev/ttyUSB0 --data-port /dev/ttyUSB1 --file app4test.bin
-// 通过硬件复位触发 OTA 升级
-python3 ota_send.py --mode hw-reset   --cmd-port /dev/ttyUSB0   --data-port /dev/ttyUSB1   --file app4test.bin   --reset-gpiochip /dev/gpiochip1   --reset-line 27
+    python3 ota_send.py --mode app-trigger --cmd-port /dev/ttyUSB0 --data-port /dev/ttyUSB1 --file app4test.bin
+    python3 ota_send.py --mode hw-reset   --cmd-port /dev/ttyUSB0   --data-port /dev/ttyUSB1   --file app4test.bin   --reset-gpiochip /dev/gpiochip1   --reset-line 27
 ```
 
 ## Flash Layout
