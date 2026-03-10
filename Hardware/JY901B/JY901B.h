@@ -8,17 +8,7 @@ extern volatile char s_cCmd;
 
 
 extern struct_JY901BFifo JY901BFifo;
-//#define JY901BFifo_in(RxByte) JY901BFifo.JY901BRxBuf[JY901BFifo.Cnt++] = (RxByte);\
-//                            if(JY901BFifo.Cnt >= JY901BFifoSize)\
-//                            {\
-//                                JY901BFifo.Cnt = 0;\
-//                            }
-#define JY901BFifo_in(RxByte) if(JY901BFifoSize > JY901BFifo.Cnt)\
-								{\
-									JY901BFifo.JY901BRxBuf[JY901BFifo.In] = RxByte;\
-									if(++JY901BFifo.In>=JY901BFifoSize) JY901BFifo.In=0;\
-									JY901BFifo.Cnt++;\
-								}
+
 
 void JY901B_Init(void);
 void CopeCmdData(unsigned char ucData);

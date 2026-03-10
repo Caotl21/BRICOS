@@ -97,3 +97,10 @@ void USART3_DMA_Init(void)
     DMA_Cmd(DMA1_Stream1, ENABLE); // 开启 DMA 流
 }
 
+void DMA_User_Init(void)
+{
+    USART1_DMA_Init();
+    USART2_DMA_Init();
+    USART3_DMA_Init();
+}
+

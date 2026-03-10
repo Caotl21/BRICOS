@@ -3,10 +3,10 @@
 #include "stm32f4xx_conf.h"
 #include "misc.h"
 #include "wit_c_sdk.h"
-#include "JY901B_UART.h"
 #include "Delay.h"
 #include "JY901B.h"
 #include "TaskScheduler.h"
+#include "Serial.h"
 
 #define ACC_UPDATE		0x01
 #define GYRO_UPDATE		0x02
@@ -102,15 +102,11 @@ void CmdProcess(void)
 			break;
 		case 'B':	
 			if(WitSetUartBaud(WIT_BAUD_115200) != WIT_HAL_OK) 
-				printf("\r\nSet Baud Error\r\n");
-			else 
-				JY901B_UartInit(c_uiBaud[WIT_BAUD_115200]);											
+				printf("\r\nSet Baud Error\r\n");									
 			break;
 		case 'b':	
 			if(WitSetUartBaud(WIT_BAUD_9600) != WIT_HAL_OK)
-				printf("\r\nSet Baud Error\r\n");
-			else 
-				JY901B_UartInit(c_uiBaud[WIT_BAUD_9600]);												
+				printf("\r\nSet Baud Error\r\n");												
 			break;
 		case 'R':	
 			if(WitSetOutputRate(RRATE_10HZ) != WIT_HAL_OK) 
@@ -141,7 +137,7 @@ void CmdProcess(void)
   */
 void SensorUartSend(uint8_t *p_data, uint32_t uiSize)
 {
-	JY901B_UartSend(p_data, uiSize);
+	USART2_UartSend(p_data, uiSize);
 }
 /**
   * ��    ������ʱ����
@@ -164,23 +160,19 @@ void SensorDataUpdata(uint32_t uiReg, uint32_t uiRegNum)
     {
         switch(uiReg)
         {
-//            case AX:
-//            case AY:
+
             case AZ:
 				s_cDataUpdate |= ACC_UPDATE;
             break;
-//            case GX:
-//            case GY:
+
             case GZ:
 				s_cDataUpdate |= GYRO_UPDATE;
             break;
-//            case HX:
-//            case HY:
+
             case HZ:
 				s_cDataUpdate |= MAG_UPDATE;
             break;
-//            case Roll:
-//            case Pitch:
+
             case Yaw:
 				s_cDataUpdate |= QUATER_UPDATE;
             break;
@@ -193,49 +185,17 @@ void SensorDataUpdata(uint32_t uiReg, uint32_t uiRegNum)
 }
 
 /**
-  * ��    �����ò�ͬ�ֶεĲ����ʳ�ʼ����ɨ��JY901B
-  * ��    ������
-  * �� �� ֵ����
-  */
-void AutoScanSensor(void)
-{
-	int i, iRetry;
-	for(i = 1; i < 10; i++)
-	{
-		JY901B_UartInit(c_uiBaud[i]);
-		iRetry = 2;
-		do
-		{
-			s_cDataUpdate = 0;
-			
-			WitReadReg(AX, 3);
-			
-			Delay_ms(100);
-			if(s_cDataUpdate != 0)
-			{
-				printf("%d baud find sensor\r\n\r\n", c_uiBaud[i]);
-				ShowHelp();
-				return ;
-			}
-			iRetry--;
-		}while(iRetry);		
-	}
-	printf("can not find sensor\r\n");
-	printf("please check your connection\r\n");
-}
-/**
   * ��    ����JY901B��ʼ������
   * ��    ������
   * �� �� ֵ����
   */
 void JY901B_Init(void)
 {
-	JY901B_UartInit(115200);			//��ʼ����ȡģ�����ݴ���
 	WitInit(WIT_PROTOCOL_NORMAL, 0x50);	//��ʼ����׼Э�飬�˴�ΪnormalЭ�飬��Ч
 	WitSerialWriteRegister(SensorUartSend);//ע��д�ص�����
 	WitRegisterCallBack(SensorDataUpdata);//ע���ȡ���������ݻص�����
 	WitDelayMsRegister(Delayms);
-	//AutoScanSensor();				//���ڴ����ж�ֻ�������ݴ洢����ʱautoscan�Ͳ�������
+
 	JY901BFifo.Cnt = 0;
 	JY901BFifo.In = 0;
 	JY901BFifo.Out = 0;
@@ -255,7 +215,6 @@ void JY901B_GetData(float fAcc[],float fGyro[],float fQuater[])
 		{
 			fAcc[i] = sReg[AX+i] / 32768.0f * 16.0f;
 			fGyro[i] = sReg[GX+i] / 32768.0f * 2000.0f;
-			//fAngle[i] = sReg[Roll+i] / 32768.0f * 180.0f;
 		}
 		for(i = 0; i < 4; i++)
 		{
@@ -263,22 +222,18 @@ void JY901B_GetData(float fAcc[],float fGyro[],float fQuater[])
 		}
 		if(s_cDataUpdate & ACC_UPDATE)
 		{
-			//printf("acc:%.3f %.3f %.3f\r\n", fAcc[0], fAcc[1], fAcc[2]);
 			s_cDataUpdate &= ~ACC_UPDATE;
 		}
 		if(s_cDataUpdate & GYRO_UPDATE)
 		{
-			//printf("gyro:%.3f %.3f %.3f\r\n", fGyro[0], fGyro[1], fGyro[2]);
 			s_cDataUpdate &= ~GYRO_UPDATE;
 		}
 		if(s_cDataUpdate & QUATER_UPDATE)
 		{
-			//printf("angle:%.3f %.3f %.3f\r\n", fAngle[0], fAngle[1], fAngle[2]);
 			s_cDataUpdate &= ~QUATER_UPDATE;
 		}
 		if(s_cDataUpdate & MAG_UPDATE)
 		{
-			//printf("mag:%d %d %d\r\n", sReg[HX], sReg[HY], sReg[HZ]);
 			s_cDataUpdate &= ~MAG_UPDATE;
 		}
 	}
@@ -298,8 +253,6 @@ static uint8_t __CaliSum(uint8_t *data, uint32_t len)
   */
 void JY901B_process(void)
 {
-	int current_time = GetSystemTick();
-	
 	uint16_t usData[4];
 	uint8_t ucSum;
 	uint8_t data_temp[11] = {0};
@@ -313,7 +266,6 @@ void JY901B_process(void)
 	{JY901BFifo.Cnt = JY901BFifo.In - JY901BFifo.Out;}
 	else
 	{JY901BFifo.Cnt = JY901BFifoSize + JY901BFifo.In - JY901BFifo.Out;}
-	//printf("In:%d  Out:%d   cnt:%d\r\n",JY901BFifo.In,JY901BFifo.Out,JY901BFifo.Cnt);
 	
 	
 	while(JY901BFifo.Cnt >= 11)
@@ -362,8 +314,6 @@ void JY901B_process(void)
 					//������ݲ���11���ֽ��ˣ��ǾͲ������˵��´δ���
 					if(JY901BFifo.Cnt < 11) 
 					{
-						//int last_time = GetSystemTick();
-						//printf("time1:%d\r\n",last_time - current_time);
 						return;
 					}
 					//JY901BFifo.Cnt = 0;
@@ -371,7 +321,5 @@ void JY901B_process(void)
 				//�����ݴ洢
             }
         }
-		//int last_time = GetSystemTick();
-		//printf("time2:%d\r\n",last_time - current_time);
 		
 }

@@ -12,7 +12,6 @@ void MS5837I2C_SendAck(uint8_t AckBit);
 uint8_t MS5837I2C_ReceiveAck(void);
 
 void MS5837_init(void);
-void MS5837_Getdata(float * outTemp, float * outPress, float *outDepth);
 void MS5837_GetTemp_1(void);
 void MS5837_GetTemp_2(float * outTemp);
 void MS5837_GetDepth_1(void);

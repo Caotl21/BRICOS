@@ -114,32 +114,3 @@ void PWM_Init(void)
 	TIM_Cmd(TIM9, ENABLE);			//使能TIM9，定时器开始运行
 }
 
-/**
-  * 函    数：PWM设置CCR
-  * 参    数：Compare 要写入的CCR的值，范围：0~100
-  * 返 回 值：无
-  * 注意事项：CCR和ARR共同决定占空比，此函数仅设置CCR的值，并不直接是占空比
-  *           占空比Duty = CCR / (ARR + 1)
-  */
-void Motor_SetPWM(uint16_t Compare[])
-{	
-	TIM_SetCompare1(TIM3, Compare[0]);		//设置CCR2的值
-	TIM_SetCompare2(TIM3, Compare[1]);
-	TIM_SetCompare3(TIM3, Compare[2]);
-	TIM_SetCompare4(TIM3, Compare[3]);
-	TIM_SetCompare1(TIM4, Compare[4]);
-	TIM_SetCompare2(TIM4, Compare[5]);
-}
-
-void LED_SetPWM(uint16_t Compare[])
-{
-	TIM_SetCompare3(TIM4, Compare[0]);
-	TIM_SetCompare4(TIM4, Compare[1]);
-}
-
-void Servo_SetPWM(uint16_t Compare[])
-{
-	TIM_SetCompare1(TIM9, Compare[0]);		//设置CCR2的值
-	TIM_SetCompare2(TIM9, Compare[1]);
-}
-

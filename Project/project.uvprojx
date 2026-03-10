@@ -684,16 +684,6 @@
           <GroupName>Hardware</GroupName>
           <Files>
             <File>
-              <FileName>LED.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\LED.c</FilePath>
-            </File>
-            <File>
-              <FileName>LED.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\LED.h</FilePath>
-            </File>
-            <File>
               <FileName>Serial.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Hardware\Serial.c</FilePath>
@@ -702,21 +692,6 @@
               <FileName>Serial.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Hardware\Serial.h</FilePath>
-            </File>
-            <File>
-              <FileName>OLED.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\OLED.c</FilePath>
-            </File>
-            <File>
-              <FileName>OLED.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\OLED.h</FilePath>
-            </File>
-            <File>
-              <FileName>OLED_Font.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\OLED_Font.h</FilePath>
             </File>
             <File>
               <FileName>AD.c</FileName>
@@ -807,16 +782,6 @@
               <FileName>JY901B.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Hardware\JY901B\JY901B.h</FilePath>
-            </File>
-            <File>
-              <FileName>JY901B_UART.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\JY901B\JY901B_UART.c</FilePath>
-            </File>
-            <File>
-              <FileName>JY901B_UART.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\JY901B\JY901B_UART.h</FilePath>
             </File>
             <File>
               <FileName>REG.h</FileName>

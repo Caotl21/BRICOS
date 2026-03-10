@@ -36,24 +36,9 @@ typedef struct {
     uint32_t run_count;          // 执行计数
 } TaskControlBlock_t;
 
-// 事件标志
-extern volatile uint8_t g_event_pwm_received;
-extern volatile uint8_t g_event_sensor_ready;
-extern volatile uint8_t g_event_im948_received;
-extern volatile uint8_t g_event_JY901B_received;
+
 // 任务执行标志位
 extern volatile uint16_t g_task_flags;
-
-static volatile uint32_t system_tick_ms;
-
-// 任务标志位定义
-//#define TASK_FLAG_SENSOR_DATA   (1 << TASK_SENSOR_DATA)
-//#define TASK_FLAG_SERIAL_PCSEND (1 << TASK_SERIAL_PCSEND)
-//#define TASK_FLAG_DISPLAY       (1 << TASK_DISPLAY)
-//#define TASK_FLAG_THRUSTERS_PWM    (1 << TASK_Thrusters_PWM_OUTPUT)
-//#define      (1 << TASK_Servo_PWM_OUTPUT)
-//#define TASK_FLAG_LIGHT_PWM    (1 << TASK_Light_PWM_OUTPUT)
-#define TASK_FLAG_IM948_PROCESS (1 << TASK_IM948_PROCESS)
 
 
 // 函数声明
@@ -61,8 +46,7 @@ void TaskScheduler_Init(void);     //
 void TaskScheduler_Check(void);    // 检查任务，设置标志位
 void TaskScheduler_Execute(void);  // 执行标志位对应的任务
 void TaskScheduler_Run(void);
-uint32_t GetSystemTick(void);
-void SystemTick_Increment(void);
+uint32_t GetSchedulerTick(void);
 
 void Task_Disable(void);
 void Task_Enable(void);
