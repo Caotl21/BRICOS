@@ -1,9 +1,6 @@
 #include "stm32f4xx.h"                  // Device header
 #include "stm32f4xx_conf.h"
 
-//#include "TaskScheduler.h"
-//#include "im948_CMD.h"
-//#include "Serial.h"
 
 
 
@@ -62,8 +59,6 @@ void Timer_Init(void)
 	/*TIM使能*/
 	TIM_Cmd(TIM2, ENABLE);			//使能TIM2，定时器开始运行
 
-	// 调试 定时器最终结果
-	//printf("Timer initialized successfully\r\n");
 	
 }
 

@@ -4,28 +4,20 @@
 #include <stdarg.h>
 #include "Serial.h"
 #include "TaskScheduler.h"
-//#include "im948_CMD.h"
-//#include "Serial.h"
-//#include "OLED.h"
-
-//#include "JY901B.h"
+#include "boot_flag.h"
 
 
 uint8_t Serial_RxData;		//定义串口接收的数据变量
 uint8_t Serial_RxFlag;		//定义串口接收的标志位变量
 
 volatile uint8_t Serial_RxPWM_Control[64] = {0};     // 接收的PWM值数组
-uint16_t Serial_RxPWM_Thruster[6] = {0};     // 接收的PWM值数组
-uint16_t Serial_RxPWM_Servo[2] = {0};        // 接收的舵机PWM值
-uint16_t Serial_RxPWM_Light[2] = {0};        // 接收的LED PWM值
+
 uint8_t Serial_RxPacket[MAX_PACKET_SIZE];          // 接收数据包缓冲区
 uint8_t Serial_TxPacket[MAX_PACKET_SIZE];          // 发送数据包缓冲区
 
 static void Emergency_Process();
 static void Recovery_Process();
 static void Control_SetPWM(volatile uint8_t *RxBuf);
-static void Thruster_SetPWM(volatile uint8_t *RxBuf);
-static void Servo_SetPWM(volatile uint8_t *RxBuf);
 static void Light_SetPWM(volatile uint8_t *RxBuf);
 
 static uint8_t emergency_flag = 0;
@@ -33,9 +25,14 @@ static uint8_t emergency_flag = 0;
 #define PWM_DEFAULT 1500
 #define PWM_MAX 1800
 
+#define OTA_1 0x12
+#define OTA_2 0x34
+#define OTA_3 0x56
+#define OTA_4 0x78
 
-// 传感器数据（模拟数据）
 SensorData_t Serial_SensorData = {0};
+
+
 /*	USART1_TX:PA9	USART1_RX:PA10
 	USART2_TX:PA2	USART2_RX:PA3
 	USART3_TX:PB10	USART3_RX:PB11
@@ -101,56 +98,44 @@ void USART1_Init(uint32_t baudrate)
     USART_Cmd(USART1, ENABLE);
 }
 
-/**
-  * 函    数：串口2 TXD->PA2, RXD->PA3 初始化
-  * 参    数：无
-  * 返 回 值：无
-  */
-void USART2_Init(uint32_t baudrate)
+void USART2_Init(unsigned int uiBaud)
 {
-    GPIO_InitTypeDef GPIO_InitStructure;
-    USART_InitTypeDef USART_InitStructure;
-    NVIC_InitTypeDef NVIC_InitStructure;
+ 	GPIO_InitTypeDef GPIO_InitStructure;
+	USART_InitTypeDef USART_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+	
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);	//����USART2��ʱ��
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);
+	
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2);
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2);
 
-    // 1. 开启时钟
-    // USART2 挂载在 APB1，GPIOA 挂载在 AHB1
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
-
-    // 2. 引脚复用映射
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2);
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource3, GPIO_AF_USART2);
-
-    // 3. GPIO 初始化
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
     GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+
+    /* ����Tx����Ϊ���ù���  */
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-    // 4. USART 参数配置
-    USART_InitStructure.USART_BaudRate = baudrate; // 注意确认这个IMU的波特率
-    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
-    USART_InitStructure.USART_StopBits = USART_StopBits_1;
-    USART_InitStructure.USART_Parity = USART_Parity_No;
-    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
-    USART_Init(USART2, &USART_InitStructure);
+    /* ����Rx����Ϊ���ù��� */
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+	  
+	USART_InitStructure.USART_BaudRate = uiBaud;
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	USART_InitStructure.USART_Parity = USART_Parity_No ;
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+	USART_Init(USART2, &USART_InitStructure); 
+	//USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
+	USART_DMACmd(USART2, USART_DMAReq_Rx, ENABLE);
+	USART_Cmd(USART2, ENABLE);	
+	
 
-    // 5. 中断配置 (IMU 数据量大且快，必须用中断)
-    USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);
-
-    // 设置优先级：IMU 的优先级要高 (数字越小优先级越高)
-    // 防止打印日志的时候，IMU 突发数据导致丢包
-    NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0; // 抢占优先级 0 (最高)
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-
-    // 6. 使能串口
-    USART_Cmd(USART2, ENABLE);
 }
 
 /**
@@ -158,7 +143,7 @@ void USART2_Init(uint32_t baudrate)
   * 参    数：无
   * 返 回 值：无
   */
-void Serial_Init(void)
+void USART3_Init(uint32_t baudrate)
 {
 	GPIO_InitTypeDef GPIO_InitStructure;
     USART_InitTypeDef USART_InitStructure;
@@ -182,7 +167,7 @@ void Serial_Init(void)
     GPIO_Init(GPIOB, &GPIO_InitStructure);
 
     // 4. USART 参数配置
-    USART_InitStructure.USART_BaudRate = 115200;
+    USART_InitStructure.USART_BaudRate = baudrate;
     USART_InitStructure.USART_WordLength = USART_WordLength_8b;
     USART_InitStructure.USART_StopBits = USART_StopBits_1;
     USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -195,7 +180,7 @@ void Serial_Init(void)
 	USART_ITConfig(USART3, USART_IT_IDLE, ENABLE);				//开启USART1空闲中断 
 
     // 5. 中断配置 (用于接收电脑发的指令)
-//    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
+    //USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
 
     // 设置优先级：调试串口优先级稍微低一点，不要打断 IMU 的数据读取
     NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
@@ -207,6 +192,68 @@ void Serial_Init(void)
     // 6. 使能串口
     USART_Cmd(USART3, ENABLE);
 }
+
+/**
+ * 函    数：UART4 TXD->PA0, RXD->PA1 初始化
+ * 参    数：baudrate 波特率    
+ * 返 回 值：无
+ */
+void UART4_Init(uint32_t baudrate)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    USART_InitTypeDef USART_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    // 1. 开启时钟
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART4, ENABLE);
+
+    // 2. 配置引脚复用
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource0, GPIO_AF_UART4);   // PA0 -> UART4_TX
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource1, GPIO_AF_UART4);   // PA1 -> UART4_RX
+
+    // 3. GPIO 初始化
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    // 4. UART 参数配置
+    USART_InitStructure.USART_BaudRate = baudrate;
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    USART_Init(UART4, &USART_InitStructure);
+
+    // 5. 开启接收中断
+    USART_ITConfig(UART4, USART_IT_RXNE, ENABLE);
+
+    // 6. NVIC 配置
+    NVIC_InitStructure.NVIC_IRQChannel = UART4_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    // 7. 使能 UART4
+    USART_Cmd(UART4, ENABLE);
+}
+
+void USART2_UartSend(unsigned char *p_data, unsigned int uiSize)
+{	
+	unsigned int i;
+	for(i = 0; i < uiSize; i++)
+	{
+		while(USART_GetFlagStatus(USART2, USART_FLAG_TXE) == RESET);
+		USART_SendData(USART2, *p_data++);		
+	}
+	while(USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET);
+}
+
 
 /**
   * 函    数：串口发送一个字节
@@ -240,7 +287,7 @@ void Serial_SendArray(uint8_t *Array, uint16_t Length)
 // 输入: buf[Len]=要发送的内容
 // 返回: 返回发送字节数
 //------------------------------------------------------------------------------
-int IM948_Write(const U8 *buf, int Len)
+int USART1_UartSend(const U8 *buf, int Len)
 {
 	int i;
 	
@@ -401,69 +448,6 @@ uint8_t Serial_CRC8(uint8_t *data, uint8_t length)
  }
 
 /**
-  * 函    数：串口发送传感器数据包
-  * 参    数：无
-  * 返 回 值：无
-  */
-void Serial_SendSensorPacket(void)
-{
-	// 包头2 + 类型1 + 长度1 + 数据32 + 校验1 + 包尾2 = 39字节
-    uint8_t packet[39];  
-    uint8_t index = 0;
-    uint8_t crc;
-    
-    // 构建数据包
-    packet[index++] = PACKET_START_BYTE1;       // 包头字节1
-    packet[index++] = PACKET_START_BYTE2;       // 包头字节2
-    packet[index++] = DATA_TYPE_SENSOR;         // 数据类型
-    packet[index++] = SENSOR_DATA_LENGTH;       // 数据长度
-    
-    // 传感器数据
-    packet[index++] = (uint8_t)(Serial_SensorData.accel_x1 >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.accel_x1 & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.accel_y1 >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.accel_y1 & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.accel_z1 >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.accel_z1 & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.gyro_x1 >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.gyro_x1 & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.gyro_y1 >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.gyro_y1 & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.gyro_z1 >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.gyro_z1 & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.Wquat_2 >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.Wquat_2 & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.Xquat_2 >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.Xquat_2 & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.Yquat_2 >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.Yquat_2 & 0xFF);
-	packet[index++] = (uint8_t)(Serial_SensorData.Zquat_2 >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.Zquat_2 & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.press >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.press & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.temperature_water >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.temperature_water & 0xFF);
-    packet[index++] = (uint8_t)(Serial_SensorData.humidity >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.humidity & 0xFF);
-	packet[index++] = (uint8_t)(Serial_SensorData.temperature_AUV >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.temperature_AUV & 0xFF);
-	packet[index++] = (uint8_t)(Serial_SensorData.voltage >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.voltage & 0xFF);
-	packet[index++] = (uint8_t)(Serial_SensorData.current >> 8);
-    packet[index++] = (uint8_t)(Serial_SensorData.current & 0xFF);
-	
-    
-    // 计算校验位（从数据类型开始到数据结束）
-    crc = Serial_CRC8(&packet[2], index - 2);  // 跳过包头
-    packet[index++] = crc;                      // 校验位
-    packet[index++] = PACKET_END_BYTE1;         // 包尾字节1
-    packet[index++] = PACKET_END_BYTE2;         // 包尾字节2
-    
-    // 发送数据包
-    Serial_SendArray(packet, index);
-}
-
-/**
   * 函    数：高频串口发送传感器数据包
   * 参    数：无
   * 返 回 值：无
@@ -579,222 +563,48 @@ void Slow_Serial_SendSensorPacket(void)
 }
 
 
-
-
-
-void USART1_IRQHandler(void)
+/**
+ * 函    数：UART4 接收中断服务程序，用于接收 OTA 升级指令
+ * 参    数：无
+ * 返 回 值：无
+ */
+void UART4_IRQHandler(void)
 {
-//    uint8_t temp;
-//    
-//    // 检测空闲中断
-//    if(USART_GetITStatus(USART1, USART_IT_IDLE) != RESET)
-//    {
-//        // 1. 清除 IDLE 标志 (读取 SR 后读取 DR 序列)
-//        temp = USART1->SR;
-//        temp = USART1->DR; 
-//        
-//        // 2. 计算当前 DMA 写到哪里了
-//        // DMA_GetCurrDataCounter 返回的是“剩余传输量” (从 FifoSize 减到 0)
-//        // 所以：当前位置 = 总大小 - 剩余大小
-//        // 在循环模式下，这个逻辑是自动回环的
-//        Uart1Fifo.In = FifoSize - DMA_GetCurrDataCounter(DMA2_Stream2);
-//        
-//        // 3. 通知消费者任务 (置位事件标志)
-//        // 此时，Uart1Fifo.RxBuf 里的数据已经由 DMA 填好了，In 指针也更新了
-//        g_event_im948_received = 1;
-//        
-//        // 不需要清除 PendingBit，上面的 SR+DR 读取操作已经清除了
-//    }
+    uint8_t rx_byte;
+    static uint8_t ota_state = 0; // 0: 等待包头1, 1: 等待包头2, 2: 接收数据
+    // 检测接收中断
+    if(USART_GetITStatus(UART4, USART_IT_RXNE) != RESET)
+    {
+        rx_byte = USART_ReceiveData(UART4); // 读取接收到的数据
+
+        switch(ota_state)
+        {
+        case 0:
+            ota_state = (rx_byte == OTA_1) ? 1 : 0; // 等待包头1
+            break;
+        case 1:
+            ota_state = (rx_byte == OTA_2) ? 2 : 0; // 等待包头2
+            break;
+        case 2:
+            ota_state = (rx_byte == OTA_3) ? 3 : 0; // 等待包头2
+            break;
+        case 3:
+            if(rx_byte == OTA_4)
+            {
+                BootFlag_RequestEnterBootloader();
+                NVIC_SystemReset(); // 触发系统复位，进入 Bootloader
+            }
+			ota_state = 0;
+			break;
+        }
+    }  
 }
 
-//void USART1_IRQHandler(void)
-//{
-//    if (USART_GetFlagStatus(USART1, USART_IT_RXNE) == SET)
-//    {
-//		
-//        U16 RxByte = USART_ReceiveData(USART1);
-//		//Cmd_GetPkt(RxByte);
-//        IM948_Fifo_in(RxByte);
-//		g_event_im948_received = 1;
-//		//printf("get new data!");
-//		
-//        USART_ClearITPendingBit(USART1, USART_IT_RXNE);
-//    }
-//}
-
 /**
-  * 函    数：USART3中断函数
-  * 参    数：无
-  * 返 回 值：无
-  * 注意事项：此函数为中断函数，无需调用，中断触发后自动执行
-  *           函数名为预留的指定名称，可以从启动文件复制
-  *           请确保函数名正确，不能有任何差异，否则中断函数将不能进入
-  */
-//void USART3_IRQHandler(void)
-//{
-//	if (USART_GetITStatus(USART3, USART_IT_RXNE) == SET)		//判断是否是USART3的接收事件触发的中断
-//	{
-//		Serial_RxData = USART_ReceiveData(USART3);				//读取数据寄存器，存放在接收的数据变量
-//		Serial_RxFlag = 1;										//置接收标志位变量为1
-//		g_event_pwm_received = 1;
-//		
-//		USART_ClearITPendingBit(USART3, USART_IT_RXNE);			//清除USART3的RXNE标志位
-//																//读取数据寄存器会自动清除此标志位
-//																//如果已经读取了数据寄存器，也可以不执行此代码
-//	}
-//}
-//void UART4_IRQHandler(void)
-//{
-//    if (USART_GetFlagStatus(UART4, USART_IT_RXNE) == SET)
-//    {
-//		
-//        U16 RxByte = USART_ReceiveData(UART4);
-//		//Cmd_GetPkt(RxByte);
-//        Fifo_in(RxByte);
-//        g_event_im948_received = 1;
-//		
-//        USART_ClearITPendingBit(UART4, USART_IT_RXNE);
-//    }
-//}
-
-
-//}
-
-
-//void USART3_IRQHandler(void)
-//{
-//    static uint8_t RxState = 0;         // 状态机状态
-//    static uint8_t DataType = 0;        // 数据类型
-//    static uint8_t DataLength = 0;      // 数据长度
-//    static uint8_t pRxPacket = 0;       // 数据包位置指针
-//    static uint8_t ReceivedCRC = 0;     // 接收到的校验值
-//    
-//    if (USART_GetITStatus(USART3, USART_IT_RXNE) == SET) //判断是否是USART3的接收事件触发的中断
-//    {
-//        uint8_t RxData = USART_ReceiveData(USART3);
-//        
-//        switch (RxState)
-//        {
-//            case 0: // 等待起始字节1
-//                if (RxData == PACKET_START_BYTE1) {
-//                    RxState = 1;
-//                }
-//                break;
-//                
-//            case 1: // 等待起始字节2
-//                if (RxData == PACKET_START_BYTE2) {
-//                    RxState = 2;
-//                    pRxPacket = 0;  // 重置数据包指针
-//                } else {
-//                    RxState = 0; // 如果不是起始字节2，重新开始
-//                }
-//                break;
-//                
-//            case 2: // 接收数据类型
-//                DataType = RxData;
-//                Serial_RxPacket[pRxPacket++] = RxData;
-//                RxState = 3;
-//                break;
-//                
-//            case 3: // 接收数据长度
-//                DataLength = RxData;
-//                Serial_RxPacket[pRxPacket++] = RxData;
-//                
-//                // 验证数据长度是否合法
-//                if ((DataType == DATA_TYPE_Thrusters && DataLength == THRUSTER_DATA_LENGTH) ||
-//                    (DataType == DATA_TYPE_SENSOR && DataLength == SENSOR_DATA_LENGTH) ||
-//                    (DataType == DATA_TYPE_SERVO && DataLength == SERVO_DATA_LENGTH) ||
-//                    (DataType == DATA_TYPE_LIGHT && DataLength == LIGHT_DATA_LENGTH)) {
-//                    RxState = 4;
-//                } else {
-//                    RxState = 0; // 数据长度不匹配，重新开始
-//                }
-//                break;
-//                
-//            case 4: // 接收数据负载
-//                Serial_RxPacket[pRxPacket++] = RxData;
-//                // 检查是否接收完所有数据 (+2是因为包含了数据类型和长度)
-//                if (pRxPacket >= (DataLength + 2)) {
-//                    RxState = 5;
-//                }
-//                break;
-//                
-//            case 5: // 接收校验位
-//                ReceivedCRC = RxData;
-//                RxState = 6;
-//                break;
-//                
-//            case 6: // 等待结束字节1
-//                if (RxData == PACKET_END_BYTE1) {
-//                    RxState = 7;
-//                } else {
-//                    RxState = 0; // 如果不是结束字节1，重新开始
-//                }
-//                break;
-//                
-//            case 7: // 等待结束字节2
-//                if (RxData == PACKET_END_BYTE2) {
-//                    // 完整数据包接收完成，进行校验
-//                    uint8_t CalculatedCRC = Serial_CRC8(Serial_RxPacket, pRxPacket);
-//                    //if (CalculatedCRC == ReceivedCRC) {
-//					if(1){
-//                        // CRC校验成功，处理数据
-//                        //解码推进器电机PWM
-//                        if (DataType == DATA_TYPE_Thrusters) {
-//                            // 解析PWM数据
-//                            for (uint8_t i = 0; i < 6; i++) {
-//                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
-//                                Serial_RxPWM_Thruster[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
-//                                // 数据范围检查
-//                                if (Serial_RxPWM_Thruster[i] > 5000) {
-//                                    Serial_RxPWM_Thruster[i] = 5000;
-//                                }
-//                            }
-//                            Serial_RxFlag = 1; // 设置接收完成标志
-//                        }
-//                        //解码舵机PWM
-//                        if (DataType == DATA_TYPE_SERVO) {
-//                            // 解析PWM数据
-//                            for (uint8_t i = 0; i < 2; i++) {
-//                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
-//                                Serial_RxPWM_Servo[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
-//                                // 数据范围检查
-//                                if (Serial_RxPWM_Servo[i] > 2500) {
-//                                    Serial_RxPWM_Servo[i] = 2500;
-//                                }
-//                            }
-//                            Serial_RxFlag = 1; // 设置接收完成标志
-//							
-//                        }
-//                        //解码探照灯PWM
-//                        if (DataType == DATA_TYPE_LIGHT) {
-//                            // 解析PWM数据
-//                            for (uint8_t i = 0; i < 2; i++) {
-//                                // Serial_RxPacket[2 + i*2]是高8位，Serial_RxPacket[2 + i*2 + 1]是低8位
-//                                Serial_RxPWM_Light[i] = (Serial_RxPacket[2 + i*2] << 8) | Serial_RxPacket[2 + i*2 + 1];
-//                                // 数据范围检查
-//                                if (Serial_RxPWM_Light[i] > 2500) {
-//                                    Serial_RxPWM_Light[i] = 2500;
-//                                }
-//                            }
-//                            Serial_RxFlag = 1; // 设置接收完成标志
-//                        }
-//                    }
-//                    // 无论校验是否成功，都重新开始
-//                }
-//                RxState = 0; // 重新开始
-//                break;
-//                
-//            default:
-//                RxState = 0;
-//                break;
-//        }
-//        
-//        USART_ClearITPendingBit(USART3, USART_IT_RXNE);
-//    }
-//}
-
-
+ * 函    数：USART3 空闲中断服务程序，用于接收控制指令并设置 PWM 输出 用于与主控通信
+ * 参    数：无
+ * 返 回 值：无
+ */
 void USART3_IRQHandler(void)
 {
     uint8_t temp;
@@ -844,34 +654,6 @@ void USART3_IRQHandler(void)
 			}
 				
 		}
-		
-//        switch(Serial_RxPWM_Control[2]) // 根据数据类型处理
-//        {
-//            case DATA_TYPE_Thrusters:
-//                if (Serial_RxPWM_Control[3] == THRUSTER_DATA_LENGTH)
-//                {
-//                    // CCR寄存器，自动装入影子寄存器中
-//                    Thruster_SetPWM(Serial_RxPWM_Control);
-//                }
-//                break;
-//            // 可以添加更多数据类型的处理
-//			case DATA_TYPE_SERVO:
-//                if (Serial_RxPWM_Control[3] == SERVO_DATA_LENGTH)
-//                {
-//                    Servo_SetPWM(Serial_RxPWM_Control);
-//                }
-//                break;		
-//			case DATA_TYPE_LIGHT:
-//				if (Serial_RxPWM_Control[3] == LIGHT_DATA_LENGTH)
-//				{
-//					Light_SetPWM(Serial_RxPWM_Control);
-//				}
-//				break;
-//            default:
-//				TIM4->CCR3 = 0;  // LED 1
-//				TIM4->CCR4 = 0;  // LED 2
-//                break;
-//        }
         
         // DMA重置
         DMA1->LIFCR = (uint32_t)(0x3D << 6);
@@ -879,8 +661,6 @@ void USART3_IRQHandler(void)
         DMA1_Stream1->M0AR = (uint32_t)Serial_RxPWM_Control;
         DMA_Cmd(DMA1_Stream1, ENABLE);
 
-        
-        // 不需要清除 PendingBit，上面的 SR+DR 读取操作已经清除了
     }
 }
 
@@ -926,31 +706,7 @@ static void Control_SetPWM(volatile uint8_t *RxBuf)
     TIM9->CCR2 = (uint16_t)(RxBuf[14] << 8) | RxBuf[15];  // servo 2
 	
 }
-static void Thruster_SetPWM(volatile uint8_t *RxBuf)
-{
-//    TIM3->CCR1 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // Thruster 1
-//    TIM3->CCR2 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // Thruster 2
-//    TIM3->CCR3 = (uint16_t)(RxBuf[8] << 8) | RxBuf[9];  // Thruster 3
-//    TIM3->CCR4 = (uint16_t)(RxBuf[10] << 8) | RxBuf[11];  // Thruster 4
-//    
-//    TIM4->CCR1 = (uint16_t)(RxBuf[12] << 8) | RxBuf[13];  // Thruster 5
-//    TIM4->CCR2 = (uint16_t)(RxBuf[14] << 8) | RxBuf[15];  // Thruster 6
-	TIM3->CCR1 = (uint16_t)(RxBuf[0] << 8) | RxBuf[1];  // Thruster 1
-    TIM3->CCR2 = (uint16_t)(RxBuf[2] << 8) | RxBuf[3];  // Thruster 2
-    TIM3->CCR3 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // Thruster 3
-    TIM3->CCR4 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // Thruster 4
-    
-    TIM4->CCR1 = (uint16_t)(RxBuf[8] << 8) | RxBuf[9];  // Thruster 5
-    TIM4->CCR2 = (uint16_t)(RxBuf[10] << 8) | RxBuf[11];  // Thruster 6
 
-}
-static void Servo_SetPWM(volatile uint8_t *RxBuf)
-{
-//    TIM9->CCR1 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // servo 1
-//    TIM9->CCR2 = (uint16_t)(RxBuf[6] << 8) | RxBuf[7];  // servo 2
-    TIM9->CCR1 = (uint16_t)(RxBuf[0] << 8) | RxBuf[1];  // servo 1
-    TIM9->CCR2 = (uint16_t)(RxBuf[2] << 8) | RxBuf[3];  // servo 2
-}
 static void Light_SetPWM(volatile uint8_t *RxBuf)
 {
 	TIM4->CCR3 = (uint16_t)(RxBuf[4] << 8) | RxBuf[5];  // LED 1

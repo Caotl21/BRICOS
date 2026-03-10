@@ -16,7 +16,7 @@
         <TargetCommonOption>
           <Device>STM32F407ZGTx</Device>
           <Vendor>STMicroelectronics</Vendor>
-          <PackID>Keil.STM32F4xx_DFP.2.17.1</PackID>
+          <PackID>Keil.STM32F4xx_DFP.2.17.0</PackID>
           <PackURL>https://www.keil.com/pack/</PackURL>
           <Cpu>IRAM(0x20000000,0x00020000) IRAM2(0x10000000,0x00010000) IROM(0x08000000,0x00100000) CPUTYPE("Cortex-M4") FPU2 CLOCK(12000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
@@ -49,10 +49,10 @@
             <InvalidFlash>1</InvalidFlash>
           </TargetStatus>
           <OutputDirectory>.\Objects\</OutputDirectory>
-          <OutputName>project</OutputName>
+          <OutputName>app1</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
-          <CreateHexFile>0</CreateHexFile>
+          <CreateHexFile>1</CreateHexFile>
           <DebugInformation>1</DebugInformation>
           <BrowseInformation>1</BrowseInformation>
           <ListingPath>.\Listings\</ListingPath>
@@ -80,9 +80,9 @@
             <nStopB2X>0</nStopB2X>
           </BeforeMake>
           <AfterMake>
-            <RunUserProg1>0</RunUserProg1>
+            <RunUserProg1>1</RunUserProg1>
             <RunUserProg2>0</RunUserProg2>
-            <UserProg1Name></UserProg1Name>
+            <UserProg1Name>fromelf --bin --output ".\Objects\app4test.bin" ".\Objects\app4test.axf"</UserProg1Name>
             <UserProg2Name></UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
@@ -274,7 +274,7 @@
               <OCR_RVCT4>
                 <Type>1</Type>
                 <StartAddress>0x8000000</StartAddress>
-                <Size>0x100000</Size>
+                <Size>0x18000</Size>
               </OCR_RVCT4>
               <OCR_RVCT5>
                 <Type>1</Type>
@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>USE_STDPERIPH_DRIVER,STM32F40_41xxx</Define>
               <Undefine></Undefine>
-              <IncludePath>..\Libraries\STM32F4xx_StdPeriph_Driver\inc;..\Libraries\CMSIS\Include;..\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\User;..\System;..\Hardware;..\Hardware\DHT11;..\Hardware\MS5837;..\Hardware\JY901B;..\Hardware\Motor;..\Hardware\IM948</IncludePath>
+              <IncludePath>..\Libraries\STM32F4xx_StdPeriph_Driver\inc;..\Libraries\CMSIS\Include;..\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\User;..\System;..\Hardware;..\Hardware\DHT11;..\Hardware\MS5837;..\Hardware\JY901B;..\Hardware\Motor;..\Hardware\IM948;..\Boot</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -358,7 +358,7 @@
             </VariousControls>
           </Aads>
           <LDads>
-            <umfTarg>1</umfTarg>
+            <umfTarg>0</umfTarg>
             <Ropi>0</Ropi>
             <Rwpi>0</Rwpi>
             <noStLib>0</noStLib>
@@ -367,7 +367,7 @@
             <TextAddressRange>0x08000000</TextAddressRange>
             <DataAddressRange>0x20000000</DataAddressRange>
             <pXoBase></pXoBase>
-            <ScatterFile></ScatterFile>
+            <ScatterFile>..\Boot\app1.sct</ScatterFile>
             <IncludeLibs></IncludeLibs>
             <IncludeLibsPath></IncludeLibsPath>
             <Misc></Misc>
@@ -684,16 +684,6 @@
           <GroupName>Hardware</GroupName>
           <Files>
             <File>
-              <FileName>LED.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\LED.c</FilePath>
-            </File>
-            <File>
-              <FileName>LED.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\LED.h</FilePath>
-            </File>
-            <File>
               <FileName>Serial.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Hardware\Serial.c</FilePath>
@@ -702,21 +692,6 @@
               <FileName>Serial.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Hardware\Serial.h</FilePath>
-            </File>
-            <File>
-              <FileName>OLED.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\OLED.c</FilePath>
-            </File>
-            <File>
-              <FileName>OLED.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\OLED.h</FilePath>
-            </File>
-            <File>
-              <FileName>OLED_Font.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\OLED_Font.h</FilePath>
             </File>
             <File>
               <FileName>AD.c</FileName>
@@ -809,16 +784,6 @@
               <FilePath>..\Hardware\JY901B\JY901B.h</FilePath>
             </File>
             <File>
-              <FileName>JY901B_UART.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\JY901B\JY901B_UART.c</FilePath>
-            </File>
-            <File>
-              <FileName>JY901B_UART.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\JY901B\JY901B_UART.h</FilePath>
-            </File>
-            <File>
               <FileName>REG.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Hardware\JY901B\REG.h</FilePath>
@@ -872,6 +837,21 @@
               <FileName>im948_CMD.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Hardware\IM948\im948_CMD.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Boot</GroupName>
+          <Files>
+            <File>
+              <FileName>boot_flag.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Boot\boot_flag.c</FilePath>
+            </File>
+            <File>
+              <FileName>boot_flag.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Boot\boot_flag.h</FilePath>
             </File>
           </Files>
         </Group>

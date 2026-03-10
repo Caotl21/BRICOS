@@ -1040,6 +1040,11 @@ static void Cmd_RxUnpack(U8 *buf, U8 DLen)
     }
 }
 
+static void IM948_Write(U8 *pBuf, int Len)
+{
+	USART1_UartSend(pBuf, Len);
+}
+
 /**
  * 发送数据  需要用户实现里面的串口发送数据方法-------------------------------------
  * @param pBuf 要发送的内容指针
@@ -1048,7 +1053,6 @@ static void Cmd_RxUnpack(U8 *buf, U8 DLen)
 static void Cmd_Write(U8 *pBuf, int Len)
 {
     // 通过UART_Write函数发送通信数据流，由用户针对底层硬件实现UART_Write函数把buf指针指向的Len字节数据发送出去即可
-    //extern int IM948_Write(const U8 *buf, int Len);
     IM948_Write(pBuf, Len);
 
     Dbp_U8_buf("tx: ", "\r\n",
@@ -1328,7 +1332,6 @@ void IM948_Init(void)
 {
 	//RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
     //GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
-	USART1_Init(115200);
 	
 	printf("--- IM948 test start FirmwareVer ---\r\n");
     int i = 40000000; while (i--);// 延时一下让传感器上电准备完毕，传感器上电后需要初始化完毕后才会接收指令的

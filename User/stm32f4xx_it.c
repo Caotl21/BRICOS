@@ -23,7 +23,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_it.h"
 #include "stm32f4xx_conf.h"
-#include "LED.h"
 
 /** @addtogroup Template_Project
   * @{
