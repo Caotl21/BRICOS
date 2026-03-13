@@ -42,6 +42,9 @@ void bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config);
 // 驱动层调用此函数 将自己的缓冲区地址传给底层
 void bsp_uart_start_dma_rx_circular(bsp_uart_port_t port, uint8_t *buf_addr, uint16_t buf_size);
 
+// 启动 DMA 正常接收模式 零拷贝处理接收数据
+void bsp_uart_start_dma_rx_normal(bsp_uart_port_t port, uint8_t *buf_addr, uint16_t buf_size);
+
 // 获取DMA当前剩余未接收的数据长度（单位：字节），用于上层计算实际收到的数据长度
 uint16_t bsp_uart_get_dma_rx_remaining(bsp_uart_port_t port);
 
