@@ -184,7 +184,7 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
  * 通过硬件字典实现了高度抽象和解耦
  ************************************************************/
 
-bool bsp_pwm_init(bsp_pwm_ch_t ch, bsp_pwm_config_t *config) {
+bool bsp_pwm_init(bsp_pwm_ch_t ch, uint16_t init_pulse_us) {
     GPIO_InitTypeDef GPIO_InitStructure;
     TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
     TIM_OCInitTypeDef TIM_OCInitStructure;
@@ -220,7 +220,7 @@ bool bsp_pwm_init(bsp_pwm_ch_t ch, bsp_pwm_config_t *config) {
     // 配置 PWM 模式
     TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
     TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse = config->init_pulse_us; // 初始占空比/脉宽设为 0
+    TIM_OCInitStructure.TIM_Pulse = init_pulse_us; // 初始占空比/脉宽设为 0
     TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
 
     hw->pwm_oc_init(hw->tim, &TIM_OCInitStructure);
@@ -237,15 +237,13 @@ bool bsp_pwm_init(bsp_pwm_ch_t ch, bsp_pwm_config_t *config) {
  * 参  数：ch - PWM 通道枚举 (如 BSP_PWM_THRUSTER_1)
  * pulse_us - 高电平微秒数 (如 1500 代表中位停止)
  * ------------------------------------------------------------------------- */
-void bsp_pwm_set_pulse_us(bsp_pwm_ch_t ch, uint16_t pulse_us, bsp_pwm_config_t *config) 
+void bsp_pwm_set_pulse_us(bsp_pwm_ch_t ch, uint16_t pulse_us) 
 {
     if (ch >= BSP_PWM_MAX) return;
 
     TIM_TypeDef* tim = pwm_hw_info[ch].tim;
     uint8_t ch_num = pwm_hw_info[ch].ch;
 
-    if (pulse_us < config->min_pulse_us) pulse_us = config->min_pulse_us;
-    if (pulse_us > config->max_pulse_us) pulse_us = config->max_pulse_us;
     // 直接操作 CCR 寄存器改变脉宽 (极速响应)
     switch (ch_num) {
         case 1: tim->CCR1 = pulse_us; break;
@@ -261,7 +259,7 @@ void bsp_pwm_set_pulse_us(bsp_pwm_ch_t ch, uint16_t pulse_us, bsp_pwm_config_t *
  * 参  数：ch - PWM 通道枚举 (如 BSP_PWM_LIGHT_1)
  * duty - 占空比 0.0f ~ 100.0f
  * ------------------------------------------------------------------------- */
-void bsp_pwm_set_duty(bsp_pwm_ch_t ch, float duty, bsp_pwm_config_t *config) 
+void bsp_pwm_set_duty(bsp_pwm_ch_t ch, float duty) 
 {
     if (ch >= BSP_PWM_MAX) return;
 
@@ -276,6 +274,6 @@ void bsp_pwm_set_duty(bsp_pwm_ch_t ch, float duty, bsp_pwm_config_t *config)
     uint16_t pulse = (uint16_t)((duty / 100.0f) * period);
 
     // 4. 复用上面的脉宽设置函数
-    bsp_pwm_set_pulse_us(ch, pulse, config);
+    bsp_pwm_set_pulse_us(ch, pulse);
 }
 
