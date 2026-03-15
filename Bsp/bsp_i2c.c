@@ -19,7 +19,7 @@ typedef struct {
 
 /* 实例化映射表，加 const 存入 Flash 不占 RAM，加 static 限制作用域 */
 static const i2c_hw_info_t s_i2c_hw_info[BSP_I2C_MAX] = {
-    [BSP_I2C_1] = {
+    [BSP_I2C_MS5837] = {
         .scl_rcc  = RCC_AHB1Periph_GPIOB,
         .scl_port = GPIOB,
         .scl_pin  = GPIO_Pin_6,

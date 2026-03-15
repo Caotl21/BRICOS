@@ -41,9 +41,17 @@ typedef enum {
 
 /* --- 软件 I2C 总线枚举 --- */
 typedef enum {
-    BSP_I2C_1 = 0,  // 对应 PB6/PB7 (如 MS5837 水压计)
+    BSP_I2C_MS5837 = 0,  // 对应 PB6/PB7 (如 MS5837 水压计)
     BSP_I2C_MAX
 } bsp_i2c_bus_t;
+
+typedef enum {
+    BSP_GPIO_DHT11 = 0,
+    // BSP_GPIO_LEAK_DET, // 预留：漏水检测传感器
+    // BSP_GPIO_RELAY_1,  // 预留：外部设备供电继电器
+    BSP_GPIO_MAX
+}bsp_gpio_pin_t;
+
 
 
 #endif // __BSP_CORE_H
