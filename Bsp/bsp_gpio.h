@@ -8,7 +8,7 @@
  * @brief GPIO 模块底层驱动初始化
  * @note 该函数会根据 bsp_core.h 中定义的 bsp_gpio_pin_t 枚举，自动启用对应 GPIO 引脚的时钟，为后续的 GPIO 配置做好准备。
  */
-void bsp_gpio_init(void);
+bool bsp_gpio_init(void);
 
 /**
  * @brief 设置 GPIO 引脚的输入输出方向

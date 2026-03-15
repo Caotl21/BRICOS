@@ -42,7 +42,7 @@ typedef void (*bsp_uart_rx_cb_t)(uint8_t *data, uint16_t len);
  * @param config - 串口配置结构体指针，包含波特率、数据位、停止位、校验位等参数
  * @note 该函数会根据配置结构体中的参数初始化对应的串口硬件。
  */
-void bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config);
+bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config);
 
 /**
  * @brief 启动 DMA 循环接收模式

@@ -2,6 +2,7 @@
 #include "stm32f4xx.h"
 #include "stm32f4xx_gpio.h"
 #include "stm32f4xx_rcc.h"
+#include <stdbool.h>
 
 /* --- 只读硬件字典结构体 --- */
 typedef struct {
@@ -20,12 +21,14 @@ static const gpio_hw_info_t s_gpio_hw_info[BSP_GPIO_MAX] = {
     }
 };
 
-void bsp_gpio_init(void) {
+bool bsp_gpio_init(void) {
     for (int i = 0; i < BSP_GPIO_MAX; i++) {
         if (s_gpio_hw_info[i].port != NULL) {
             RCC_AHB1PeriphClockCmd(s_gpio_hw_info[i].rcc, ENABLE);
         }
     }
+
+    return true;
 }
 
 void bsp_gpio_set_direction(bsp_gpio_pin_t pin, bool is_output) {

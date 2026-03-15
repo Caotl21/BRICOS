@@ -6,6 +6,8 @@
 #include "stm32f4xx_gpio.h"
 #include "misc.h"
 
+#include <stdbool.h>
+
 /* 内部管理的私有硬件上下文 */
 typedef struct {
     USART_TypeDef* uart_base;
@@ -197,8 +199,8 @@ void bsp_uart_isr_handler(bsp_uart_port_t port) {
  * 参  数：port - 串口端口枚举 (IMU1, IMU2, OPI, OTA)
  * config - 硬件无关的串口配置结构体指针
  * ------------------------------------------------------------------------- */
-void bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
-    if (port >= BSP_UART_MAX || config == NULL) return;
+bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
+    if (port >= BSP_UART_MAX || config == NULL) return false;
 
     // 获取当前串口的硬件字典指针
     const uart_hw_info_t* hw = &s_uart_hw_info[port];
@@ -294,6 +296,8 @@ void bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
     // 5. 使能外设
     // ==========================================
     USART_Cmd(hw->uart_base, ENABLE);
+
+    return true;
 }
 
 

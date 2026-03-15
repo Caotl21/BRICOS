@@ -18,22 +18,18 @@ typedef struct {
     uint32_t gpio_rcc;       // GPIO 时钟 (如 RCC_AHB1Periph_GPIOA)
 
     void (*pwm_oc_init)(TIM_TypeDef*, TIM_OCInitTypeDef*); // PWM 输出比较初始化函数指针
-    void (*tim_oc_preload_config)(TIM_TypeDef*, FunctionalState); // 定时器输出比较预装载配置函数指针
+    void (*tim_oc_preload_config)(TIM_TypeDef*, uint16_t); // 定时器输出比较预装载配置函数指针
 
     uint32_t prescaler;      // 预分频器 (PSC)
     uint32_t period;         // 自动重装载值 (ARR)
+
 } pwm_ch_hw_t;
 
-/* * 假设：系统时钟 168MHz，APB1 定时器频率 84MHz，APB2 定时器频率 168MHz。
- * 为了得到 1MHz 的计数频率 (1us 分辨率)：
- * APB1 定时器 PSC = 84 - 1
- * APB2 定时器 PSC = 168 - 1
- */
-#define PSC_APB1_1MHZ  (84 - 1)
-#define PSC_APB2_1MHZ  (168 - 1)
-
-#define ARR_50HZ       (20000 - 1)  // 20ms 周期，用于推进器和舵机
-#define ARR_1KHZ       (1000 - 1)   // 1ms 周期，用于探照灯
+static const bsp_pwm_config_t s_default_cfg = {
+    .init_pulse_us = 0,          // 初始脉宽为 0us
+    .max_pulse_us = 20000,      // 最大脉宽为 20000us (20ms)，对应占空比 100%
+    .min_pulse_us = 1000        // 最小脉宽为 1000us (1ms)，对应占空比 5%
+};
 
 static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
     [BSP_PWM_THRUSTER_1] = {
@@ -139,7 +135,7 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .pwm_oc_init = TIM_OC3Init,
         .tim_oc_preload_config = TIM_OC3PreloadConfig,
         .prescaler = PSC_APB1_1MHZ,
-        .period = ARR_1KHZ
+        .period = ARR_50HZ
     },
     [BSP_PWM_LIGHT_2]    = {
         .tim = TIM4, 
@@ -154,7 +150,7 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .pwm_oc_init = TIM_OC4Init,
         .tim_oc_preload_config = TIM_OC4PreloadConfig,
         .prescaler = PSC_APB1_1MHZ,
-        .period = ARR_1KHZ
+        .period = ARR_50HZ
     },
     [BSP_PWM_SERVO_1]    = {
         .tim = TIM9, 
@@ -194,49 +190,51 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
  * 通过硬件字典实现了高度抽象和解耦
  ************************************************************/
 
-void bsp_pwm_init(void) {
+bool bsp_pwm_init(bsp_pwm_ch_t ch, bsp_pwm_config_t *config) {
     GPIO_InitTypeDef GPIO_InitStructure;
     TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
     TIM_OCInitTypeDef TIM_OCInitStructure;
 
-    for(int i=0;i < BSP_PWM_MAX; i++) {
-        const pwm_ch_hw_t* hw = &pwm_hw_info[i];
-        if(hw->tim == NULL) continue;
-        
-        // 使能时钟
-        hw->tim_rcc_cmd(hw->tim_rcc, ENABLE);
-        RCC_AHB1PeriphClockCmd(hw->gpio_rcc, ENABLE);
-        
-        // 配置 GPIO 引脚为复用功能
-        GPIO_InitStructure.GPIO_Pin = hw->pin;
-        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-        GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-        GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-        GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-        GPIO_Init(hw->port, &GPIO_InitStructure);
-        
-        // 配置 GPIO 复用映射
-        GPIO_PinAFConfig(hw->port, hw->pin_src, hw->af);
-        
-        // 配置定时器基本参数
-        TIM_TimeBaseInitStructure.TIM_Prescaler = hw->prescaler;
-        TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-        TIM_TimeBaseInitStructure.TIM_Period = hw->period;
-        TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-        TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
-        TIM_TimeBaseInit(hw->tim, &TIM_TimeBaseInitStructure);
-        
-        // 配置 PWM 模式
-        TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
-        TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-        TIM_OCInitStructure.TIM_Pulse = 0; // 初始占空比/脉宽设为 0
-        TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
-
-        hw->pwm_oc_init(hw->tim, &TIM_OCInitStructure);
-        hw->tim_oc_preload_config(hw->tim, ENABLE);
-
-        TIM_Cmd(hw->tim, ENABLE);
+    const pwm_ch_hw_t* hw = &pwm_hw_info[ch];
+    if(hw->tim == NULL) {
+        return false;
     }
+    
+    // 使能时钟
+    hw->tim_rcc_cmd(hw->tim_rcc, ENABLE);
+    RCC_AHB1PeriphClockCmd(hw->gpio_rcc, ENABLE);
+    
+    // 配置 GPIO 引脚为复用功能
+    GPIO_InitStructure.GPIO_Pin = hw->pin;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_Init(hw->port, &GPIO_InitStructure);
+    
+    // 配置 GPIO 复用映射
+    GPIO_PinAFConfig(hw->port, hw->pin_src, hw->af);
+    
+    // 配置定时器基本参数
+    TIM_TimeBaseInitStructure.TIM_Prescaler = hw->prescaler;
+    TIM_TimeBaseInitStructure.TIM_Period = hw->period;
+    TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
+    TIM_TimeBaseInit(hw->tim, &TIM_TimeBaseInitStructure);
+    
+    // 配置 PWM 模式
+    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+    TIM_OCInitStructure.TIM_Pulse = config->init_pulse_us; // 初始占空比/脉宽设为 0
+    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
+
+    hw->pwm_oc_init(hw->tim, &TIM_OCInitStructure);
+    hw->tim_oc_preload_config(hw->tim, TIM_OCPreload_Enable);
+
+    TIM_Cmd(hw->tim, ENABLE);
+
+    return true;
 }
 
 /* -------------------------------------------------------------------------
@@ -245,13 +243,15 @@ void bsp_pwm_init(void) {
  * 参  数：ch - PWM 通道枚举 (如 BSP_PWM_THRUSTER_1)
  * pulse_us - 高电平微秒数 (如 1500 代表中位停止)
  * ------------------------------------------------------------------------- */
-void bsp_pwm_set_pulse_us(bsp_pwm_ch_t ch, uint16_t pulse_us) 
+void bsp_pwm_set_pulse_us(bsp_pwm_ch_t ch, uint16_t pulse_us, bsp_pwm_config_t *config) 
 {
     if (ch >= BSP_PWM_MAX) return;
 
     TIM_TypeDef* tim = pwm_hw_info[ch].tim;
     uint8_t ch_num = pwm_hw_info[ch].ch;
 
+    if (pulse_us < config->min_pulse_us) pulse_us = config->min_pulse_us;
+    if (pulse_us > config->max_pulse_us) pulse_us = config->max_pulse_us;
     // 直接操作 CCR 寄存器改变脉宽 (极速响应)
     switch (ch_num) {
         case 1: tim->CCR1 = pulse_us; break;
@@ -267,7 +267,7 @@ void bsp_pwm_set_pulse_us(bsp_pwm_ch_t ch, uint16_t pulse_us)
  * 参  数：ch - PWM 通道枚举 (如 BSP_PWM_LIGHT_1)
  * duty - 占空比 0.0f ~ 100.0f
  * ------------------------------------------------------------------------- */
-void bsp_pwm_set_duty(bsp_pwm_ch_t ch, float duty) 
+void bsp_pwm_set_duty(bsp_pwm_ch_t ch, float duty, bsp_pwm_config_t *config) 
 {
     if (ch >= BSP_PWM_MAX) return;
 
@@ -282,6 +282,6 @@ void bsp_pwm_set_duty(bsp_pwm_ch_t ch, float duty)
     uint16_t pulse = (uint16_t)((duty / 100.0f) * period);
 
     // 4. 复用上面的脉宽设置函数
-    bsp_pwm_set_pulse_us(ch, pulse);
+    bsp_pwm_set_pulse_us(ch, pulse, &config);
 }
 
