@@ -39,4 +39,11 @@ typedef enum {
     BSP_ADC_MAX
 } bsp_adc_ch_t;
 
+/* --- 软件 I2C 总线枚举 --- */
+typedef enum {
+    BSP_I2C_1 = 0,  // 对应 PB6/PB7 (如 MS5837 水压计)
+    BSP_I2C_MAX
+} bsp_i2c_bus_t;
+
+
 #endif // __BSP_CORE_H

@@ -17,29 +17,37 @@
 #define ADDR_FLASH_SECTOR_10    ((uint32_t)0x080C0000) 	// 128KB
 #define ADDR_FLASH_SECTOR_11    ((uint32_t)0x080E0000) 	// 128KB
 
-/* =======================================================
- * API：擦除 Flash 区域
- * 参数：start_addr - 起始物理地址 (如 0x08040000)
- * size       - 需要擦除的字节大小
- * 返回：true-成功，false-失败
- * ======================================================= */
+/**
+ * @brief  擦除指定地址所在的 Flash 
+ * @param  addr 目标地址
+ * @param  size 目标地址范围大小 (字节)，用于判断是否跨扇区
+ * @return 是否成功擦除
+ * @note   1. STM32F4 的 Flash 擦除是以扇区为单位的，且不同扇区大小不同。
+ *         2. 擦除前必须先解锁 Flash，擦除后要锁定 Flash。
+ *         3. 擦除时要清除相关的状态标志，防止之前的错误状态影响当前操作。
+ *         4. 该函数会自动判断是否跨扇区，并擦除所有涉及的扇区。
+ *         5. 该函数不检查地址合法性，调用前请确保地址在 Flash 范围内。
+ */
 bool bsp_flash_erase(uint32_t start_addr, uint32_t size);
 
-/* =======================================================
- * API：写入 Flash 数据
- * 参数：addr - 写入目标地址
- * data - 数据源指针
- * len  - 写入长度 (字节)
- * 返回：true-成功，false-失败
- * ======================================================= */
+/**
+ * @brief 写入 Flash 数据
+ * @param addr 目标地址
+ * @param data 存放数据的缓冲区指针
+ * @param len 写入长度 (字节)
+ * @return 是否成功写入
+ * @note 该函数直接向 Flash 地址写入数据，适用于任何地址范围内的写入操作。调用前请确保地址合法且缓冲区足够大。
+ */
 bool bsp_flash_write(uint32_t addr, const uint8_t *data, uint32_t len);
 
-/* =======================================================
- * API：读取 Flash 数据
- * 参数：addr - 读取目标地址
- * data - 存放数据的缓冲区指针
- * len  - 读取长度 (字节)
- * ======================================================= */
+/**
+ * @brief 读取 Flash 数据
+ * @param addr 目标地址
+ * @param data 存放数据的缓冲区指针
+ * @param len 读取长度 (字节)
+ * @return 是否成功读取
+ * @note 该函数直接从 Flash 地址读取数据，适用于任何地址范围内的读取操作。调用前请确保地址合法且缓冲区足够大。
+ */
 void bsp_flash_read(uint32_t addr, uint8_t *data, uint32_t len);
 
 #endif // __BSP_FLASH_H
