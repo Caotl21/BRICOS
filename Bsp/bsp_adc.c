@@ -119,3 +119,4 @@ bool bsp_adc_init(bsp_adc_ch_t *ch_list, uint8_t ch_num, uint16_t *val_array)
     
     return true; // 返回布尔值 true
 }
+

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 /* =========================================
  * 硬件资源全局枚举字典 (资源更新后需要同步修改)

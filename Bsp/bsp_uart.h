@@ -103,4 +103,5 @@ bool bsp_uart_send_dma(bsp_uart_port_t port, uint8_t *data, uint16_t len);
  */
 void bsp_uart_isr_handler(bsp_uart_port_t port);
 
-#endif // __BSP_UART_H
+#endif
+

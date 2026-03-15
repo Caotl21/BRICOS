@@ -25,12 +25,6 @@ typedef struct {
 
 } pwm_ch_hw_t;
 
-static const bsp_pwm_config_t s_default_cfg = {
-    .init_pulse_us = 0,          // 初始脉宽为 0us
-    .max_pulse_us = 20000,      // 最大脉宽为 20000us (20ms)，对应占空比 100%
-    .min_pulse_us = 1000        // 最小脉宽为 1000us (1ms)，对应占空比 5%
-};
-
 static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
     [BSP_PWM_THRUSTER_1] = {
         .tim = TIM3,
@@ -282,6 +276,6 @@ void bsp_pwm_set_duty(bsp_pwm_ch_t ch, float duty, bsp_pwm_config_t *config)
     uint16_t pulse = (uint16_t)((duty / 100.0f) * period);
 
     // 4. 复用上面的脉宽设置函数
-    bsp_pwm_set_pulse_us(ch, pulse, &config);
+    bsp_pwm_set_pulse_us(ch, pulse, config);
 }
 

@@ -2,7 +2,7 @@
 #include "stm32f4xx.h"
 #include "stm32f4xx_gpio.h"
 #include "stm32f4xx_rcc.h"
-#include "Delay.h" 
+#include "bsp_delay.h" 
 
 /* ==========================================
  * 1. 定义软件 I2C 硬件信息字典 (数据驱动核心)
@@ -35,17 +35,17 @@ static const i2c_hw_info_t s_i2c_hw_info[BSP_I2C_MAX] = {
  * ========================================== */
 static inline void i2c_scl_write(bsp_i2c_bus_t bus, uint8_t bit_val) {
     GPIO_WriteBit(s_i2c_hw_info[bus].scl_port, s_i2c_hw_info[bus].scl_pin, (BitAction)bit_val);
-    Delay_us(2);
+    bsp_delay_us(2);
 }
 
 static inline void i2c_sda_write(bsp_i2c_bus_t bus, uint8_t bit_val) {
     GPIO_WriteBit(s_i2c_hw_info[bus].sda_port, s_i2c_hw_info[bus].sda_pin, (BitAction)bit_val);
-    Delay_us(2);
+    bsp_delay_us(2);
 }
 
 static inline uint8_t i2c_sda_read(bsp_i2c_bus_t bus) {
     uint8_t bit_val = GPIO_ReadInputDataBit(s_i2c_hw_info[bus].sda_port, s_i2c_hw_info[bus].sda_pin);
-    Delay_us(2);
+    bsp_delay_us(2);
     return bit_val;
 }
 
@@ -210,3 +210,4 @@ bool bsp_i2c_mem_read(bsp_i2c_bus_t bus, uint8_t dev_addr, uint8_t reg_addr, uin
     bsp_i2c_stop(bus);
     return true;
 }
+

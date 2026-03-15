@@ -615,243 +615,98 @@
               <FileType>1</FileType>
               <FilePath>..\User\main.c</FilePath>
             </File>
-            <File>
-              <FileName>stm32f4xx_it.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\stm32f4xx_it.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f4xx_conf.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\stm32f4xx_conf.h</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f4xx_it.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\stm32f4xx_it.h</FilePath>
-            </File>
-            <File>
-              <FileName>TaskScheduler.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\TaskScheduler.c</FilePath>
-            </File>
-            <File>
-              <FileName>TaskScheduler.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\TaskScheduler.h</FilePath>
-            </File>
-            <File>
-              <FileName>Tasks.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\Tasks.c</FilePath>
-            </File>
-            <File>
-              <FileName>Tasks.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\Tasks.h</FilePath>
-            </File>
           </Files>
         </Group>
         <Group>
           <GroupName>DOC</GroupName>
         </Group>
         <Group>
-          <GroupName>System</GroupName>
+          <GroupName>Bsp</GroupName>
           <Files>
             <File>
-              <FileName>Delay.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\System\Delay.h</FilePath>
-            </File>
-            <File>
-              <FileName>Delay.c</FileName>
+              <FileName>bsp_adc.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\System\Delay.c</FilePath>
+              <FilePath>..\Bsp\bsp_adc.c</FilePath>
             </File>
             <File>
-              <FileName>Timer.c</FileName>
+              <FileName>bsp_adc.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Bsp\bsp_adc.h</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_core.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Bsp\bsp_core.h</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_delay.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\System\Timer.c</FilePath>
+              <FilePath>..\Bsp\bsp_delay.c</FilePath>
             </File>
             <File>
-              <FileName>Timer.h</FileName>
+              <FileName>bsp_delay.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\System\Timer.h</FilePath>
+              <FilePath>..\Bsp\bsp_delay.h</FilePath>
             </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>Hardware</GroupName>
-          <Files>
             <File>
-              <FileName>Serial.c</FileName>
+              <FileName>bsp_flash.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Hardware\Serial.c</FilePath>
+              <FilePath>..\Bsp\bsp_flash.c</FilePath>
             </File>
             <File>
-              <FileName>Serial.h</FileName>
+              <FileName>bsp_flash.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Hardware\Serial.h</FilePath>
+              <FilePath>..\Bsp\bsp_flash.h</FilePath>
             </File>
             <File>
-              <FileName>AD.c</FileName>
+              <FileName>bsp_gpio.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Hardware\AD.c</FilePath>
+              <FilePath>..\Bsp\bsp_gpio.c</FilePath>
             </File>
             <File>
-              <FileName>AD.h</FileName>
+              <FileName>bsp_gpio.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Hardware\AD.h</FilePath>
+              <FilePath>..\Bsp\bsp_gpio.h</FilePath>
             </File>
             <File>
-              <FileName>Watchdog.c</FileName>
+              <FileName>bsp_i2c.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Hardware\Watchdog.c</FilePath>
+              <FilePath>..\Bsp\bsp_i2c.c</FilePath>
             </File>
             <File>
-              <FileName>Watchdog.h</FileName>
+              <FileName>bsp_i2c.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Hardware\Watchdog.h</FilePath>
+              <FilePath>..\Bsp\bsp_i2c.h</FilePath>
             </File>
             <File>
-              <FileName>flash.c</FileName>
+              <FileName>bsp_pwm.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Hardware\flash.c</FilePath>
+              <FilePath>..\Bsp\bsp_pwm.c</FilePath>
             </File>
             <File>
-              <FileName>flash.h</FileName>
+              <FileName>bsp_pwm.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Hardware\flash.h</FilePath>
+              <FilePath>..\Bsp\bsp_pwm.h</FilePath>
             </File>
             <File>
-              <FileName>Types.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\Types.h</FilePath>
-            </File>
-            <File>
-              <FileName>Dma.c</FileName>
+              <FileName>bsp_uart.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Hardware\Dma.c</FilePath>
+              <FilePath>..\Bsp\bsp_uart.c</FilePath>
             </File>
             <File>
-              <FileName>Dma.h</FileName>
+              <FileName>bsp_uart.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Hardware\Dma.h</FilePath>
+              <FilePath>..\Bsp\bsp_uart.h</FilePath>
             </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>DHT11</GroupName>
-          <Files>
             <File>
-              <FileName>DHT11.c</FileName>
+              <FileName>bsp_watchdog.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Hardware\DHT11\DHT11.c</FilePath>
+              <FilePath>..\Bsp\bsp_watchdog.c</FilePath>
             </File>
             <File>
-              <FileName>DHT11.h</FileName>
+              <FileName>bsp_watchdog.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Hardware\DHT11\DHT11.h</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>MS5837</GroupName>
-          <Files>
-            <File>
-              <FileName>MS5837_I2C.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\MS5837\MS5837_I2C.c</FilePath>
-            </File>
-            <File>
-              <FileName>MS5837_I2C.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\MS5837\MS5837_I2C.h</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>JY901B</GroupName>
-          <Files>
-            <File>
-              <FileName>JY901B.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\JY901B\JY901B.c</FilePath>
-            </File>
-            <File>
-              <FileName>JY901B.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\JY901B\JY901B.h</FilePath>
-            </File>
-            <File>
-              <FileName>REG.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\JY901B\REG.h</FilePath>
-            </File>
-            <File>
-              <FileName>wit_c_sdk.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\JY901B\wit_c_sdk.c</FilePath>
-            </File>
-            <File>
-              <FileName>wit_c_sdk.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\JY901B\wit_c_sdk.h</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>Motor</GroupName>
-          <Files>
-            <File>
-              <FileName>Motor.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\Motor\Motor.c</FilePath>
-            </File>
-            <File>
-              <FileName>Motor.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\Motor\Motor.h</FilePath>
-            </File>
-            <File>
-              <FileName>PWM.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\Motor\PWM.c</FilePath>
-            </File>
-            <File>
-              <FileName>PWM.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\Motor\PWM.h</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>IM948</GroupName>
-          <Files>
-            <File>
-              <FileName>im948_CMD.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Hardware\IM948\im948_CMD.c</FilePath>
-            </File>
-            <File>
-              <FileName>im948_CMD.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\IM948\im948_CMD.h</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>Boot</GroupName>
-          <Files>
-            <File>
-              <FileName>boot_flag.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Boot\boot_flag.c</FilePath>
-            </File>
-            <File>
-              <FileName>boot_flag.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Boot\boot_flag.h</FilePath>
+              <FilePath>..\Bsp\bsp_watchdog.h</FilePath>
             </File>
           </Files>
         </Group>

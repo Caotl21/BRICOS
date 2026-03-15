@@ -51,3 +51,4 @@ void bsp_pwm_set_pulse_us(bsp_pwm_ch_t ch, uint16_t pulse_us, bsp_pwm_config_t *
 void bsp_pwm_set_duty(bsp_pwm_ch_t ch, float duty, bsp_pwm_config_t *config);
 
 #endif // __BSP_PWM_H
+
