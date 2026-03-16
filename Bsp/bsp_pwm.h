@@ -22,7 +22,7 @@
  * @note 1. 该模块使用数据驱动设计，所有硬件相关配置都集中在 bsp_pwm.c 的 pwm_hw_info 数组中，方便维护和扩展。
  *       2. bsp_pwm_init() 会根据 pwm_hw_info 数组自动初始化所有配置的 PWM 通道，无需修改初始化代码。
  */
-bool bsp_pwm_init(bsp_pwm_ch_t ch, uint16_t init_pulse_us);
+bool bsp_pwm_init(uint16_t init_pulse_us);
 
 /**
  * @brief 设置指定 PWM 通道的高电平脉宽时间 (单位：微秒 us)

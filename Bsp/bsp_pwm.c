@@ -184,49 +184,52 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
  * 通过硬件字典实现了高度抽象和解耦
  ************************************************************/
 
-bool bsp_pwm_init(bsp_pwm_ch_t ch, uint16_t init_pulse_us) {
+bool bsp_pwm_init(uint16_t init_pulse_us) {
     GPIO_InitTypeDef GPIO_InitStructure;
     TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
     TIM_OCInitTypeDef TIM_OCInitStructure;
 
-    const pwm_ch_hw_t* hw = &pwm_hw_info[ch];
-    if(hw->tim == NULL) {
-        return false;
+    for(int i=0;i<BSP_PWM_MAX;i++) {
+        const pwm_ch_hw_t* hw = &pwm_hw_info[i];
+        if(hw->tim == NULL) {
+            return false;
+        }
+        
+        // 使能时钟
+        hw->tim_rcc_cmd(hw->tim_rcc, ENABLE);
+        RCC_AHB1PeriphClockCmd(hw->gpio_rcc, ENABLE);
+        
+        // 配置 GPIO 引脚为复用功能
+        GPIO_InitStructure.GPIO_Pin = hw->pin;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+        GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+        GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+        GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+        GPIO_Init(hw->port, &GPIO_InitStructure);
+        
+        // 配置 GPIO 复用映射
+        GPIO_PinAFConfig(hw->port, hw->pin_src, hw->af);
+        
+        // 配置定时器基本参数
+        TIM_TimeBaseInitStructure.TIM_Prescaler = hw->prescaler;
+        TIM_TimeBaseInitStructure.TIM_Period = hw->period;
+        TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
+        TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+        TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
+        TIM_TimeBaseInit(hw->tim, &TIM_TimeBaseInitStructure);
+        
+        // 配置 PWM 模式
+        TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+        TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+        TIM_OCInitStructure.TIM_Pulse = init_pulse_us; // 初始占空比/脉宽设为 0
+        TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
+        TIM_OCStructInit(&TIM_OCInitStructure);
+
+        hw->pwm_oc_init(hw->tim, &TIM_OCInitStructure);
+        hw->tim_oc_preload_config(hw->tim, TIM_OCPreload_Enable);
+
+        TIM_Cmd(hw->tim, ENABLE);
     }
-    
-    // 使能时钟
-    hw->tim_rcc_cmd(hw->tim_rcc, ENABLE);
-    RCC_AHB1PeriphClockCmd(hw->gpio_rcc, ENABLE);
-    
-    // 配置 GPIO 引脚为复用功能
-    GPIO_InitStructure.GPIO_Pin = hw->pin;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-    GPIO_Init(hw->port, &GPIO_InitStructure);
-    
-    // 配置 GPIO 复用映射
-    GPIO_PinAFConfig(hw->port, hw->pin_src, hw->af);
-    
-    // 配置定时器基本参数
-    TIM_TimeBaseInitStructure.TIM_Prescaler = hw->prescaler;
-    TIM_TimeBaseInitStructure.TIM_Period = hw->period;
-    TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-    TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
-    TIM_TimeBaseInit(hw->tim, &TIM_TimeBaseInitStructure);
-    
-    // 配置 PWM 模式
-    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
-    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_Pulse = init_pulse_us; // 初始占空比/脉宽设为 0
-    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
-
-    hw->pwm_oc_init(hw->tim, &TIM_OCInitStructure);
-    hw->tim_oc_preload_config(hw->tim, TIM_OCPreload_Enable);
-
-    TIM_Cmd(hw->tim, ENABLE);
 
     return true;
 }

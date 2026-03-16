@@ -1,0 +1,23 @@
+#include "driver_servo.h"
+#include "bsp_pwm.h"
+
+// 设置单路舵机角度
+void Servo_SetAngle(bsp_pwm_ch_t ch, float angle){
+    if (ch < BSP_PWM_SERVO_1 || ch > BSP_PWM_SERVO_2) return;
+
+    // 安全限幅
+    if (angle > 90.0f) angle = 90.0f;
+    if (angle < -90.0f) angle = -90.0f;
+
+    // 根据正负计算对应的脉宽
+    uint16_t pulse_us;
+    if (angle >= 0.0f) {
+        pulse_us = SERVO_PWM_STOP + (uint16_t)((SERVO_PWM_MAX_LEFT - SERVO_PWM_STOP) * (angle / 90.0f));
+    } else {
+        pulse_us = SERVO_PWM_STOP + (uint16_t)((SERVO_PWM_MAX_RIGHT - SERVO_PWM_STOP) * (angle / 90.0f));
+    }
+
+    // 设置 PWM 输出
+    bsp_pwm_set_pulse_us(ch, pulse_us);
+}
+

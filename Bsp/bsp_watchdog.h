@@ -20,3 +20,4 @@ void bsp_wdg_init(uint16_t timeout_ms);
 void bsp_wdg_feed(void);
 
 #endif // __BSP_WDG_H
+

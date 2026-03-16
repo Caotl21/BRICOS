@@ -93,3 +93,4 @@ void bsp_flash_read(uint32_t addr, uint8_t *data, uint32_t len)
         data[i] = *(volatile uint8_t*)(addr + i);
     }
 }
+

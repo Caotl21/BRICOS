@@ -51,3 +51,4 @@ bool bsp_flash_write(uint32_t addr, const uint8_t *data, uint32_t len);
 void bsp_flash_read(uint32_t addr, uint8_t *data, uint32_t len);
 
 #endif // __BSP_FLASH_H
+

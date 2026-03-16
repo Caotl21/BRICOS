@@ -16,3 +16,4 @@ void Thruster_Init(void);
 void Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent);
 
 #endif // __THRUSTER_DRIVER_H
+

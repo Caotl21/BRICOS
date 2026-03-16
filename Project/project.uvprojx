@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>USE_STDPERIPH_DRIVER,STM32F40_41xxx</Define>
               <Undefine></Undefine>
-              <IncludePath>..\Libraries\STM32F4xx_StdPeriph_Driver\inc;..\Libraries\CMSIS\Include;..\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\User;..\System;..\Hardware;..\Hardware\DHT11;..\Hardware\MS5837;..\Hardware\JY901B;..\Hardware\Motor;..\Hardware\IM948;..\Boot</IncludePath>
+              <IncludePath>..\Libraries\STM32F4xx_StdPeriph_Driver\inc;..\Libraries\CMSIS\Include;..\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\User;..\System;..\Bsp;..\Driver</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -707,6 +707,31 @@
               <FileName>bsp_watchdog.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Bsp\bsp_watchdog.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Driver</GroupName>
+          <Files>
+            <File>
+              <FileName>driver_servo.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_servo.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_servo.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_servo.h</FilePath>
+            </File>
+            <File>
+              <FileName>driver_thruster.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_thruster.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_thruster.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_thruster.h</FilePath>
             </File>
           </Files>
         </Group>
