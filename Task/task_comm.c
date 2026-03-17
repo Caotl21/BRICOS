@@ -10,6 +10,9 @@ static uint8_t s_ping_buf[RX_BUF_SIZE];
 static uint8_t s_pong_buf[RX_BUF_SIZE];
 static uint8_t *s_active_dma_buf = s_ping_buf; // DMA 当前正在写的数组
 
+volatile uint32_t g_rt_drop_cnt = 0; // 实时通信丢包计数器
+volatile uint32_t g_nrt_drop_cnt = 0; // 非实时通信丢包计数器
+
 // RTOS 消息队列：零拷贝传递的是数据地址
 static QueueHandle_t s_rt_rx_ptr_queue = NULL;
 static QueueHandle_t s_nrt_rx_ptr_queue = NULL;
@@ -28,7 +31,9 @@ static void Opi_RT_Comm_Rx_Callback(uint8_t *completed_buf, uint16_t len) {
         .len = len 
     };
 
-    xQueueSendFromISR(s_rt_rx_ptr_queue, &msg, &xWoken);
+    if(xQueueSendFromISR(s_rt_rx_ptr_queue, &msg, &xWoken) != pdPASS) {
+        g_rt_drop_cnt++; // 实时通信丢包计数器递增
+    }
 
     if (s_active_dma_buf == s_ping_buf) {
         s_active_dma_buf = s_pong_buf;
@@ -48,7 +53,9 @@ static void Opi_NRT_Comm_Rx_Callback(uint8_t *data, uint16_t len) {
         .len = len 
     };
 
-    xQueueSendFromISR(s_nrt_rx_ptr_queue, &msg, &xWoken);
+    if(xQueueSendFromISR(s_nrt_rx_ptr_queue, &msg, &xWoken) != pdPASS) {
+        g_nrt_drop_cnt++; // 非实时通信丢包计数器递增
+    }
 
     portYIELD_FROM_ISR(xWoken);
 }

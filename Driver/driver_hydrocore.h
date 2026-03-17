@@ -18,6 +18,7 @@
 #define DATA_TYPE_LIGHT           0x03
 #define DATA_TYPE_SENSOR_RT		  0x04
 #define DATA_TYPE_SENSOR_NRT      0x05
+#define DATA_TYPE_OTA             0x10
 
 
 typedef void (*protocol_cmd_handler_t)(const uint8_t *payload, uint16_t len);
