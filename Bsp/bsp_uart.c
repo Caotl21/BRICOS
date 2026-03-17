@@ -33,10 +33,12 @@ typedef struct {
     
     // 中断号 (可选，用于需要开启 NVIC 的串口)
     uint8_t       irqn;
+    uint32_t      nvic_priority;
 
     // DMA 配置 (仅用于需要 DMA 的串口)
     DMA_Stream_TypeDef* dma_rx_stream;  
     uint32_t            dma_channel;
+    uint32_t            dma_priority;
     uint32_t            dma_rx_clear_flags;
 } uart_hw_info_t;
 
@@ -63,8 +65,10 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .gpio_pin_rx_src = GPIO_PinSource10,
         .gpio_af = GPIO_AF_USART1,
         .irqn = 0,  // 零中断架构 不需要NVIC配置
+        .nvic_priority = 0,
         .dma_rx_stream = DMA2_Stream2,
         .dma_channel = DMA_Channel_4,
+        .dma_priority = DMA_Priority_High,
         .dma_rx_clear_flags = DMA_FLAG_TCIF2 | DMA_FLAG_HTIF2 | DMA_FLAG_TEIF2 | DMA_FLAG_DMEIF2 | DMA_FLAG_FEIF2
     },
 
@@ -82,8 +86,10 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .gpio_pin_rx_src = GPIO_PinSource3,
         .gpio_af = GPIO_AF_USART2,
         .irqn = 0,
+        .nvic_priority = 0,
         .dma_rx_stream = DMA1_Stream5,
         .dma_channel = DMA_Channel_4,
+        .dma_priority = DMA_Priority_High,
         .dma_rx_clear_flags = DMA_FLAG_TCIF5 | DMA_FLAG_HTIF5 | DMA_FLAG_TEIF5 | DMA_FLAG_DMEIF5 | DMA_FLAG_FEIF5
     },
 
@@ -101,8 +107,10 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .gpio_pin_rx_src = GPIO_PinSource11,
         .gpio_af = GPIO_AF_USART3,
         .irqn = USART3_IRQn,   // 需要串口DMA空闲中断
+        .nvic_priority = 5,
         .dma_rx_stream = DMA1_Stream1,
         .dma_channel = DMA_Channel_4,
+        .dma_priority = DMA_Priority_VeryHigh, // 实时通信优先级更高
         .dma_rx_clear_flags = DMA_FLAG_TCIF1 | DMA_FLAG_HTIF1 | DMA_FLAG_TEIF1 | DMA_FLAG_DMEIF1 | DMA_FLAG_FEIF1
     },
 
@@ -110,7 +118,7 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .uart_base = UART4,
         .gpio_rcc = RCC_AHB1Periph_GPIOA,
         .uart_rcc = RCC_APB1Periph_UART4,
-        .dma_rcc = 0,  // UART4 不使用 DMA
+        .dma_rcc = RCC_AHB1Periph_DMA1,  
         .uart_rcc_cmd = RCC_APB1PeriphClockCmd,
         .gpio_tx_port = GPIOA,
         .gpio_pin_tx = GPIO_Pin_0,
@@ -120,9 +128,11 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .gpio_pin_rx_src = GPIO_PinSource1,
         .gpio_af = GPIO_AF_UART4,
         .irqn = UART4_IRQn,  // 需要串口接收中断
-        .dma_rx_stream = NULL,
-        .dma_channel = 0,
-        .dma_rx_clear_flags = 0
+        .nvic_priority = 7,
+        .dma_rx_stream = DMA1_Stream2,
+        .dma_channel = DMA_Channel_4,
+        .dma_priority = DMA_Priority_Medium, // 非实时通信优先级较低
+        .dma_rx_clear_flags = DMA_FLAG_TCIF2 | DMA_FLAG_HTIF2 | DMA_FLAG_TEIF2 | DMA_FLAG_DMEIF2 | DMA_FLAG_FEIF2
     }
 
 };
@@ -279,7 +289,7 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
     if (hw->irqn != 0) 
     {
         NVIC_InitStructure.NVIC_IRQChannel = hw->irqn;
-        NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 5; // FreeRTOS 安全级别
+        NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = hw->nvic_priority;
         NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
         NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
         NVIC_Init(&NVIC_InitStructure);
@@ -288,7 +298,7 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
         if (port == BSP_UART_OPI_RT) {
             USART_ITConfig(hw->uart_base, USART_IT_IDLE, ENABLE);
         } else if (port == BSP_UART_OPI_NRT) {
-            USART_ITConfig(hw->uart_base, USART_IT_RXNE, ENABLE);
+            USART_ITConfig(hw->uart_base, USART_IT_IDLE, ENABLE);
         }
     }
 
@@ -333,7 +343,7 @@ void bsp_uart_start_dma_rx_circular(bsp_uart_port_t port, uint8_t *buf_addr, uin
     DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
     
     DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;             // 【关键】循环模式
-    DMA_InitStructure.DMA_Priority = DMA_Priority_High;     // 优先级很高
+    DMA_InitStructure.DMA_Priority = s_uart_hw_info[port].dma_priority;     // 优先级很高
     DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;      // 禁用 FIFO 模式
     
     DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
@@ -379,7 +389,7 @@ void bsp_uart_start_dma_rx_normal(bsp_uart_port_t port, uint8_t *buf_addr, uint1
     DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
     
     DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;             // 【关键】普通模式
-    DMA_InitStructure.DMA_Priority = DMA_Priority_VeryHigh;     // 优先级很高
+    DMA_InitStructure.DMA_Priority = s_uart_hw_info[port].dma_priority;     // 优先级很高
     DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;      // 禁用 FIFO 模式
     
     DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;

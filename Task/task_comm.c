@@ -8,7 +8,8 @@
 #define RX_BUF_SIZE 128
 static uint8_t s_ping_buf[RX_BUF_SIZE];
 static uint8_t s_pong_buf[RX_BUF_SIZE];
-static uint8_t *s_active_dma_buf = s_ping_buf; // DMA 当前正在写的数组
+static uint8_t *s_active_rt_dma_buf = s_ping_buf; // DMA 当前正在写的数组
+static uint8_t s_active_nrt_dma_buf[RX_BUF_SIZE]; // 非实时通信专用 DMA 缓冲区
 
 volatile uint32_t g_rt_drop_cnt = 0; // 实时通信丢包计数器
 volatile uint32_t g_nrt_drop_cnt = 0; // 非实时通信丢包计数器
@@ -35,13 +36,13 @@ static void Opi_RT_Comm_Rx_Callback(uint8_t *completed_buf, uint16_t len) {
         g_rt_drop_cnt++; // 实时通信丢包计数器递增
     }
 
-    if (s_active_dma_buf == s_ping_buf) {
-        s_active_dma_buf = s_pong_buf;
+    if (s_active_rt_dma_buf == s_ping_buf) {
+        s_active_rt_dma_buf = s_pong_buf;
     } else {
-        s_active_dma_buf = s_ping_buf;
+        s_active_rt_dma_buf = s_ping_buf;
     }
 
-    bsp_uart_start_dma_rx_normal(BSP_UART_OPI_RT, s_active_dma_buf, RX_BUF_SIZE);
+    bsp_uart_start_dma_rx_normal(BSP_UART_OPI_RT, s_active_rt_dma_buf, RX_BUF_SIZE);
     portYIELD_FROM_ISR(xWoken);
 }
 
@@ -57,6 +58,7 @@ static void Opi_NRT_Comm_Rx_Callback(uint8_t *data, uint16_t len) {
         g_nrt_drop_cnt++; // 非实时通信丢包计数器递增
     }
 
+    bsp_uart_start_dma_rx_normal(BSP_UART_OPI_NRT, s_active_nrt_dma_buf, RX_BUF_SIZE);
     portYIELD_FROM_ISR(xWoken);
 }
 
@@ -69,10 +71,11 @@ void Task_Comm_Init(void){
 
     // 串口3 实时任务通信
     bsp_uart_register_rx_cb(BSP_UART_OPI_RT, Opi_RT_Comm_Rx_Callback);
-    bsp_uart_start_dma_rx_normal(BSP_UART_OPI_RT, s_active_dma_buf, RX_BUF_SIZE);
+    bsp_uart_start_dma_rx_normal(BSP_UART_OPI_RT, s_active_rt_dma_buf, RX_BUF_SIZE);
 
     // 串口4 非实时任务通信 (如 OTA)，如果需要也可以启用 DMA
     bsp_uart_register_rx_cb(BSP_UART_OPI_NRT, Opi_NRT_Comm_Rx_Callback);
+    bsp_uart_start_dma_rx_normal(BSP_UART_OPI_NRT, s_active_nrt_dma_buf, RX_BUF_SIZE);
 }
 
 // 实时通信任务

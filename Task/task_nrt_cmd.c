@@ -15,3 +15,4 @@ static void On_Receive_OTA_Cmd(const uint8_t *payload, uint16_t len){
 void App_NRT_Control_Init(void){
     Driver_Protocol_Register(DATA_TYPE_OTA, On_Receive_OTA_Cmd);
 }
+
