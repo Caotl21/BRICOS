@@ -100,10 +100,9 @@ bool bsp_i2c_init(bsp_i2c_bus_t *bus_list, uint8_t bus_num)
     return true; // 全部初始化完成
 }
 
-// 内部协议原语无需暴露给外部，加上 static
 
 // 产生起始信号：SCL高电平时，SDA由高变低
-static void bsp_i2c_start(bsp_i2c_bus_t bus) {
+void bsp_i2c_start(bsp_i2c_bus_t bus) {
     i2c_sda_write(bus, 1);
     i2c_scl_write(bus, 1);
     i2c_sda_write(bus, 0); 
@@ -111,28 +110,28 @@ static void bsp_i2c_start(bsp_i2c_bus_t bus) {
 }
 
 // 产生停止信号：SCL高电平时，SDA由低变高
-static void bsp_i2c_stop(bsp_i2c_bus_t bus) {
+void bsp_i2c_stop(bsp_i2c_bus_t bus) {
     i2c_sda_write(bus, 0);
     i2c_scl_write(bus, 1);
     i2c_sda_write(bus, 1); 
 }
 
 // 主机产生应答(ACK)：SDA拉低
-static void bsp_i2c_ack(bsp_i2c_bus_t bus) {
+void bsp_i2c_ack(bsp_i2c_bus_t bus) {
     i2c_sda_write(bus, 0);
     i2c_scl_write(bus, 1);
     i2c_scl_write(bus, 0);
 }
 
 // 主机产生非应答(NACK)：SDA拉高
-static void bsp_i2c_nack(bsp_i2c_bus_t bus) {
+void bsp_i2c_nack(bsp_i2c_bus_t bus) {
     i2c_sda_write(bus, 1);
     i2c_scl_write(bus, 1);
     i2c_scl_write(bus, 0);
 }
 
 // 等待从机应答
-static uint8_t bsp_i2c_wait_ack(bsp_i2c_bus_t bus) {
+uint8_t bsp_i2c_wait_ack(bsp_i2c_bus_t bus) {
     uint8_t ack_bit;
     i2c_sda_write(bus, 1); // 主机释放SDA线
     i2c_scl_write(bus, 1);
@@ -142,17 +141,18 @@ static uint8_t bsp_i2c_wait_ack(bsp_i2c_bus_t bus) {
 }
 
 // 发送一个字节 (MSB 高位先发)
-static void bsp_i2c_send_byte(bsp_i2c_bus_t bus, uint8_t byte) {
+bool bsp_i2c_send_byte(bsp_i2c_bus_t bus, uint8_t byte) {
     for (uint8_t i = 0; i < 8; i++) {
-        i2c_sda_write(bus, byte & (0x80 >> i));
+        i2c_sda_write(bus, (byte & (0x80 >> i)) ? 1 : 0);
         i2c_scl_write(bus, 1);
         i2c_scl_write(bus, 0);
     }
-    bsp_i2c_wait_ack(bus); // 发送完毕后自动等待应答
+    // 等待应答，0 代表收到 ACK (成功)，返回 true
+    return (bsp_i2c_wait_ack(bus) == 0);
 }
 
 // 读取一个字节 (MSB 高位先收)
-static uint8_t bsp_i2c_read_byte(bsp_i2c_bus_t bus, uint8_t ack) {
+uint8_t bsp_i2c_read_byte(bsp_i2c_bus_t bus, uint8_t ack) {
     uint8_t byte = 0x00;
     i2c_sda_write(bus, 1); // 主机释放SDA线，交由从机控制
     
@@ -180,11 +180,15 @@ bool bsp_i2c_mem_write(bsp_i2c_bus_t bus, uint8_t dev_addr, uint8_t reg_addr, ui
 {
     if (bus >= BSP_I2C_MAX) return false;
 
-    bsp_i2c_start(bus);
-    bsp_i2c_send_byte(bus, dev_addr);       // 发送设备地址 (默认最低位为0，即写操作)
-    bsp_i2c_send_byte(bus, reg_addr);       // 发送目标寄存器地址
+    bsp_i2c_start(bus);   
+    // 每发一个字节都检查 ACK，只要有一次 NACK 就终止并返回 false
+    if (!bsp_i2c_send_byte(bus, dev_addr)) { bsp_i2c_stop(bus); return false; } // 发送设备地址 (默认最低位为0，即写操作)
+    if (!bsp_i2c_send_byte(bus, reg_addr)) { bsp_i2c_stop(bus); return false; } // 发送目标寄存器地址
     for (uint16_t i = 0; i < len; i++) {
-        bsp_i2c_send_byte(bus, data[i]);    // 连续发数据
+        if (!bsp_i2c_send_byte(bus, data[i])) { 
+            bsp_i2c_stop(bus); 
+            return false;
+        }
     }
     bsp_i2c_stop(bus);
     return true;
@@ -195,13 +199,13 @@ bool bsp_i2c_mem_read(bsp_i2c_bus_t bus, uint8_t dev_addr, uint8_t reg_addr, uin
 {
     if (bus >= BSP_I2C_MAX || len == 0) return false;
     
-    bsp_i2c_start(bus);
-    bsp_i2c_send_byte(bus, dev_addr);        // 发送设备地址 (假写，用于定位寄存器)
-    bsp_i2c_send_byte(bus, reg_addr);        // 发送要读取的寄存器地址
+    bsp_i2c_start(bus);      
     
+    if (!bsp_i2c_send_byte(bus, dev_addr)) { bsp_i2c_stop(bus); return false; } // 发送设备地址 (假写，用于定位寄存器)
+    if (!bsp_i2c_send_byte(bus, reg_addr)) { bsp_i2c_stop(bus); return false; } // 发送要读取的寄存器地址
+
     bsp_i2c_start(bus);                      // 产生 Restart (重复起始) 信号
-    bsp_i2c_send_byte(bus, dev_addr | 0x01); // 发送设备地址，强制拉高最低位 (转为读操作)
-    
+    if (!bsp_i2c_send_byte(bus, dev_addr | 0x01)) { bsp_i2c_stop(bus); return false; } // 发送设备地址，强制拉高最低位 (转为读操作)
     for (uint16_t i = 0; i < len - 1; i++) {
         data[i] = bsp_i2c_read_byte(bus, 1); // 还没读完时，每读一个字节回一个 ACK
     }
