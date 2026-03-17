@@ -36,7 +36,8 @@ typedef struct {
     uint32_t      nvic_priority;
 
     // DMA 配置 (仅用于需要 DMA 的串口)
-    DMA_Stream_TypeDef* dma_rx_stream;  
+    DMA_Stream_TypeDef* dma_rx_stream;
+    DMA_Stream_TypeDef* dma_tx_stream;
     uint32_t            dma_channel;
     uint32_t            dma_priority;
     uint32_t            dma_rx_clear_flags;
@@ -109,6 +110,7 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .irqn = USART3_IRQn,   // 需要串口DMA空闲中断
         .nvic_priority = 5,
         .dma_rx_stream = DMA1_Stream1,
+        .dma_tx_stream = DMA1_Stream3,
         .dma_channel = DMA_Channel_4,
         .dma_priority = DMA_Priority_VeryHigh, // 实时通信优先级更高
         .dma_rx_clear_flags = DMA_FLAG_TCIF1 | DMA_FLAG_HTIF1 | DMA_FLAG_TEIF1 | DMA_FLAG_DMEIF1 | DMA_FLAG_FEIF1
@@ -130,6 +132,7 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .irqn = UART4_IRQn,  // 需要串口接收中断
         .nvic_priority = 7,
         .dma_rx_stream = DMA1_Stream2,
+        .dma_tx_stream = DMA1_Stream4,
         .dma_channel = DMA_Channel_4,
         .dma_priority = DMA_Priority_Medium, // 非实时通信优先级较低
         .dma_rx_clear_flags = DMA_FLAG_TCIF2 | DMA_FLAG_HTIF2 | DMA_FLAG_TEIF2 | DMA_FLAG_DMEIF2 | DMA_FLAG_FEIF2

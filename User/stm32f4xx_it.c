@@ -23,6 +23,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_it.h"
 #include "stm32f4xx_conf.h"
+#include "bsp_uart.h"
 
 /** @addtogroup Template_Project
   * @{
@@ -135,6 +136,16 @@ void PendSV_Handler(void)
 void SysTick_Handler(void)
 {
 
+}
+
+void USART3_IRQHandler(void)
+{
+    bsp_uart_isr_handler(BSP_UART_OPI_RT);
+}
+
+void UART4_IRQHandler(void)
+{
+    bsp_uart_isr_handler(BSP_UART_OPI_NRT);
 }
 
 /******************************************************************************/
