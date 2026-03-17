@@ -1,0 +1,124 @@
+#ifndef __BOT_DATA_POOL_H
+#define __BOT_DATA_POOL_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#define PARAM_ID_ROLL       0
+#define PARAM_ID_PITCH      1
+#define PARAM_ID_YAW        2
+#define PARAM_ID_DEPTH      3
+
+// ============================================================================
+//  状态池 (State) - 包含所有传感器的高频/低频融合数据
+// ============================================================================
+typedef struct {
+    // --- 高频状态 (100Hz IMU) ---
+    float roll;           // 横滚角 (度)
+    float pitch;          // 俯仰角 (度)
+    float yaw;            // 偏航角 (度)
+    float gyro_x;         // X轴角速度 (度/秒) - 内环PID极度需要它！
+    float gyro_y;         // Y轴角速度
+    float gyro_z;         // Z轴角速度
+    
+    // --- 中频状态 (10Hz MS5837) ---
+    float depth_m;        // 当前深度 (米)
+    float water_temp_c;   // 外水温 (摄氏度)
+    
+    // --- 低频环境与系统状态 (1~2Hz) ---
+    float cabin_temp_c;   // 舱内温度 (DHT11)
+    float cabin_humi;     // 舱内湿度 (DHT11)
+    float bat_voltage_v;  // 电池电压 (ADC)
+    float bat_current_a;  // 电池总电流 (ADC)
+    
+    // --- 报警标志 ---
+    bool is_leak_detected; // 是否漏水
+    bool is_imu_error;     // IMU是否异常
+} bot_state_t;
+
+// ============================================================================
+// 目标池 (Target) - 包含高速下发的期望姿态、手动摇杆量、执行机构指令
+// ============================================================================
+typedef struct {
+    // --- 期望姿态与深度 ---
+    float target_roll;    // 期望横滚角
+    float target_pitch;   // 期望俯仰角
+    float target_yaw;     // 期望偏航角
+    float target_depth;   // 期望深度
+    
+    // --- 纯手动裸控量 (仅在纯手动模式下生效, -100~100) ---
+    float manual_thrust_x; // 前后平移
+    float manual_thrust_y; // 左右平移
+    float manual_thrust_z; // 上下平移
+    
+    // --- 附加外设目标 ---
+    uint8_t servo_angle;  // 机械手舵机角度 (0-180)
+    uint8_t light1_pwm;   // 探照灯1 亮度 (0-100%)
+    uint8_t light2_pwm;   // 探照灯2 亮度 (0-100%)
+} bot_target_t;
+
+// ============================================================================
+// 参数池 (Params) - 包含运行模式、PID参数等，由串口 4 慢速配置或 Flash 初始加载
+// ============================================================================
+typedef enum {
+    MODE_MANUAL = 0,      // 纯手动裸跑 (直接输出PWM)
+    MODE_STABILIZE = 1,   // 姿态自稳 (自动保持水平)
+    MODE_DEPTH_HOLD = 2,  // 定深定首向 (姿态+深度全闭环)
+} bot_run_mode_e;
+
+typedef struct {
+    float kp;
+    float ki;
+    float kd;
+    float max_out;        // 积分限幅/输出限幅
+} pid_param_t;
+
+typedef struct {
+    bot_run_mode_e current_mode; // 当前机器人模式
+    
+    // --- PID 参数矩阵 ---
+    pid_param_t pid_roll;
+    pid_param_t pid_pitch;
+    pid_param_t pid_yaw;
+    pid_param_t pid_depth;
+    
+    // --- 安全保护参数 ---
+    float failsafe_max_depth;    // 最大允许下潜深度
+    float failsafe_low_voltage;  // 低压报警线
+} bot_params_t;
+
+
+// ============================================================================
+// 全局 API 接口 (在 bot_data_pool.c 中实现临界区保护)
+// ============================================================================
+
+// 初始化数据池 (赋初值、从Flash读取PID等)
+void Bot_Data_Pool_Init(void);
+
+// ---------------------------------------------------------
+// [拉取] Getter API
+// ---------------------------------------------------------
+void Bot_State_Pull(bot_state_t *out_state);
+void Bot_Target_Pull(bot_target_t *out_target);
+void Bot_Params_Pull(bot_params_t *out_params);
+
+// ---------------------------------------------------------
+// [推送] Setter API
+// ---------------------------------------------------------
+
+// 高频更新：仅由 Task_IMU 调用，只刷新姿态，不碰深度和温度
+void Bot_State_Push_IMU(float r, float p, float y, float gx, float gy, float gz);
+
+// 中低频更新：由 Task_env_sensing 调用
+void Bot_State_Push_DepthTemp(float depth, float water_temp);
+void Bot_State_Push_CabinEnv(float temp, float humi, bool leak);
+void Bot_State_Push_Power(float vol, float cur);
+
+// 目标更新：由 Task_Comm_RT 接收到指令后调用
+void Bot_Target_Push_All(const bot_target_t *new_target);
+
+// 参数更新：由 Task_Comm_NRT 接收到调参指令后调用
+void Bot_Params_Push_PID(uint8_t pid_id, float p, float i, float d);
+void Bot_Params_Set_Mode(bot_run_mode_e mode);
+
+#endif // __BOT_DATA_POOL_H

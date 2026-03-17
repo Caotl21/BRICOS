@@ -746,17 +746,22 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>App</GroupName>
+          <GroupName>Task</GroupName>
           <Files>
             <File>
               <FileName>task_comm.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\App\task_comm.c</FilePath>
+              <FilePath>..\Task\task_comm.c</FilePath>
             </File>
             <File>
-              <FileName>task_control.c</FileName>
+              <FileName>task_nrt_cmd.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\App\task_control.c</FilePath>
+              <FilePath>..\Task\task_nrt_cmd.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_rt_cmd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\task_rt_cmd.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -1,0 +1,125 @@
+#include "bot_data_pool.h"
+#include "sys_port.h"
+#include <string.h>
+#include "driver_pid_param.h"
+
+static bot_state_t s_bricsbot_state;
+static bot_target_t s_bricsbot_target;
+static bot_params_t s_bricsbot_params;
+
+// 数据池初始化 在RTOS调度前启动
+void Bot_Data_Pool_Init(void)
+{
+    memset(&s_bricsbot_state, 0, sizeof(s_bricsbot_state));
+    memset(&s_bricsbot_target, 0, sizeof(s_bricsbot_target));
+    memset(&s_bricsbot_params, 0, sizeof(s_bricsbot_params));
+
+    s_bricsbot_params.current_mode = MODE_MANUAL;
+
+    // 从flash读取PID参数
+    Driver_PidParam_FillDefault(&s_bricsbot_params);
+    if (!Driver_PidParam_Load(&s_bricsbot_params))
+    {
+        (void)Driver_PidParam_Save(&s_bricsbot_params);
+    }
+    s_bricsbot_params.failsafe_max_depth = 10.0f; // 默认最大下潜深度10米
+    s_bricsbot_params.failsafe_low_voltage = 10.0f; // 默认低压报警线10V
+}
+
+
+// --- Getter API 实现 ---
+void Bot_State_Pull(bot_state_t *out_state) {
+    if (out_state == NULL) return;
+
+    SYS_ENTER_CRITICAL();
+    memcpy(out_state, &s_bricsbot_state, sizeof(bot_state_t));
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_Target_Pull(bot_target_t *out_target) {
+    if (out_target == NULL) return;
+
+    SYS_ENTER_CRITICAL();
+    memcpy(out_target, &s_bricsbot_target, sizeof(bot_target_t));
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_Params_Pull(bot_params_t *out_params) {
+    if (out_params == NULL) return;
+
+    SYS_ENTER_CRITICAL();
+    memcpy(out_params, &s_bricsbot_params, sizeof(bot_params_t));
+    SYS_EXIT_CRITICAL();
+}
+
+// --- Setter API 实现 ---
+void Bot_State_Push_IMU(float r, float p, float y, float gx, float gy, float gz) {
+    SYS_ENTER_CRITICAL();
+    s_bricsbot_state.roll = r;
+    s_bricsbot_state.pitch = p;
+    s_bricsbot_state.yaw = y;
+    s_bricsbot_state.gyro_x = gx;
+    s_bricsbot_state.gyro_y = gy;
+    s_bricsbot_state.gyro_z = gz;
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_State_Push_DepthTemp(float depth, float water_temp) {
+    SYS_ENTER_CRITICAL();
+    s_bricsbot_state.depth_m = depth;
+    s_bricsbot_state.water_temp_c = water_temp;
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_State_Push_CabinEnv(float temp, float humi, bool leak) {
+    SYS_ENTER_CRITICAL();
+    s_bricsbot_state.cabin_temp_c = temp;
+    s_bricsbot_state.cabin_humi = humi;
+    s_bricsbot_state.is_leak_detected = leak;
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_State_Push_Power(float vol, float cur) {
+    SYS_ENTER_CRITICAL();
+    s_bricsbot_state.bat_voltage_v = vol;
+    s_bricsbot_state.bat_current_a = cur;
+    SYS_EXIT_CRITICAL();
+}
+
+// --- 控制与配置更新系列 ---
+void Bot_Target_Push(const bot_target_t *new_target) {
+    if (new_target == NULL) return;
+
+    SYS_ENTER_CRITICAL();
+    memcpy(&s_bricsbot_target, new_target, sizeof(bot_target_t));
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_Params_Push_PID(uint8_t pid_id, float p, float i, float d)
+{
+    SYS_ENTER_CRITICAL();
+    pid_param_t *pid = NULL;
+    switch (pid_id) {
+        case PARAM_ID_ROLL: pid = &s_bricsbot_params.pid_roll; break;
+        case PARAM_ID_PITCH: pid = &s_bricsbot_params.pid_pitch; break;
+        case PARAM_ID_YAW: pid = &s_bricsbot_params.pid_yaw; break;
+        case PARAM_ID_DEPTH: pid = &s_bricsbot_params.pid_depth; break;
+        default: break;
+    }
+    if (pid != NULL) {
+        pid->kp = p;
+        pid->ki = i;
+        pid->kd = d;
+
+        // 同步写入Flash
+        Driver_PidParam_Save(&s_bricsbot_params);
+    }
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_Params_Push_Mode(bot_run_mode_e mode)
+{
+    SYS_ENTER_CRITICAL();
+    s_bricsbot_params.current_mode = mode;
+    SYS_EXIT_CRITICAL();
+}
