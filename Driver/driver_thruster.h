@@ -12,8 +12,8 @@
 #define THRUSTER_PWM_MAX_REV 1000
 
 // 函数声明
-void Thruster_Init(void);
-void Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent);
+void Driver_Thruster_Init(void);
+void Driver_Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent);
 
 #endif // __THRUSTER_DRIVER_H
 

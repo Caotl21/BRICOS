@@ -2,7 +2,7 @@
 #include "bsp_pwm.h"
 
 // 设置单路舵机角度
-void Servo_SetAngle(bsp_pwm_ch_t ch, float angle){
+void Driver_Servo_SetAngle(bsp_pwm_ch_t ch, float angle){
     if (ch < BSP_PWM_SERVO_1 || ch > BSP_PWM_SERVO_2) return;
 
     // 安全限幅

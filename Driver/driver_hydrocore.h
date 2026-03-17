@@ -2,7 +2,8 @@
 #define __DRIVER_HYDROCORE_H
 
 #include <stdio.h>
-#include "stm32f4xx.h"
+#include <stdbool.h>
+#include <stdint.h>
 #include "bsp_uart.h"
 
 // 协议帧格式定义
@@ -12,21 +13,18 @@
 #define PACKET_END_BYTE2          0xDD
 
 // 命令码定义
-#define DATA_TYPE_Thrusters       0x01
-#define DATA_TYPE_SENSOR          0x02
-#define DATA_TYPE_SERVO           0x03
-#define DATA_TYPE_LIGHT           0x04
-#define DATA_TYPE_FAST		      0x05
-#define DATA_TYPE_SLOW		      0x06
-#define CONTROL_DATA 		      0x01
+#define DATA_TYPE_THRUSTER        0x01
+#define DATA_TYPE_SERVO           0x02
+#define DATA_TYPE_LIGHT           0x03
+#define DATA_TYPE_SENSOR_RT		  0x04
+#define DATA_TYPE_SENSOR_NRT      0x05
 
-#define THRUSTER_DATA_LENGTH      0x0C    
-#define SENSOR_DATA_LENGTH        30    
-#define FAST_SENSOR_DATA_LENGTH   42
-#define SLOW_SENSOR_DATA_LENGTH   10
-#define SERVO_DATA_LENGTH         0x04
-#define LIGHT_DATA_LENGTH         0x04
-#define MAX_PACKET_SIZE           32
-#define CONTROL_DATA_LENGTH       0x10
+
+typedef void (*protocol_cmd_handler_t)(const uint8_t *payload, uint16_t len);
+
+void Driver_Protocol_Register(uint8_t cmd_id, protocol_cmd_handler_t handler);
+
+void Driver_Protocol_Dispatch(const uint8_t *raw_frame, uint16_t total_len);
 
 #endif // __DRIVER_HYDROCORE_H
+

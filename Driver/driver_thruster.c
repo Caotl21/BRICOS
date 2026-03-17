@@ -3,15 +3,15 @@
 #include "bsp_delay.h"
 
 // 电调ESC解锁：上电时必须发送 1500us 持续一段时间
-void Thruster_Init(void){
+void Driver_Thruster_Init(void){
     for(int i=0;i<THRUSTER_COUNT;i++){
-        bsp_pwm_set_pulse_us(BSP_PWM_THRUSTER_1+i, THRUSTER_PWM_STOP);
+        bsp_pwm_set_pulse_us((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), THRUSTER_PWM_STOP);
     }
     bsp_delay_ms(2000); // 等待 2000ms 确保电调解锁
 }
 
 // 设置单路推力
-void Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent){
+void Driver_Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent){
     if (ch < BSP_PWM_THRUSTER_1 || ch > BSP_PWM_THRUSTER_6) return;
 
     // 安全限幅
