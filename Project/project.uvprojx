@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>USE_STDPERIPH_DRIVER,STM32F40_41xxx</Define>
               <Undefine></Undefine>
-              <IncludePath>..\Libraries\STM32F4xx_StdPeriph_Driver\inc;..\Libraries\CMSIS\Include;..\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\User;..\System;..\Bsp;..\Driver</IncludePath>
+              <IncludePath>..\Libraries\STM32F4xx_StdPeriph_Driver\inc;..\Libraries\CMSIS\Include;..\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\User;..\System;..\Bsp;..\Driver;..\App;..\FreeRTOS</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -732,6 +732,41 @@
               <FileName>driver_thruster.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Driver\driver_thruster.h</FilePath>
+            </File>
+            <File>
+              <FileName>driver_hydrocore.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_hydrocore.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_hydrocore.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_hydrocore.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>App</GroupName>
+          <Files>
+            <File>
+              <FileName>task_comm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\task_comm.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\App\task_control.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>FreeRTOS</GroupName>
+          <Files>
+            <File>
+              <FileName>FreeRTOS.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeRTOS\include\FreeRTOS.h</FilePath>
             </File>
           </Files>
         </Group>

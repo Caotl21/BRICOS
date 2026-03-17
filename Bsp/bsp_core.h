@@ -13,8 +13,8 @@
 typedef enum {
     BSP_UART_IMU1 = 0,  // 对应 USART1: IMU1 数据接收
     BSP_UART_IMU2,      // 对应 USART2: IMU2 数据接收
-    BSP_UART_OPI,       // 对应 USART3: 香橙派指令与数据交互
-    BSP_UART_OTA,       // 对应 UART4:  OTA 固件升级
+    BSP_UART_OPI_RT,    // 对应 USART3: 香橙派指令与数据交互
+    BSP_UART_OPI_NRT,   // 对应 UART4:  OTA 固件升级
     BSP_UART_MAX        // 端口数量上限，用于数组越界保护
 } bsp_uart_port_t;
 

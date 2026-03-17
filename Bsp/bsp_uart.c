@@ -87,7 +87,7 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .dma_rx_clear_flags = DMA_FLAG_TCIF5 | DMA_FLAG_HTIF5 | DMA_FLAG_TEIF5 | DMA_FLAG_DMEIF5 | DMA_FLAG_FEIF5
     },
 
-    [BSP_UART_OPI] = {
+    [BSP_UART_OPI_RT] = {
         .uart_base = USART3,
         .gpio_rcc = RCC_AHB1Periph_GPIOB,
         .uart_rcc = RCC_APB1Periph_USART3,
@@ -106,7 +106,7 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .dma_rx_clear_flags = DMA_FLAG_TCIF1 | DMA_FLAG_HTIF1 | DMA_FLAG_TEIF1 | DMA_FLAG_DMEIF1 | DMA_FLAG_FEIF1
     },
 
-    [BSP_UART_OTA] = {
+    [BSP_UART_OPI_NRT] = {
         .uart_base = UART4,
         .gpio_rcc = RCC_AHB1Periph_GPIOA,
         .uart_rcc = RCC_APB1Periph_UART4,
@@ -285,9 +285,9 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
         NVIC_Init(&NVIC_InitStructure);
         
         // 开启特定中断标志位 (香橙派开 IDLE，OTA开 RXNE)
-        if (port == BSP_UART_OPI) {
+        if (port == BSP_UART_OPI_RT) {
             USART_ITConfig(hw->uart_base, USART_IT_IDLE, ENABLE);
-        } else if (port == BSP_UART_OTA) {
+        } else if (port == BSP_UART_OPI_NRT) {
             USART_ITConfig(hw->uart_base, USART_IT_RXNE, ENABLE);
         }
     }
