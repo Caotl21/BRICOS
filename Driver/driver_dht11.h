@@ -1,6 +1,8 @@
 #ifndef __DRIVER_DHT11_H
 #define __DRIVER_DHT11_H
 
+#include "bsp_core.h"
+
 /**
  * @brief  初始化 DHT11 温湿度传感器
  * @note   该函数内部包含约 20ms 的阻塞延时以复位传感器。

@@ -26,6 +26,7 @@ typedef struct {
 } pwm_ch_hw_t;
 
 static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
+    // --- 电机 1：TIM3 CH1 (PA6) [保持不变] ---
     [BSP_PWM_THRUSTER_1] = {
         .tim = TIM3,
         .tim_rcc = RCC_APB1Periph_TIM3, 
@@ -41,9 +42,26 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .prescaler = PSC_APB1_1MHZ,
         .period = ARR_50HZ
     },
+    // --- 电机 2：修改为 TIM3 CH4 (PB1) ---
     [BSP_PWM_THRUSTER_2] = {
         .tim = TIM3,
         .tim_rcc = RCC_APB1Periph_TIM3, 
+        .tim_rcc_cmd = RCC_APB1PeriphClockCmd,
+        .ch = 4, 
+        .port = GPIOB, 
+        .pin = GPIO_Pin_1, 
+        .pin_src = GPIO_PinSource1, 
+        .af = GPIO_AF_TIM3, 
+        .gpio_rcc = RCC_AHB1Periph_GPIOB,
+        .pwm_oc_init = TIM_OC4Init,
+        .tim_oc_preload_config = TIM_OC4PreloadConfig,
+        .prescaler = PSC_APB1_1MHZ,
+        .period = ARR_50HZ
+    },
+    // --- 电机 3：修改为 TIM3 CH2 (PA7) ---
+    [BSP_PWM_THRUSTER_3] = {
+        .tim = TIM3, 
+        .tim_rcc = RCC_APB1Periph_TIM3,
         .tim_rcc_cmd = RCC_APB1PeriphClockCmd,
         .ch = 2, 
         .port = GPIOA, 
@@ -56,7 +74,8 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .prescaler = PSC_APB1_1MHZ,
         .period = ARR_50HZ
     },
-    [BSP_PWM_THRUSTER_3] = {
+    // --- 电机 4：修改为 TIM3 CH3 (PB0) ---
+    [BSP_PWM_THRUSTER_4] = {
         .tim = TIM3, 
         .tim_rcc = RCC_APB1Periph_TIM3,
         .tim_rcc_cmd = RCC_APB1PeriphClockCmd,
@@ -71,51 +90,39 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .prescaler = PSC_APB1_1MHZ,
         .period = ARR_50HZ
     },
-    [BSP_PWM_THRUSTER_4] = {
-        .tim = TIM3, 
-        .tim_rcc = RCC_APB1Periph_TIM3,
+    // --- 电机 5：修改为 TIM4 CH4 (PD15) ---
+    [BSP_PWM_THRUSTER_5] = {
+        .tim = TIM4, 
+        .tim_rcc = RCC_APB1Periph_TIM4,
         .tim_rcc_cmd = RCC_APB1PeriphClockCmd,
         .ch = 4, 
-        .port = GPIOB, 
-        .pin = GPIO_Pin_1, 
-        .pin_src = GPIO_PinSource1, 
-        .af = GPIO_AF_TIM3, 
-        .gpio_rcc = RCC_AHB1Periph_GPIOB,
+        .port = GPIOD, 
+        .pin = GPIO_Pin_15, 
+        .pin_src = GPIO_PinSource15, 
+        .af = GPIO_AF_TIM4, 
+        .gpio_rcc = RCC_AHB1Periph_GPIOD,
         .pwm_oc_init = TIM_OC4Init,
         .tim_oc_preload_config = TIM_OC4PreloadConfig,
         .prescaler = PSC_APB1_1MHZ,
         .period = ARR_50HZ
     },
-    [BSP_PWM_THRUSTER_5] = {
+    // --- 电机 6：修改为 TIM4 CH1 (PD12) ---
+    [BSP_PWM_THRUSTER_6] = {
         .tim = TIM4, 
         .tim_rcc = RCC_APB1Periph_TIM4,
         .tim_rcc_cmd = RCC_APB1PeriphClockCmd,
         .ch = 1, 
         .port = GPIOD, 
-        .pin = GPIO_Pin_12, 
-        .pin_src = GPIO_PinSource12, 
-        .af = GPIO_AF_TIM4, 
+        .pin = GPIO_Pin_12,
+        .pin_src = GPIO_PinSource12,
+        .af = GPIO_AF_TIM4,
         .gpio_rcc = RCC_AHB1Periph_GPIOD,
         .pwm_oc_init = TIM_OC1Init,
         .tim_oc_preload_config = TIM_OC1PreloadConfig,
         .prescaler = PSC_APB1_1MHZ,
         .period = ARR_50HZ
-    },
-    [BSP_PWM_THRUSTER_6] = {
-        .tim = TIM4, 
-        .tim_rcc = RCC_APB1Periph_TIM4,
-        .tim_rcc_cmd = RCC_APB1PeriphClockCmd,
-        .ch = 2, 
-        .port = GPIOD, 
-        .pin =GPIO_Pin_13,
-        .pin_src = GPIO_PinSource13,
-        .af = GPIO_AF_TIM4,
-        .gpio_rcc = RCC_AHB1Periph_GPIOD,
-        .pwm_oc_init = TIM_OC2Init,
-        .tim_oc_preload_config = TIM_OC2PreloadConfig,
-        .prescaler = PSC_APB1_1MHZ,
-        .period = ARR_50HZ
     },    
+    // --- 探照灯 1：TIM4 CH3 (PD14) [保持不变] ---
     [BSP_PWM_LIGHT_1]    = {
         .tim = TIM4, 
         .tim_rcc = RCC_APB1Periph_TIM4,
@@ -131,21 +138,23 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .prescaler = PSC_APB1_1MHZ,
         .period = ARR_50HZ
     },
+    // --- 探照灯 2：修改为 TIM4 CH2 (PD13) ---
     [BSP_PWM_LIGHT_2]    = {
         .tim = TIM4, 
         .tim_rcc = RCC_APB1Periph_TIM4,
         .tim_rcc_cmd = RCC_APB1PeriphClockCmd,
-        .ch = 4, 
+        .ch = 2, 
         .port = GPIOD, 
-        .pin = GPIO_Pin_15, 
-        .pin_src = GPIO_PinSource15, 
+        .pin = GPIO_Pin_13, 
+        .pin_src = GPIO_PinSource13, 
         .af = GPIO_AF_TIM4, 
         .gpio_rcc = RCC_AHB1Periph_GPIOD,
-        .pwm_oc_init = TIM_OC4Init,
-        .tim_oc_preload_config = TIM_OC4PreloadConfig,
+        .pwm_oc_init = TIM_OC2Init,
+        .tim_oc_preload_config = TIM_OC2PreloadConfig,
         .prescaler = PSC_APB1_1MHZ,
         .period = ARR_50HZ
     },
+    // --- 舵机 1：TIM9 CH1 (PE5) [保持不变] ---
     [BSP_PWM_SERVO_1]    = {
         .tim = TIM9, 
         .tim_rcc = RCC_APB2Periph_TIM9,
@@ -161,6 +170,7 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .prescaler = PSC_APB2_1MHZ,
         .period = ARR_50HZ
     },
+    // --- 舵机 2：TIM9 CH2 (PE6) [保持不变] ---
     [BSP_PWM_SERVO_2]    = {
         .tim = TIM9, 
         .tim_rcc = RCC_APB2Periph_TIM9,

@@ -1,5 +1,6 @@
 #include <string.h>
 #include "FreeRTOS.h"
+#include "task.h"
 #include "driver_hydrocore.h"
 
 #pragma pack(push, 1)

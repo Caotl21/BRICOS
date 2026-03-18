@@ -1,5 +1,4 @@
 #include "driver_dht11.h"
-#include "bsp_core.h"
 #include "bsp_gpio.h"
 #include "bsp_delay.h"
 
