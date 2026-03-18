@@ -17,10 +17,16 @@ typedef struct {
     float roll;           // 横滚角 (度)
     float pitch;          // 俯仰角 (度)
     float yaw;            // 偏航角 (度)
-    float gyro_x;         // X轴角速度 (度/秒) - 内环PID极度需要它！
-    float gyro_y;         // Y轴角速度
-    float gyro_z;         // Z轴角速度
-    
+    float gyro_x;         // X轴角速度 (度/秒) 
+    float gyro_y;         // Y轴角速度 (度/秒) 
+    float gyro_z;         // Z轴角速度 (度/秒) 
+    float vel_x;          // X轴线速度 (米/秒) 
+    float vel_y;          // Y轴线速度 (米/秒) 
+    float vel_z;          // Z轴线速度 (米/秒)
+    float acc_x;          // X轴加速度 (米/秒²)
+    float acc_y;          // Y轴加速度 (米/秒²)
+    float acc_z;          // Z轴加速度 (米/秒²)
+
     // --- 中频状态 (10Hz MS5837) ---
     float depth_m;        // 当前深度 (米)
     float water_temp_c;   // 外水温 (摄氏度)
