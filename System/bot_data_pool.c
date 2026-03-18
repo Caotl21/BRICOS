@@ -1,7 +1,7 @@
 #include "bot_data_pool.h"
 #include "sys_port.h"
 #include <string.h>
-#include "driver_pid_param.h"
+#include "driver_param.h"
 
 static bot_state_t s_bricsbot_state;
 static bot_target_t s_bricsbot_target;
@@ -14,7 +14,8 @@ void Bot_Data_Pool_Init(void)
     memset(&s_bricsbot_target, 0, sizeof(s_bricsbot_target));
     memset(&s_bricsbot_params, 0, sizeof(s_bricsbot_params));
 
-    s_bricsbot_params.current_mode = MODE_MANUAL;
+    s_bricsbot_params.current_mode = MOTION_STATE_MANUAL;
+    s_bricsbot_params.sys_mode = SYS_MODE_ACTIVE_DISARMED;
 
     // 从flash读取PID参数
     Driver_PidParam_FillDefault(&s_bricsbot_params);
@@ -122,4 +123,57 @@ void Bot_Params_Push_Mode(bot_run_mode_e mode)
     SYS_ENTER_CRITICAL();
     s_bricsbot_params.current_mode = mode;
     SYS_EXIT_CRITICAL();
+}
+
+// --- 模式切换 API 实现 ---
+
+// 尝试切换系统模式 (加锁/解锁)
+bool Bot_Params_Request_SysMode(bot_sys_mode_e requested_mode) 
+{
+    SYS_ENTER_CRITICAL();
+    
+    // 请求解锁 (ARMED)，进行安全检查
+    if (requested_mode == SYS_MODE_MOTION_ARMED) {
+        // 检查是否漏水
+        if (s_bricsbot_state.is_leak_detected) {
+            SYS_EXIT_CRITICAL();
+            return false;
+        }
+        // 检查 IMU 是否健康
+        if (s_bricsbot_state.is_imu_error) {
+            SYS_EXIT_CRITICAL();
+            return false;
+        }
+        // 检查电压是否过低
+        if (s_bricsbot_state.bat_voltage_v < s_bricsbot_params.failsafe_low_voltage) {
+            SYS_EXIT_CRITICAL();
+            return false;
+        }
+
+        // 可以添加更多安全检查，如深度是否过深等
+    }
+    
+    // 检查通过，或者请求的是加锁/待机(这些总是允许的)
+    s_bricsbot_params.sys_mode = requested_mode;
+    
+    SYS_EXIT_CRITICAL();
+    return true;
+}
+
+// API: 尝试切换运动状态 (手动/自稳/自动)
+bool Bot_Params_Request_MotionState(bot_run_mode_e requested_state)
+{
+    SYS_ENTER_CRITICAL();
+    
+    // 如果请求切入“定深定向自稳”，必须确保深度计数据是新的
+    if (requested_state == MOTION_STATE_STABILIZE || requested_state == MOTION_STATE_AUTO) {
+        if(s_bricsbot_state.is_imu_error) { 
+            SYS_EXIT_CRITICAL();
+            return false;
+        }
+    }
+    
+    s_bricsbot_params.current_mode = requested_state;
+    SYS_EXIT_CRITICAL();
+    return true;
 }

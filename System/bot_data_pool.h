@@ -60,12 +60,6 @@ typedef struct {
 // ============================================================================
 // 参数池 (Params) - 包含运行模式、PID参数等，由串口 4 慢速配置或 Flash 初始加载
 // ============================================================================
-typedef enum {
-    MODE_MANUAL = 0,      // 纯手动裸跑 (直接输出PWM)
-    MODE_STABILIZE = 1,   // 姿态自稳 (自动保持水平)
-    MODE_DEPTH_HOLD = 2,  // 定深定首向 (姿态+深度全闭环)
-} bot_run_mode_e;
-
 typedef struct {
     float kp;
     float ki;
@@ -73,8 +67,21 @@ typedef struct {
     float max_out;        // 积分限幅/输出限幅
 } pid_param_t;
 
+typedef enum {
+    SYS_MODE_STANDBY         = 0, // 待机/低功耗 (推进器断电)
+    SYS_MODE_ACTIVE_DISARMED = 1, // 正常工作但加锁 (传感器全开，推力输出锁定为 1500中位)
+    SYS_MODE_MOTION_ARMED    = 2  // 运动解锁 (推进器可以真正转动)
+} bot_sys_mode_e;
+
+typedef enum {
+    MOTION_STATE_MANUAL    = 0, // 纯手动 (摇杆直接映射推力)
+    MOTION_STATE_STABILIZE = 1, // 定深定向自稳 (摇杆映射为期望角度和期望深度，走 PID)
+    MOTION_STATE_AUTO      = 2  // 自主导航 (上位机下发航点或速度矢量)
+} bot_run_mode_e;
+
 typedef struct {
-    bot_run_mode_e current_mode; // 当前机器人模式
+    bot_run_mode_e current_mode; // 当前机器人运动模式
+    bot_sys_mode_e sys_mode;     // 当前系统状态 (待机/加锁/解锁)
     
     // --- PID 参数矩阵 ---
     pid_param_t pid_roll;
@@ -121,4 +128,14 @@ void Bot_Target_Push_All(const bot_target_t *new_target);
 void Bot_Params_Push_PID(uint8_t pid_id, float p, float i, float d);
 void Bot_Params_Set_Mode(bot_run_mode_e mode);
 
-#endif // __BOT_DATA_POOL_H
+// ---------------------------------------------------------
+// [切换] change mode API
+// ---------------------------------------------------------
+
+// API: 尝试切换系统模式 (加锁/解锁)
+bool Bot_Params_Request_SysMode(bot_sys_mode_e requested_mode);
+
+// API: 尝试切换运动状态 (手动/自稳/自动)
+bool Bot_Params_Request_MotionState(bot_run_mode_e requested_state);
+
+#endif // __BOT_DATA_POOL_H 
