@@ -86,7 +86,7 @@ typedef enum {
 } bot_run_mode_e;
 
 typedef struct {
-    bot_run_mode_e current_mode; // 当前机器人运动模式
+    bot_run_mode_e motion_mode;  // 当前机器人运动模式
     bot_sys_mode_e sys_mode;     // 当前系统状态 (待机/加锁/解锁)
     
     // --- PID 参数矩阵 ---
