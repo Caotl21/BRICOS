@@ -19,6 +19,7 @@
 #define DATA_TYPE_SENSOR_RT		  0x04
 #define DATA_TYPE_SENSOR_NRT      0x05
 #define DATA_TYPE_OTA             0x10
+#define DATA_TYPE_SET_PID_PARAM   0x11
 
 
 typedef void (*protocol_cmd_handler_t)(const uint8_t *payload, uint16_t len);

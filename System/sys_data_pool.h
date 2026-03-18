@@ -50,12 +50,8 @@ typedef struct {
     float target_roll;    // 期望横滚角
     float target_pitch;   // 期望俯仰角
     float target_yaw;     // 期望偏航角
+    float target_
     float target_depth;   // 期望深度
-    
-    // --- 纯手动裸控量 (仅在纯手动模式下生效, -100~100) ---
-    float manual_thrust_x; // 前后平移
-    float manual_thrust_y; // 左右平移
-    float manual_thrust_z; // 上下平移
     
     // --- 附加外设目标 ---
     uint8_t servo_angle;  // 机械手舵机角度 (0-180)

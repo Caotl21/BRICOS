@@ -2,15 +2,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "driver_hydrocore.h"
-
-#pragma pack(push, 1)
-typedef struct {
-    float target_roll;
-    float target_pitch;
-    float target_yaw;
-    float target_depth;
-} Bricsbot_MotionControl_Cmd_t;
-#pragma pack(pop)
+#include "sys_data_pool.h"
 
 Bricsbot_MotionControl_Cmd_t g_motion_cmd = {0};
 

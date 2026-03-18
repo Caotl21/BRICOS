@@ -1,3 +1,6 @@
+#ifndef __SYS_PID_ALGO_H
+#define __SYS_PID_ALGO_H
+
 // 单个 PID 控制器结构体
 typedef struct {
     float kp, ki, kd;
@@ -22,3 +25,5 @@ typedef struct {
     float torque_y;  // 俯仰扭矩 (Pitch)
     float torque_z;  // 偏航扭矩 (Yaw)
 } Bot_Wrench_t; // 物理学中称为 Wrench (旋量)
+
+#endif // __SYS_PID_ALGO_H
