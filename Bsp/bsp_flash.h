@@ -45,7 +45,7 @@ bool bsp_flash_write(uint32_t addr, const uint8_t *data, uint32_t len);
  * @param addr 目标地址
  * @param data 存放数据的缓冲区指针
  * @param len 读取长度 (字节)
- * @return 是否成功读取
+ * @return 无
  * @note 该函数直接从 Flash 地址读取数据，适用于任何地址范围内的读取操作。调用前请确保地址合法且缓冲区足够大。
  */
 void bsp_flash_read(uint32_t addr, uint8_t *data, uint32_t len);

@@ -33,6 +33,7 @@
  * ------------------------------------------------------------------------- */
 bool bsp_flash_erase(uint32_t start_addr, uint32_t size)
 {
+    if (size == 0) return true;
     uint32_t end_addr = start_addr + size;
     uint32_t sector_start = bsp_get_flash_sector(start_addr);
     uint32_t sector_end = bsp_get_flash_sector(end_addr - 1); // -1 确保包含最后一个地址
@@ -63,6 +64,7 @@ bool bsp_flash_erase(uint32_t start_addr, uint32_t size)
  * ------------------------------------------------------------------------- */
 bool bsp_flash_write(uint32_t addr, const uint8_t *data, uint32_t len)
 {
+    if(data == NULL || len == 0) return false;
     FLASH_Unlock();
     FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | 
                     FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
@@ -89,6 +91,7 @@ bool bsp_flash_write(uint32_t addr, const uint8_t *data, uint32_t len)
  * ------------------------------------------------------------------------- */
 void bsp_flash_read(uint32_t addr, uint8_t *data, uint32_t len)
 {
+    if (data == NULL || len == 0) return;
     for (uint32_t i = 0; i < len; i++) {
         data[i] = *(volatile uint8_t*)(addr + i);
     }
