@@ -1,6 +1,7 @@
 #include "bsp_flash.h"
 #include "stm32f4xx.h"
 #include "stm32f4xx_flash.h"
+#include <stddef.h>
 
 /************************************************************
  * 统一的 Flash 驱动实现文件
