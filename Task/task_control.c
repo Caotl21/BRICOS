@@ -1,4 +1,4 @@
-#include "bot_data_pool.h"
+#include "sys_data_pool.h"
 #include "sys_pid_algo.h"
 #include "driver_thruster.h"
 #include "FreeRTOS.h"
@@ -74,43 +74,53 @@ void Task_Control(void *pvParameters)
                 
             case SYS_MODE_MOTION_ARMED:
 
-                switch (local_params.motion_mode) 
+                if (local_target.target_mode != local_params.motion_mode)
                 {
-                    case MOTION_STATE_MANUAL:
-                        // [纯手动模式]：直接把摇杆量扔给推力分配矩阵
-                        
-                        break;
-                        
-                    case MOTION_STATE_STABILIZE:
-                        // [自稳定深模式]：完整的串级 PID 控制
-
-                        // Roll 和 Pitch 的控制逻辑 -- 维持稳定
-                        float target_roll_rate  = PID_Calc(&pid_roll.outer,  local_target.target_roll,  local_state.roll);
-                        wrench_out.torque_x     = PID_Calc(&pid_roll.inner,  target_roll_rate,    local_state.gyro_x);
-        
-                        float target_pitch_rate = PID_Calc(&pid_pitch.outer, local_target.target_pitch, local_state.pitch);
-                        wrench_out.torque_y     = PID_Calc(&pid_pitch.inner, target_pitch_rate,   local_state.gyro_y);
-                        
-                        // Yaw 的控制逻辑 -- 定向控制
-                        float target_yaw_rate   = PID_Calc(&pid_yaw.outer,   local_target.target_yaw,   local_state.yaw);
-                        wrench_out.torque_z     = PID_Calc(&pid_yaw.inner,   target_yaw_rate,     local_state.gyro_z);
-                        
-                        // Depth 的控制逻辑 -- 定深控制
-                        wrench_out.force_z      = PID_Calc(&pid_depth, local_target.target_depth, local_state.depth_m);
-
-                        // X/Y 方向的平移控制逻辑 -- 目前简单映射为摇杆量开环
-                        wrench_out.force_x      = local_target.manual_thrust_x;
-                        wrench_out.force_y      = local_target.manual_thrust_y;
-                        
-                        break;
-                        
-                    case MOTION_STATE_AUTO:
-                        // [自主导航模式]：由轨迹规划算法生成 target_roll/pitch/depth
-                        // 逻辑类似于 STABILIZE，但 target 数据不是操作手给的，而是算法生成的
-                        // Run_Trajectory_Planner(&local_target, &local_state);
-                        // ... 调用 PID ...
-                        break;
+                    // 目标模式和当前运动模式不匹配，安全起见先停机
+                    Thruster_Set_Idle();
+                    break;
                 }
+                else
+                {
+                    switch (local_params.motion_mode) 
+                    {
+                        case MOTION_STATE_MANUAL:
+                            // [纯手动模式]：直接把摇杆量扔给推力分配矩阵
+                            
+                            break;
+                            
+                        case MOTION_STATE_STABILIZE:
+                            // [自稳定深模式]：完整的串级 PID 控制
+
+                            // Roll 和 Pitch 的控制逻辑 -- 维持稳定
+                            float target_roll_rate  = PID_Calc(&pid_roll.outer,  local_target.target_roll,  local_state.roll);
+                            wrench_out.torque_x     = PID_Calc(&pid_roll.inner,  target_roll_rate,    local_state.gyro_x);
+            
+                            float target_pitch_rate = PID_Calc(&pid_pitch.outer, local_target.target_pitch, local_state.pitch);
+                            wrench_out.torque_y     = PID_Calc(&pid_pitch.inner, target_pitch_rate,   local_state.gyro_y);
+                            
+                            // Yaw 的控制逻辑 -- 定向控制
+                            float target_yaw_rate   = PID_Calc(&pid_yaw.outer,   local_target.target_yaw,   local_state.yaw);
+                            wrench_out.torque_z     = PID_Calc(&pid_yaw.inner,   target_yaw_rate,     local_state.gyro_z);
+                            
+                            // Depth 的控制逻辑 -- 定深控制
+                            wrench_out.force_z      = PID_Calc(&pid_depth, local_target.target_depth, local_state.depth_m);
+
+                            // X/Y 方向的平移控制逻辑 -- 目前简单映射为摇杆量开环
+                            wrench_out.force_x      = local_target.manual_thrust_x;
+                            wrench_out.force_y      = local_target.manual_thrust_y;
+                            
+                            break;
+                            
+                        case MOTION_STATE_AUTO:
+                            // [自主导航模式]：由轨迹规划算法生成 target_roll/pitch/depth
+                            // 逻辑类似于 STABILIZE，但 target 数据不是操作手给的，而是算法生成的
+                            // Run_Trajectory_Planner(&local_target, &local_state);
+                            // ... 调用 PID ...
+                            break;
+                    }
+                }
+                
                 
                 TAM_Mixer(&wrench_out, thruster_pwm);
                 break;

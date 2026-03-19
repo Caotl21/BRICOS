@@ -29,10 +29,10 @@ static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
     }
 
     // 将新的参数写入全局数据池，供控制任务读取
-    Bot_Params_Push_PID(PID_ROLL, new_params.pid_roll.kp, new_params.pid_roll.ki, new_params.pid_roll.kd);
-    Bot_Params_Push_PID(PID_PITCH, new_params.pid_pitch.kp, new_params.pid_pitch.ki, new_params.pid_pitch.kd);
-    Bot_Params_Push_PID(PID_YAW, new_params.pid_yaw.kp, new_params.pid_yaw.ki, new_params.pid_yaw.kd);
-    Bot_Params_Push_PID(PID_DEPTH, new_params.pid_depth.kp, new_params.pid_depth.ki, new_params.pid_depth.kd);
+    Bot_Params_Push_PID(PARAM_ID_ROLL, new_params.pid_roll.kp, new_params.pid_roll.ki, new_params.pid_roll.kd);
+    Bot_Params_Push_PID(PARAM_ID_PITCH, new_params.pid_pitch.kp, new_params.pid_pitch.ki, new_params.pid_pitch.kd);
+    Bot_Params_Push_PID(PARAM_ID_YAW, new_params.pid_yaw.kp, new_params.pid_yaw.ki, new_params.pid_yaw.kd);
+    Bot_Params_Push_PID(PARAM_ID_DEPTH, new_params.pid_depth.kp, new_params.pid_depth.ki, new_params.pid_depth.kd);
     Driver_PidParam_Save(&new_params);
 
     bsp_cpu_reset();

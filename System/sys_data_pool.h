@@ -45,13 +45,30 @@ typedef struct {
 // ============================================================================
 // 目标池 (Target) - 包含高速下发的期望姿态、手动摇杆量、执行机构指令
 // ============================================================================
+// MANUAL 模式专属包 (16字节)，直接映射为推进器推力 纯开环
 typedef struct {
-    // --- 期望姿态与深度 ---
-    float target_roll;    // 期望横滚角
-    float target_pitch;   // 期望俯仰角
-    float target_yaw;     // 期望偏航角
-    float target_
-    float target_depth;   // 期望深度
+    float surge;
+    float sway;
+    float heave;
+    float yaw_cmd;
+} payload_manual_t;  // 16 字节
+
+// STABILIZE 模式专属包 开环闭环混合
+typedef struct {
+    float surge;        // X轴开环推力
+    float sway;         // Y轴开环推力
+    float target_depth; // 闭环目标深度
+    float target_yaw;   // 闭环目标航向
+    // roll 和 pitch 默认闭环到 0，可以不用下发，进一步省带宽
+} payload_stabilize_t;
+
+typedef struct {
+    uint8_t target_mode;
+
+    union {
+        payload_manual_t    manual_cmd;
+        payload_stabilize_t stab_cmd;
+    } cmd;
     
     // --- 附加外设目标 ---
     uint8_t servo_angle;  // 机械手舵机角度 (0-180)
