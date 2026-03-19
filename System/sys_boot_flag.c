@@ -1,6 +1,7 @@
 #include "sys_boot_flag.h"
 #include "bsp_flash.h"
 #include  <string.h>
+#include  <stddef.h>
 
 static void BootFlag_Fill_Default(BootFlag_t *f)
 {
