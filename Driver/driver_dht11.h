@@ -10,7 +10,7 @@
  * @retval 0: 初始化成功，检测到 DHT11
  * @retval 1: 初始化失败，未检测到 DHT11 响应
  */
-uint8_t DHT11_Init(void);
+uint8_t Driver_DHT11_Init(void);
 
 /**
  * @brief  读取 DHT11 温湿度数据 (非阻塞状态机版)
@@ -26,6 +26,6 @@ uint8_t DHT11_Init(void);
  * * @retval 0: 读取并校验成功，数据已更新
  * @retval 1: 正在等待复位延时(第1次调用后)，或者设备未响应、数据校验失败
  */
-uint8_t DHT11_Read_Data(uint8_t *temp, uint8_t *humi);
+uint8_t Driver_DHT11_Read_Data(uint8_t *temp, uint8_t *humi);
 
 #endif // __DRIVER_DHT11_H

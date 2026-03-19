@@ -9,11 +9,11 @@
       6、增加 设置z角度为指定值
 *******************************************************************************/
 #include "im948_CMD.h"
-#include "Serial.h"
 
-struct_UartFifo Uart1Fifo;
-U8 targetDeviceAddress=255; // 通信地址，设为0-254指定则设备地址，设为255则不指定设备(即广播), 当需要使用485总线形式通信时通过该参数选中要操作的设备，若仅仅是串口1对1通信设为广播地址255即可
+static IM948_TxFunc_t s_im948_tx_callback = NULL;
 
+
+U8 targetDeviceAddress=255;
 U8 CalcSum1(U8 *Buf, int Len)
 {
     U8 Sum = 0;
@@ -60,7 +60,7 @@ void Dbp_U8_buf(char *sBeginInfo, char *sEndInfo,
 
 
 static void Cmd_Write(U8 *pBuf, int Len);
-static void Cmd_RxUnpack(U8 *buf, U8 DLen);
+static void Cmd_RxUnpack(uint8_t *buf, uint8_t DLen, float *acc, float *gyro, float *quat);
 /**
  * 发送CMD命令
  *
@@ -98,7 +98,8 @@ int Cmd_PackAndTx(U8 *pDat, U8 DLen)
  * @param byte 传入接收到的每字节数据
  * @return U8 1=接收到完整数据包, 0未获取到完整数据包
  */
-U8 Cmd_GetPkt(U8 byte)
+// U8 Cmd_GetPkt(U8 byte)
+uint8_t Cmd_GetPkt(uint8_t byte, float *acc, float *gyro, float *quat)
 {
     static U8 CS=0; // 校验和
     static U8 i=0;
@@ -172,7 +173,8 @@ U8 Cmd_GetPkt(U8 byte)
                 Dbp_U8_buf("rx: ", "\r\n",
                            "%02X ",
                            buf, i);
-                Cmd_RxUnpack(&buf[3], i-5); // 处理数据包的数据体
+                //Cmd_RxUnpack(&buf[3], i-5); // 处理数据包的数据体
+                Cmd_RxUnpack(&buf[3], i-5, acc, gyro, quat);
                 return 1;
             }
         }
@@ -728,7 +730,8 @@ U8 IM948_GetNewData=0;// 1=更新了新的数据到全局变量里了
  * @param pDat 要解析的数据体
  * @param DLen 数据体的长度
  */
-static void Cmd_RxUnpack(U8 *buf, U8 DLen)
+//static void Cmd_RxUnpack(U8 *buf, U8 DLen)
+static void Cmd_RxUnpack(uint8_t *buf, uint8_t DLen, float *acc, float *gyro, float *quat)
 {
     U16 ctl;
     U8 L;
@@ -795,6 +798,10 @@ static void Cmd_RxUnpack(U8 *buf, U8 DLen)
             tmpY = (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleAccel; L += 2; Dbp("\taY: %.3f\r\n", tmpY); // y加速度aY
             tmpZ = (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleAccel; L += 2; Dbp("\taZ: %.3f\r\n", tmpZ); // z加速度aZ
             tmpAbs = sqrt(pow2(tmpX) + pow2(tmpY) + pow2(tmpZ)); Dbp("\ta_abs: %.3f\r\n", tmpAbs); // 3轴合成的绝对值
+            // 直接写入传进来的结构体！
+            acc[0] = tmpX * scaleAccel; 
+            acc[1] = tmpY * scaleAccel; 
+            acc[2] = tmpZ * scaleAccel;
         }
         if ((ctl & 0x0002) != 0)
         {// 加速度xyz 包含了重力 使用时需*scaleAccel m/s
@@ -803,6 +810,10 @@ static void Cmd_RxUnpack(U8 *buf, U8 DLen)
             tmpZ = (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleAccel; L += 2; Dbp("\tAZ: %.3f\r\n", tmpZ); // z加速度AZ
             tmpAbs = sqrt(pow2(tmpX) + pow2(tmpY) + pow2(tmpZ)); Dbp("\tA_abs: %.3f\r\n", tmpAbs); // 3轴合成的绝对值
             AccX_im948 = tmpX*scaleAccel; AccY_im948 = tmpY*scaleAccel; AccZ_im948 = tmpZ*scaleAccel; Accabs_im948 = tmpAbs*scaleAccel;
+            // 直接写入传进来的结构体！
+            acc[0] = tmpX * scaleAccel; 
+            acc[1] = tmpY * scaleAccel; 
+            acc[2] = tmpZ * scaleAccel;
         }
         if ((ctl & 0x0004) != 0)
         {// 角速度xyz 使用时需*scaleAngleSpeed °/s
@@ -811,6 +822,10 @@ static void Cmd_RxUnpack(U8 *buf, U8 DLen)
             tmpZ = (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleAngleSpeed; L += 2; Dbp("\tGZ: %.3f\r\n", tmpZ); // z角速度GZ
             tmpAbs = sqrt(pow2(tmpX) + pow2(tmpY) + pow2(tmpZ)); Dbp("\tG_abs: %.3f\r\n", tmpAbs); // 3轴合成的绝对值
             GyroX_im948 = tmpX*scaleAngleSpeed; GyroY_im948 = tmpY*scaleAngleSpeed; GyroZ_im948 = tmpZ*scaleAngleSpeed; Gyroabs_im948 = tmpAbs*scaleAngleSpeed;
+            // 直接写入传进来的结构体！
+            gyro[0] = tmpX * scaleAngleSpeed;
+            gyro[1] = tmpY * scaleAngleSpeed;
+            gyro[2] = tmpZ * scaleAngleSpeed;
         }
         if ((ctl & 0x0008) != 0)
         {// 磁场xyz 使用时需*scaleMag uT
@@ -840,7 +855,12 @@ static void Cmd_RxUnpack(U8 *buf, U8 DLen)
             tmpY =   (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleQuat; L += 2; Dbp("\ty: %.3f\r\n", tmpY); // y
             tmpZ =   (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleQuat; L += 2; Dbp("\tz: %.3f\r\n", tmpZ); // z
 			W_quat_im948 = tmpAbs; X_quat_im948 = tmpX; Y_quat_im948 = tmpY; Z_quat_im948 = tmpZ;
-		}
+		    // 直接写入传进来的结构体！
+            quat[0] = tmpAbs;
+            quat[1] = tmpX;
+            quat[2] = tmpY;
+            quat[3] = tmpZ;
+        }
         if ((ctl & 0x0040) != 0)
         {// 欧拉角xyz 使用时需*scaleAngle
             tmpX = (S16)(((S16)buf[L+1]<<8) | buf[L]) * scaleAngle; L += 2; printf("\tangleX: %.3f\r\n", tmpX); // x角度
@@ -1040,9 +1060,10 @@ static void Cmd_RxUnpack(U8 *buf, U8 DLen)
     }
 }
 
-static void IM948_Write(U8 *pBuf, int Len)
+// 注册函数
+void IM948_RegisterTxCallback(IM948_TxFunc_t tx_func)
 {
-	USART1_UartSend(pBuf, Len);
+    s_im948_tx_callback = tx_func;
 }
 
 /**
@@ -1053,12 +1074,18 @@ static void IM948_Write(U8 *pBuf, int Len)
 static void Cmd_Write(U8 *pBuf, int Len)
 {
     // 通过UART_Write函数发送通信数据流，由用户针对底层硬件实现UART_Write函数把buf指针指向的Len字节数据发送出去即可
-    IM948_Write(pBuf, Len);
+    if (s_im948_tx_callback != NULL)
+    {
+        s_im948_tx_callback(pBuf, (uint16_t)Len);
+    }
 
     Dbp_U8_buf("tx: ", "\r\n",
                "%02X ",
                pBuf, Len);
+
+        
 }
+
 
 
 // ======================================测试示例==============================================
@@ -1327,105 +1354,3 @@ void im948_test(void)
 
     }
 }
-
-void IM948_Init(void)
-{
-	//RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
-    //GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
-	
-	printf("--- IM948 test start FirmwareVer ---\r\n");
-    int i = 40000000; while (i--);// 延时一下让传感器上电准备完毕，传感器上电后需要初始化完毕后才会接收指令的
-    // 唤醒传感器，并配置好传感器工作参数，然后开启主动上报---------------
-    Cmd_03();// 1 唤醒传感器
-    
-    /**
-       * 设置设备参数
-     * @param accStill    惯导-静止状态加速度阀值 单位dm/s?
-     * @param stillToZero 惯导-静止归零速度(单位cm/s) 0:不归零 255:立即归零
-     * @param moveToZero  惯导-动态归零速度(单位cm/s) 0:不归零
-     * @param isCompassOn 1=需开启磁场 0=需关闭磁场
-     * @param barometerFilter 气压计的滤波等级[取值0-3],数值越大越平稳但实时性越差
-     * @param reportHz 数据主动上报的传输帧率[取值0-250HZ], 0表示0.5HZ
-     * @param gyroFilter    陀螺仪滤波系数[取值0-2],数值越大越平稳但实时性越差
-     * @param accFilter     加速计滤波系数[取值0-4],数值越大越平稳但实时性越差
-     * @param compassFilter 磁力计滤波系数[取值0-9],数值越大越平稳但实时性越差
-     * @param Cmd_ReportTag 功能订阅标识
-     */
-	//Cmd_12(accStill, stillToZero, moveToZero,  isCompassOn, barometerFilter, reportHz, gyroFilter, accFilter, compassFilter, Cmd_ReportTag );
-    Cmd_12(5, 255, 0,  0, 3, 25, 2, 4, 9, 0x35);// 2 设置设备参数(内容1)
-    Cmd_19();// 3 开启数据主动上报
-    i = 5000000; while (i--);// 延时大概100ms，待前面的指令执行完毕
-    Cmd_40(2);//设置开机后工作模式  参数2=开机时载入配置参数并开启串口主动上报，1=开机时载入配置参数但串口不主动上报, 0=不载入且串口不主动上报
-	printf("------ IM948 Init Finished ------\r\n");
-}
-
-//void IM948_process(void)
-//{
-//    while (Uart1Fifo.Cnt > 0)
-//        {// 从fifo获取串口发来的数据
-//			U8 rxByte;
-//            rxByte = Uart1Fifo.RxBuf[Uart1Fifo.Out];
-//            //printf("rxByte:%02X\r\n", rxByte);
-//            if (++Uart1Fifo.Out >= FifoSize)
-//            {
-//                Uart1Fifo.Out = 0;
-//            }
-//            __disable_irq();// 关中断
-//            --Uart1Fifo.Cnt;
-//            __enable_irq();// 开中断
-
-//            // 移植 每收到1字节数据都填入该函数，当抓取到有效的数据包就会回调进入 Cmd_RxUnpack(U8 *buf, U8 DLen) 函数处理
-//            if (Cmd_GetPkt(rxByte)){break;}
-//        }
-//}
-
-void IM948_process(void)
-{
-    // 1. 获取当前的写指针（在中断里由 DMA 进度更新）
-    // 使用局部变量，防止在处理过程中 In 发生变化导致逻辑混乱
-    uint16_t head = Uart1Fifo.In; 
-    uint16_t tail = Uart1Fifo.Out;
-	
-	if(head == tail){
-		printf("Fifo is empty!\r\n");
-		return;
-	}
-
-    // 2. 计算当前缓冲区有多少新数据
-    // 环形缓冲区计算公式： (In - Out + Size) % Size
-    int16_t data_len = head - tail;
-    if (data_len < 0)
-    {
-        data_len += FifoSize;
-    }
-
-    // 3. 循环处理所有新数据
-    while (data_len > 0)
-    {
-        // 取出一个字节
-        U8 rxByte = Uart1Fifo.RxBuf[tail];
-
-        // 移动读指针 (Out)
-        if (++tail >= FifoSize)
-        {
-            tail = 0; // 回环
-        }
-
-        // 减少待处理长度计数
-        data_len--;
-
-        // 4. 解析数据包
-        // 这里不需要开关中断，因为 DMA 只操作 In，我们只操作 Out，互不冲突
-        if (Cmd_GetPkt(rxByte))
-        {
-            // 【注意】如果你希望一帧处理完就立即退出（原本的逻辑），
-            // 必须先把最新的 tail 更新回全局变量，否则下次进来数据就读错了
-            Uart1Fifo.Out = tail; 
-			//break;
-        }
-    }
-
-    // 5. 将更新后的读指针写回全局结构体
-    Uart1Fifo.Out = tail;
-}
-

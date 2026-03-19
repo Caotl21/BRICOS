@@ -14,16 +14,16 @@
       <uAC6>0</uAC6>
       <TargetOption>
         <TargetCommonOption>
-          <Device>STM32F407ZGTx</Device>
+          <Device>STM32F407ZG</Device>
           <Vendor>STMicroelectronics</Vendor>
-          <PackID>Keil.STM32F4xx_DFP.2.17.0</PackID>
-          <PackURL>https://www.keil.com/pack/</PackURL>
-          <Cpu>IRAM(0x20000000,0x00020000) IRAM2(0x10000000,0x00010000) IROM(0x08000000,0x00100000) CPUTYPE("Cortex-M4") FPU2 CLOCK(12000000) ELITTLE</Cpu>
+          <PackID>Keil.STM32F4xx_DFP.1.0.8</PackID>
+          <PackURL>http://www.keil.com/pack</PackURL>
+          <Cpu>IRAM(0x20000000,0x20000) IRAM2(0x10000000,0x10000) IROM(0x08000000,0x100000) CPUTYPE("Cortex-M4") FPU2 CLOCK(12000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
           <StartupFile></StartupFile>
-          <FlashDriverDll>UL2CM3(-S0 -C0 -P0 -FD20000000 -FC1000 -FN1 -FF0STM32F4xx_1024 -FS08000000 -FL0100000 -FP0($$Device:STM32F407ZGTx$CMSIS\Flash\STM32F4xx_1024.FLM))</FlashDriverDll>
+          <FlashDriverDll>UL2CM3(-S0 -C0 -P0 -FD20000000 -FC1000 -FN1 -FF0STM32F4xx_1024 -FS08000000 -FL0100000 -FP0($$Device:STM32F407ZG$Flash\STM32F4xx_1024.FLM))</FlashDriverDll>
           <DeviceId>0</DeviceId>
-          <RegisterFile>$$Device:STM32F407ZGTx$Drivers\CMSIS\Device\ST\STM32F4xx\Include\stm32f4xx.h</RegisterFile>
+          <RegisterFile>$$Device:STM32F407ZG$Device\Include\stm32f4xx.h</RegisterFile>
           <MemoryEnv></MemoryEnv>
           <Cmp></Cmp>
           <Asm></Asm>
@@ -33,7 +33,7 @@
           <SLE66CMisc></SLE66CMisc>
           <SLE66AMisc></SLE66AMisc>
           <SLE66LinkerMisc></SLE66LinkerMisc>
-          <SFDFile>$$Device:STM32F407ZGTx$CMSIS\SVD\STM32F407.svd</SFDFile>
+          <SFDFile>$$Device:STM32F407ZG$SVD\STM32F40x.svd</SFDFile>
           <bCustSvd>0</bCustSvd>
           <UseEnv>0</UseEnv>
           <BinPath></BinPath>
@@ -209,7 +209,7 @@
             <Ra2Chk>0</Ra2Chk>
             <Ra3Chk>0</Ra3Chk>
             <Im1Chk>1</Im1Chk>
-            <Im2Chk>0</Im2Chk>
+            <Im2Chk>1</Im2Chk>
             <OnChipMemories>
               <Ocm1>
                 <Type>0</Type>
@@ -274,7 +274,7 @@
               <OCR_RVCT4>
                 <Type>1</Type>
                 <StartAddress>0x8000000</StartAddress>
-                <Size>0x18000</Size>
+                <Size>0x100000</Size>
               </OCR_RVCT4>
               <OCR_RVCT5>
                 <Type>1</Type>
@@ -336,7 +336,7 @@
               <MiscControls></MiscControls>
               <Define>USE_STDPERIPH_DRIVER,STM32F40_41xxx</Define>
               <Undefine></Undefine>
-              <IncludePath>..\Libraries\STM32F4xx_StdPeriph_Driver\inc;..\Libraries\CMSIS\Include;..\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\User;..\System;..\Bsp;..\Driver;..\Task;..\FreeRTOS</IncludePath>
+              <IncludePath>..\Libraries\STM32F4xx_StdPeriph_Driver\inc;..\Libraries\CMSIS\Include;..\Libraries\CMSIS\Device\ST\STM32F4xx\Include;..\User;..\System;..\Bsp;..\Driver;..\App;..\FreeRTOS;..\Third_Party\IM948;..\FreeRTOS\include;..\FreeRTOS\portable\RVDS\ARM_CM4F;..\System;..\Task;..\Third_Party\JY901</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -708,6 +708,16 @@
               <FileType>5</FileType>
               <FilePath>..\Bsp\bsp_watchdog.h</FilePath>
             </File>
+            <File>
+              <FileName>bsp_cpu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Bsp\bsp_cpu.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_cpu.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Bsp\bsp_cpu.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -743,6 +753,56 @@
               <FileType>5</FileType>
               <FilePath>..\Driver\driver_hydrocore.h</FilePath>
             </File>
+            <File>
+              <FileName>driver_dht11.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_dht11.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_dht11.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_dht11.h</FilePath>
+            </File>
+            <File>
+              <FileName>driver_imu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_imu.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_imu.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_imu.h</FilePath>
+            </File>
+            <File>
+              <FileName>driver_ms5837.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_ms5837.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_ms5837.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_ms5837.h</FilePath>
+            </File>
+            <File>
+              <FileName>driver_param.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_param.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_param.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_param.h</FilePath>
+            </File>
+            <File>
+              <FileName>driver_power.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_power.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_power.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_power.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -763,6 +823,26 @@
               <FileType>1</FileType>
               <FilePath>..\Task\task_rt_cmd.c</FilePath>
             </File>
+            <File>
+              <FileName>task_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\task_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_imu_parse.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\task_imu_parse.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_monitor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\task_monitor.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_sensor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\task_sensor.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -772,6 +852,121 @@
               <FileName>FreeRTOS.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\FreeRTOS\include\FreeRTOS.h</FilePath>
+            </File>
+            <File>
+              <FileName>croutine.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeRTOS\croutine.c</FilePath>
+            </File>
+            <File>
+              <FileName>event_groups.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeRTOS\event_groups.c</FilePath>
+            </File>
+            <File>
+              <FileName>list.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeRTOS\list.c</FilePath>
+            </File>
+            <File>
+              <FileName>queue.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeRTOS\queue.c</FilePath>
+            </File>
+            <File>
+              <FileName>stream_buffer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeRTOS\stream_buffer.c</FilePath>
+            </File>
+            <File>
+              <FileName>tasks.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeRTOS\tasks.c</FilePath>
+            </File>
+            <File>
+              <FileName>timers.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeRTOS\timers.c</FilePath>
+            </File>
+            <File>
+              <FileName>port.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeRTOS\portable\RVDS\ARM_CM4F\port.c</FilePath>
+            </File>
+            <File>
+              <FileName>heap_4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeRTOS\portable\MemMang\heap_4.c</FilePath>
+            </File>
+            <File>
+              <FileName>FreeRTOSConfig.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeRTOS\include\FreeRTOSConfig.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Third_Party</GroupName>
+          <Files>
+            <File>
+              <FileName>im948_CMD.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Third_Party\IM948\im948_CMD.c</FilePath>
+            </File>
+            <File>
+              <FileName>im948_CMD.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Third_Party\IM948\im948_CMD.h</FilePath>
+            </File>
+            <File>
+              <FileName>REG.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Third_Party\JY901\REG.h</FilePath>
+            </File>
+            <File>
+              <FileName>wit_c_sdk.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Third_Party\JY901\wit_c_sdk.c</FilePath>
+            </File>
+            <File>
+              <FileName>wit_c_sdk.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Third_Party\JY901\wit_c_sdk.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>System</GroupName>
+          <Files>
+            <File>
+              <FileName>sys_data_pool.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\System\sys_data_pool.c</FilePath>
+            </File>
+            <File>
+              <FileName>sys_data_pool.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_data_pool.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_log.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\System\sys_log.c</FilePath>
+            </File>
+            <File>
+              <FileName>sys_log.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_log.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_pid_algo.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_pid_algo.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_port.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_port.h</FilePath>
             </File>
           </Files>
         </Group>

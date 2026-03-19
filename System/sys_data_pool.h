@@ -157,4 +157,5 @@ bool Bot_Params_Request_SysMode(bot_sys_mode_e requested_mode);
 // API: 尝试切换运动状态 (手动/自稳/自动)
 bool Bot_Params_Request_MotionState(bot_run_mode_e requested_state);
 
-#endif // __BOT_DATA_POOL_H 
+#endif // __BOT_DATA_POOL_H
+

@@ -1,4 +1,4 @@
-#include "bot_data_pool.h"
+#include "sys_data_pool.h"
 #include "sys_port.h"
 #include <string.h>
 #include "driver_param.h"
@@ -14,7 +14,7 @@ void Bot_Data_Pool_Init(void)
     memset(&s_bricsbot_target, 0, sizeof(s_bricsbot_target));
     memset(&s_bricsbot_params, 0, sizeof(s_bricsbot_params));
 
-    s_bricsbot_params.current_mode = MOTION_STATE_MANUAL;
+    s_bricsbot_params.motion_mode = MOTION_STATE_MANUAL;
     s_bricsbot_params.sys_mode = SYS_MODE_ACTIVE_DISARMED;
 
     // 从flash读取PID参数
@@ -121,7 +121,7 @@ void Bot_Params_Push_PID(uint8_t pid_id, float p, float i, float d)
 void Bot_Params_Push_Mode(bot_run_mode_e mode)
 {
     SYS_ENTER_CRITICAL();
-    s_bricsbot_params.current_mode = mode;
+    s_bricsbot_params.motion_mode = mode;
     SYS_EXIT_CRITICAL();
 }
 
@@ -173,7 +173,7 @@ bool Bot_Params_Request_MotionState(bot_run_mode_e requested_state)
         }
     }
     
-    s_bricsbot_params.current_mode = requested_state;
+    s_bricsbot_params.motion_mode = requested_state;
     SYS_EXIT_CRITICAL();
     return true;
 }
