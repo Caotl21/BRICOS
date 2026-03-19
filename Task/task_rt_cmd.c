@@ -3,6 +3,7 @@
 #include "task.h"
 #include "driver_hydrocore.h"
 #include "sys_data_pool.h"
+#include "sys_port.h"
 
 typedef struct __attribute__((packed)) {
     uint32_t tick_ms;

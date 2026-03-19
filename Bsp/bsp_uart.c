@@ -313,6 +313,36 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
     return true;
 }
 
+/**
+ * @brief  初始化系统中所有的串口设备
+ * @note   统一配置为: 115200bps, 8位数据, 1位停止, 无校验
+ * 需要在 main 函数的硬件初始化阶段被调用
+ */
+void bsp_uart_init_default(void)
+{
+    // 定义一个通用的串口配置模板
+    bsp_uart_config_t default_config = {
+        .baudrate  = 115200,
+        .data_bits = BSP_UART_DATA_8B,
+        .stop_bits = BSP_UART_STOP_1B,
+        .parity    = BSP_UART_PARITY_NONE
+    };
+
+    // 依次传入枚举 ID 和配置模板进行初始化
+    
+    // 初始化 IMU1 (USART1)
+    bsp_uart_init(BSP_UART_IMU1, &default_config);
+    
+    // 初始化 IMU2 (USART2)
+    bsp_uart_init(BSP_UART_IMU2, &default_config);
+    
+    // 初始化 OrangePi 实时通信总线 (USART3)
+    bsp_uart_init(BSP_UART_OPI_RT, &default_config);
+    
+    // 初始化 OrangePi 非实时通信/系统日志总线 (UART4)
+    bsp_uart_init(BSP_UART_OPI_NRT, &default_config);
+}
+
 
 /* -------------------------------------------------------------------------
  * 函数名：bsp_uart_start_dma_rx_circular
@@ -444,3 +474,6 @@ void bsp_uart_send_buffer(bsp_uart_port_t port, const uint8_t *data, uint16_t le
 bool bsp_uart_send_dma(bsp_uart_port_t port, uint8_t *data, uint16_t len) {
     return false; // 目前不实现 DMA 发送，后续可根据需要添加
 }
+
+
+

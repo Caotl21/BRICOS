@@ -115,7 +115,7 @@ static uint8_t DHT11_Read_Byte(void)
 // temp:温度值(范围:0~50°)
 // humi:湿度值(范围:20%~90%)
 // 返回值：0,正常; 1,读取失败或等待阶段
-uint8_t DHT11_Read_Data(uint8_t *temp, uint8_t *humi)    
+uint8_t Driver_DHT11_Read_Data(uint8_t *temp, uint8_t *humi)    
 {        
     uint8_t buf[5];
     uint8_t i;
@@ -162,7 +162,7 @@ uint8_t DHT11_Read_Data(uint8_t *temp, uint8_t *humi)
 
 // 初始化 DHT11
 // 返回值：1:不存在; 0:存在         
-uint8_t DHT11_Init(void)
+uint8_t Driver_DHT11_Init(void)
 {               
     DHT11_Rst();          // 阻塞式复位 DHT11，确保启动时传感器就绪
     return DHT11_Check(); // 等待 DHT11 的回应

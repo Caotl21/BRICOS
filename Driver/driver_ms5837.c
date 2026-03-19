@@ -79,7 +79,7 @@ static bool readFromMs5837(uint8_t reg_addr, uint16_t *data)
     return true;
 }
 
-bool Ms5837_Init(void)
+bool Driver_Ms5837_Init(void)
 {
     // 0. 初始化底层 I2C 硬件管脚和时钟
     bsp_i2c_bus_t i2c_bus_list[] = {BSP_I2C_MS5837};
@@ -108,12 +108,12 @@ bool Ms5837_Init(void)
     return true;
 }
 
-void Ms5837_Start_Temp_Conversion(void)
+void Driver_Ms5837_Start_Temp_Conversion(void)
 {
     bsp_i2c_mem_write(BSP_I2C_MS5837, MS5837_ADDR, MS5837_CMD_CONV_D2, NULL, 0);
 }
 
-bool Ms5837_Read_Temp(float *out_temp)
+bool Driver_Ms5837_Read_Temp(float *out_temp)
 {
     uint8_t buf[3];
     int32_t TEMP;
@@ -162,12 +162,12 @@ bool Ms5837_Read_Temp(float *out_temp)
     return true;
 }
 
-void Ms5837_Start_Pressure_Conversion(void)
+void Driver_Ms5837_Start_Pressure_Conversion(void)
 {
     bsp_i2c_mem_write(BSP_I2C_MS5837, MS5837_ADDR, MS5837_CMD_CONV_D1, NULL, 0);
 }
 
-bool Ms5837_Read_Pressure_Depth(float *out_press, float *out_depth)
+bool Driver_Ms5837_Read_Pressure_Depth(float *out_press, float *out_depth)
 {
     uint8_t buf[3];
     

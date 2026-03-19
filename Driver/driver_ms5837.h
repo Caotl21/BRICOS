@@ -10,7 +10,7 @@
  * @retval true  初始化并读取校验数据成功
  * @retval false 传感器无响应或总线错误
  */
-bool Ms5837_Init(void);
+bool Driver_Ms5837_Init(void);
 
 /* =========================================================================
  * 状态机非阻塞接口：
@@ -28,7 +28,7 @@ bool Ms5837_Init(void);
  * @brief  发送温度转换指令 (D2)
  * @note   发送后需要等待至少 2~10ms (取决于内部 OSR 宏定义配置) 才能读取
  */
-void Ms5837_Start_Temp_Conversion(void);
+void Driver_Ms5837_Start_Temp_Conversion(void);
 
 /**
  * @brief  读取温度数据并进行一阶/二阶温度补偿
@@ -36,22 +36,22 @@ void Ms5837_Start_Temp_Conversion(void);
  * @retval true  读取并计算成功
  * @retval false 读取失败 (总线错误)
  */
-bool Ms5837_Read_Temp(float *out_temp);
+bool Driver_Ms5837_Read_Temp(float *out_temp);
 
 /**
  * @brief  发送压力转换指令 (D1)
  * @note   发送后需要等待至少 2~10ms 才能读取
  */
-void Ms5837_Start_Pressure_Conversion(void);
+void Driver_Ms5837_Start_Pressure_Conversion(void);
 
 /**
  * @brief  读取压力与深度数据 
- * @note   必须在 Ms5837_Read_Temp() 成功执行之后调用，因为深度计算强依赖温度补偿系数
+ * @note   必须在 Driver_Ms5837_Read_Temp() 成功执行之后调用，因为深度计算强依赖温度补偿系数
  * @param  out_press 指向存放气压/水压结果(mbar)的指针 (可传 NULL)
  * @param  out_depth 指向存放水深结果(cm)的指针 (可传 NULL)
  * @retval true  读取并解算成功
  * @retval false 读取失败
  */
-bool Ms5837_Read_Pressure_Depth(float *out_press, float *out_depth);
+bool Driver_Ms5837_Read_Pressure_Depth(float *out_press, float *out_depth);
 
 #endif // __DRIVER_MS5837_H

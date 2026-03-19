@@ -45,6 +45,13 @@ typedef void (*bsp_uart_rx_cb_t)(uint8_t *data, uint16_t len);
 bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config);
 
 /**
+ * @brief  初始化系统中所有的串口设备
+ * @note   统一配置为: 115200bps, 8位数据, 1位停止, 无校验
+ * 需要在 main 函数的硬件初始化阶段被调用
+ */
+void bsp_uart_init_default(void);
+
+/**
  * @brief 启动 DMA 循环接收模式
  * @param port - 串口端口枚举 (如 BSP_UART_OPI)
  * @param buf_addr - 上层提供的接收缓冲区地址，DMA 将直接写入此地址

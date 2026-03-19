@@ -33,7 +33,7 @@ void Driver_PidParam_FillDefault(bot_params_t *params)
 
     memset(params, 0, sizeof(*params));
 
-    params->current_mode = MODE_MANUAL;
+//    params->motion_mode = MODE_MANUAL;
 
     params->pid_roll.kp  = 2.0f;
     params->pid_roll.ki  = 0.0f;

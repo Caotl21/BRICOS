@@ -6,6 +6,7 @@
 #include "driver_hydrocore.h"
 #include "driver_param.h"
 #include "sys_data_pool.h"
+#include "sys_port.h"
 
 static void On_Receive_OTA_Cmd(const uint8_t *payload, uint16_t len){
     if(len == 4 && payload[0] == 0xDE && payload[1] == 0xAD && payload[2] == 0xBE && payload[3] == 0xEF){
