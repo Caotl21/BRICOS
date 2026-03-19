@@ -2,6 +2,7 @@
 #include "sys_pid_algo.h"
 #include "driver_thruster.h"
 #include "FreeRTOS.h"
+#include "sys_log.h"
 
 //控制器实例
 Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
@@ -78,6 +79,7 @@ void Task_Control(void *pvParameters)
                 {
                     // 目标模式和当前运动模式不匹配，安全起见先停机
                     Thruster_Set_Idle();
+                    LOG_ERROR("Motion mode mismatch!");
                     break;
                 }
                 else
