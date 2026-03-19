@@ -27,6 +27,6 @@ bool Sys_BootFlag_Read(BootFlag_t *out);
 bool Sys_BootFlag_Save(const BootFlag_t *flag);
 bool Sys_BootFlag_MarkBootSuccess(void);
 bool Sys_BootFlag_RequestEnterBootloader(void);
-bool Sys_BootFlag_CheckAndClearEnterBootloader(bool *need_enter);
+bool Sys_BootFlag_CheckAndClearEnterBootloader(void);
 
 #endif
