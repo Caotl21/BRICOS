@@ -1,5 +1,6 @@
 #include "bsp_timer.h"
 #include "stm32f4xx.h"
+#include "stm32f4xx_tim.h"
 
 /**
  * @brief  初始化 TIM2 为 FreeRTOS 提供运行时间统计基准 (零中断方案)

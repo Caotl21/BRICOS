@@ -13,7 +13,7 @@
 
 #define CABIN_HUMI_LEAK_THRESHOLD  85  // 舱内湿度大于 85% 判定为漏水预警
 
-
+imu_data_t g_imu_body_frame[IMU_MAX_NUM];
 
 /* ============================================================================
  * 任务句柄实体定义 (分配实际的内存空间)
@@ -36,15 +36,15 @@ static void vTask_DHT11_Core(void *pvParameters);
  * ============================================================================ */
 void Task_Sensor_Init(void)
 {
-    // 1. 创建 IMU 姿态解析任务
+    // 创建 IMU 姿态解析任务
     xTaskCreate((TaskFunction_t ) vTask_IMU_Core,            // 任务核心函数
-                (const char * ) "Task_IMU",                // 任务名称(供调试用)
+                (const char * ) "Task_IMU",                  // 任务名称(供调试用)
                 (uint16_t       ) IMU_STK_SIZE,              // 任务堆栈大小(字)
-                (void * ) NULL,                      // 传递给任务的参数
+                (void * ) NULL,                              // 传递给任务的参数
                 (UBaseType_t    ) IMU_TASK_PRIO,             // 任务优先级
                 (TaskHandle_t * ) &IMU_Task_Handler);        // 绑定任务句柄
 
-    // 2. 创建 MS5837 深度与水温任务
+    // 创建 MS5837 深度与水温任务
     xTaskCreate((TaskFunction_t ) vTask_MS5837_Core, 
                 (const char * ) "Task_MS5837", 
                 (uint16_t       ) MS5837_STK_SIZE, 
@@ -52,7 +52,7 @@ void Task_Sensor_Init(void)
                 (UBaseType_t    ) MS5837_TASK_PRIO, 
                 (TaskHandle_t * ) &MS5837_Task_Handler);
 
-    // 3. 创建 Power 电源监控任务
+    // 创建 Power 电源监控任务
     xTaskCreate((TaskFunction_t ) vTask_Power_Core, 
                 (const char * ) "Task_Power", 
                 (uint16_t       ) POWER_STK_SIZE, 
@@ -60,7 +60,7 @@ void Task_Sensor_Init(void)
                 (UBaseType_t    ) POWER_TASK_PRIO, 
                 (TaskHandle_t * ) &Power_Task_Handler);
 
-    // 4. 创建 DHT11 舱内环境监控任务
+    // 创建 DHT11 舱内环境监控任务
     xTaskCreate((TaskFunction_t ) vTask_DHT11_Core, 
                 (const char * ) "Task_DHT11", 
                 (uint16_t       ) DHT11_STK_SIZE, 
@@ -68,10 +68,6 @@ void Task_Sensor_Init(void)
                 (UBaseType_t    ) DHT11_TASK_PRIO, 
                 (TaskHandle_t * ) &DHT11_Task_Handler);
 }
-
-
-
-imu_data_t g_imu_body_frame[IMU_MAX_NUM];
 
 static void IMU_Align_To_BodyFrame(imu_data_t *imu)
 {
