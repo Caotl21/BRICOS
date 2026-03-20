@@ -29,7 +29,7 @@ uint32_t System_Runtime_GetCounter(void)
 uint32_t System_Runtime_GetCpuUsagePercent(void)
 {
     volatile UBaseType_t uxArraySize, x;
-    uint32_t ulTotalRunTime, ulIDLERunTime;
+    uint32_t ulTotalRunTime, ulIDLERunTime=0;
     uint32_t cpu_usage = 0;
 
     // 获取当前任务数量

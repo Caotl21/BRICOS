@@ -24,6 +24,7 @@
 #include "task_sensor.h"
 #include "task_comm.h"
 #include "task_nrt_cmd.h"
+#include "task_monitor.h"
 
 int main()
 {
@@ -60,6 +61,7 @@ int main()
 	Task_Sensor_Init(); // 创建并启动所有传感器任务
 	Task_Comm_Init();
 	Task_NRT_Cmd_Init();
+	Task_Monitor_Init(); 
 	vTaskStartScheduler(); // 启动 FreeRTOS 调度器，开始多任务运行
 
 
