@@ -215,7 +215,6 @@ void Cmd_18(void)
 void Cmd_19(void)
 {
     U8 buf[1] = {0x19};
-    printf("\r\nauto report on--\r\n");
     Cmd_PackAndTx(buf, 1);
 }
 // 获取1次订阅的功能数据
