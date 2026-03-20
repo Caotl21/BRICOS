@@ -14,7 +14,7 @@ static uint16_t s_adc_raw_values[BSP_ADC_MAX];
  * 驱动核心函数
  * ========================================= */
 
-bool Power_Init(void)
+bool Driver_Power_Init(void)
 {
     // 配置需要采集的通道枚举组 (顺序决定了 DMA 存入 s_adc_raw_values 的顺序)
     bsp_adc_ch_t ch_list[] = {
@@ -27,7 +27,7 @@ bool Power_Init(void)
     return bsp_adc_init(ch_list, 2, s_adc_raw_values);
 }
 
-float Power_GetVoltage(void)
+float Driver_Power_GetVoltage(void)
 {
     // s_adc_raw_values[0] 对应 BSP_ADC_VOLTAGE
     // 满量程 4096 对应 3.3V 内部基准，分压系数为 11
@@ -35,7 +35,7 @@ float Power_GetVoltage(void)
     return ((float)s_adc_raw_values[0] / 4096.0f) * 3.3f * 11.0f;
 }
 
-float Power_GetCurrent(void)
+float Driver_Power_GetCurrent(void)
 {
     // s_adc_raw_values[1] 对应 BSP_ADC_CURRENT
     // 满量程 4096 对应 3.3V 内部基准
