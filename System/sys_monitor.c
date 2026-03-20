@@ -29,11 +29,14 @@ uint32_t System_Runtime_GetCounter(void)
 uint32_t System_Runtime_GetCpuUsagePercent(void)
 {
     volatile UBaseType_t uxArraySize, x;
-    uint32_t ulTotalRunTime, ulIDLERunTime=0;
+    uint32_t ulTotalRunTime=0, ulIDLERunTime=0;
     uint32_t cpu_usage = 0;
 
     // 获取当前任务数量
     uxArraySize = uxTaskGetNumberOfTasks();
+    if (uxArraySize == 0U) {
+        return 0U;
+    }
 
     // 为每个任务分配一个结构体来保存状态
     TaskStatus_t *pxTaskStatusArray = pvPortMalloc(uxArraySize * sizeof(TaskStatus_t));
@@ -48,9 +51,8 @@ uint32_t System_Runtime_GetCpuUsagePercent(void)
 
         // 查找 IDLE 任务的运行时间
         for (x = 0; x < uxArraySize; x++) {
-            if (strcmp(pxTaskStatusArray[x].pcTaskName, "IDLE") == 0) {
-                ulIDLERunTime = pxTaskStatusArray[x].ulRunTimeCounter;
-                break;
+            if (strncmp(pxTaskStatusArray[x].pcTaskName, "IDLE", 4) == 0) {
+                ulIDLERunTime += pxTaskStatusArray[x].ulRunTimeCounter;
             }
         }
 
