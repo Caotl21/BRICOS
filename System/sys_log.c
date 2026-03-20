@@ -16,6 +16,7 @@ static const char *Log_Level_To_Prefix(log_level_t level)
         case LOG_LEVEL_ERROR:   return "[ERROR] ";
         case LOG_LEVEL_WARNING: return "[WARNING] ";
         case LOG_LEVEL_INFO:    return "[INFO] ";
+				case LOG_LEVEL_DEBUG:   return "[DEBUG]";  
         default:                return "[INFO] ";
     }
 }

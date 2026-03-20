@@ -145,13 +145,13 @@ void vTask_IMU_Core(void *pvParameters)
             // 存入全局数组
             g_imu_body_frame[IMU_IM948] = data_im948;
         }
-        if(++log_divider >= 50) // 每 50 次循环打印一次日志 (即每 1000ms)
+        if(++log_divider >= 100) // 每 50 次循环打印一次日志 (即每 1000ms)
         {
-            Log_Print(LOG_LEVEL_INFO, "IMU_JY901S Quat[W:%.2f X:%.2f Y:%.2f Z:%.2f]", 
+            LOG_INFO("IMU_JY901S Quat[W:%.2f X:%.2f Y:%.2f Z:%.2f]", 
                       g_imu_body_frame[IMU_JY901S].quat[0], g_imu_body_frame[IMU_JY901S].quat[1], 
                       g_imu_body_frame[IMU_JY901S].quat[2], g_imu_body_frame[IMU_JY901S].quat[3]);
             
-            Log_Print(LOG_LEVEL_INFO, "IMU_IM948  Quat[W:%.2f X:%.2f Y:%.2f Z:%.2f]", 
+            LOG_INFO("IMU_IM948  Quat[W:%.2f X:%.2f Y:%.2f Z:%.2f]", 
                       g_imu_body_frame[IMU_IM948].quat[0], g_imu_body_frame[IMU_IM948].quat[1], 
                       g_imu_body_frame[IMU_IM948].quat[2], g_imu_body_frame[IMU_IM948].quat[3]);
             log_divider = 0;
@@ -220,7 +220,7 @@ static void vTask_MS5837_Core(void *pvParameters)
                 Bot_State_Push_DepthTemp(depth_val, cached_temp);
 
                 if (++log_divider >= 50) {
-                    Log_Print(LOG_LEVEL_INFO, "MS5837 - Depth: %.2fm, Temp: %.1f C", depth_val, cached_temp);
+                    LOG_INFO("MS5837 - Depth: %.2fm, Temp: %.1f C", depth_val, cached_temp);
                     log_divider = 0;
                 }
 
@@ -263,7 +263,7 @@ static void vTask_Power_Core(void *pvParameters)
 
         Bot_State_Push_Power(v_val, c_val);
 
-        Log_Print(LOG_LEVEL_INFO, "Power - Vol: %.2fV, Cur: %.2fA", v_val, c_val);
+        LOG_INFO("Power - Vol: %.2fV, Cur: %.2fA", v_val, c_val);
 
         vTaskDelayUntil(&xLastWakeTime, xFrequency); 
     }
@@ -303,9 +303,9 @@ static void vTask_DHT11_Core(void *pvParameters)
             Bot_State_Push_CabinEnv((float)t_val, (float)h_val, is_now_leaking);
 
             if (is_now_leaking) {
-                Log_Print(LOG_LEVEL_WARNING, "Cabin DHT11 - LEAK DETECTED! Humi: %d%%", h_val);
+                LOG_WARNING("Cabin DHT11 - LEAK DETECTED! Temp: %d C, Humi: %d%%", t_val, h_val);
             } else {
-                Log_Print(LOG_LEVEL_INFO, "Cabin DHT11 - Temp: %d C, Humi: %d%%, Safe.", t_val, h_val);
+                LOG_INFO( "Cabin DHT11 - Temp: %d C, Humi: %d%%, Safe.", t_val, h_val);
             }
         }
 
