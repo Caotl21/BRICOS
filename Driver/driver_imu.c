@@ -23,7 +23,9 @@ static imu_dev_t s_devs[IMU_MAX_NUM] = {0};
 // --- JY901S：初始化以及解析 ---
 static void Init_JY901S(void) 
 {
-    // JY901S 上电默认就会主动上报数据，通常不需要特意配置。
+    bsp_uart_start_dma_rx_circular(BSP_UART_IMU1,
+                                   Driver_IMU_GetRxBuf(IMU_JY901S),
+                                   Driver_IMU_GetBufSize(IMU_JY901S));
 }
 
 static bool JY901S_Parse_Payload(const uint8_t *frame, imu_data_t *out_data)
@@ -126,6 +128,10 @@ static void IM948_Hardware_Tx(uint8_t *pBuf, uint16_t len)
 
 static void Init_IM948(void) 
 {
+    bsp_uart_start_dma_rx_circular(BSP_UART_IMU2,
+                                   Driver_IMU_GetRxBuf(IMU_IM948),
+                                   Driver_IMU_GetBufSize(IMU_IM948));
+
     IM948_RegisterTxCallback(IM948_Hardware_Tx);
     bsp_delay_ms(200);// 延时一下让传感器上电准备完毕，传感器上电后需要初始化完毕后才会接收指令的
 
@@ -198,6 +204,7 @@ void Driver_IMU_Init(void)
     Init_JY901S();
     Init_IM948();
 }
+    
 
 // 统一的分发器：上层传地址进来，下层路由给具体的解析器去填空
 bool Driver_IMU_Process(imu_id_t id, imu_data_t *out_data) {
