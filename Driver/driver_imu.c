@@ -197,6 +197,16 @@ void Driver_IMU_Init(void)
 {
     Init_JY901S();
     Init_IM948();
+
+    // 绑定 IMU1(JY901S) 的 DMA 循环接收
+    bsp_uart_start_dma_rx_circular(BSP_UART_IMU1,
+                                   Driver_IMU_GetRxBuf(IMU_JY901S),
+                                   Driver_IMU_GetBufSize(IMU_JY901S));
+
+    // 绑定 IMU2(IM948) 的 DMA 循环接收
+    bsp_uart_start_dma_rx_circular(BSP_UART_IMU2,
+                                   Driver_IMU_GetRxBuf(IMU_IM948),
+                                   Driver_IMU_GetBufSize(IMU_IM948));
 }
 
 // 统一的分发器：上层传地址进来，下层路由给具体的解析器去填空

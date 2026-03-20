@@ -105,10 +105,6 @@ void vTask_IMU_Core(void *pvParameters)
     imu_data_t data_im948;
     uint8_t log_divider = 0;
 
-    //绑定底层 DMA 管道
-    bsp_uart_start_dma_rx_circular(BSP_UART_IMU1, Driver_IMU_GetRxBuf(IMU_JY901S), Driver_IMU_GetBufSize(IMU_JY901S));
-    bsp_uart_start_dma_rx_circular(BSP_UART_IMU2, Driver_IMU_GetRxBuf(IMU_IM948),  Driver_IMU_GetBufSize(IMU_IM948));
-
     // 设定 20ms 的绝对轮询节拍 (50Hz)
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(20); 
