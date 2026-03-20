@@ -4,7 +4,7 @@
 #include "task.h"
 #include <string.h>
 
-static bsp_timer_cfg_t sys_monitor_timer_cfg = {0};
+static bsp_timer_cfg_t sys_monitor_timer_cfg = { .timer = BSP_TIM_SYSCOUNT, .tick_us = 0U };
 
 bool System_Runtime_Monitor_Init(void)
 {
@@ -45,7 +45,7 @@ uint32_t System_Runtime_GetCpuUsagePercent(void)
             vPortFree(pxTaskStatusArray);
             return 0; // 避免除以零
         }
-        
+
         // 查找 IDLE 任务的运行时间
         for (x = 0; x < uxArraySize; x++) {
             if (strcmp(pxTaskStatusArray[x].pcTaskName, "IDLE") == 0) {
