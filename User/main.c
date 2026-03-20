@@ -36,7 +36,7 @@ int main()
 
 
 	/*  Driver层初始化	*/
-  Driver_IMU_Init();	// 初始化 IMU 传感器
+  	Driver_IMU_Init();	// 初始化 IMU 传感器
 	Driver_Ms5837_Init();	// 初始化 MS5837 深度传感器
 	Driver_DHT11_Init(); // 初始化 DHT11 温湿度传感器
 	Driver_Power_Init(); // 初始化 ADC 或相关电源监控硬件
@@ -45,7 +45,7 @@ int main()
 	/* 初始化系统基础组件 */
 	System_SysTick_Init(168);
 	Sys_BootFlag_MarkBootSuccess();
-  Log_Init();
+  	Log_Init();
 
 	Bot_Data_Pool_Init();   // 初始化全局数据池
 //		LOG_INFO("======================================");
