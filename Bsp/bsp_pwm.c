@@ -4,7 +4,7 @@
 #include "stm32f4xx_gpio.h"
 #include "stm32f4xx_rcc.h"
 
-/* --- 1. 只读硬件字典结构体 --- */
+/* ---  只读硬件字典结构体 --- */
 typedef struct {
     TIM_TypeDef* tim;        // 定时器基地址
     uint32_t tim_rcc;        // 定时器时钟 (如 RCC_APB1Periph_TIM3)

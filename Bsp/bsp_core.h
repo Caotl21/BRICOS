@@ -46,12 +46,19 @@ typedef enum {
     BSP_I2C_MAX
 } bsp_i2c_bus_t;
 
+/* --- GPIO 引脚枚举 --- */
 typedef enum {
     BSP_GPIO_DHT11 = 0,
     // BSP_GPIO_LEAK_DET, // 预留：漏水检测传感器
     // BSP_GPIO_RELAY_1,  // 预留：外部设备供电继电器
     BSP_GPIO_MAX
 }bsp_gpio_pin_t;
+
+/* --- TIM 通道枚举 --- */
+typedef enum {
+    BSP_TIM_SYSCOUNT = 0,
+    BSP_TIM_MAX
+} bsp_timer_t;
 
 
 
