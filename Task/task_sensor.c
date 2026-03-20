@@ -99,7 +99,7 @@ static void IMU_Align_To_BodyFrame(imu_data_t *imu)
  * 加速度、角速度、四元数 50Hz (20ms周期)
  * ========================================================= */
 
-void vTask_IMU_Core(void *pvParameters)
+static void vTask_IMU_Core(void *pvParameters)
 {
     imu_data_t data_jy901s;
     imu_data_t data_im948;
@@ -138,10 +138,11 @@ void vTask_IMU_Core(void *pvParameters)
             // 坐标系转换
             IMU_Align_To_BodyFrame(&data_im948);
             
+            
             // 存入全局数组
             g_imu_body_frame[IMU_IM948] = data_im948;
         }
-        if(++log_divider >= 100) // 每 50 次循环打印一次日志 (即每 1000ms)
+        if(++log_divider >= 50) // 每 50 次循环打印一次日志 (即每 1000ms)
         {
             LOG_INFO("IMU_JY901S Quat[W:%.2f X:%.2f Y:%.2f Z:%.2f]", 
                       g_imu_body_frame[IMU_JY901S].quat[0], g_imu_body_frame[IMU_JY901S].quat[1], 
