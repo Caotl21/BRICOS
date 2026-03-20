@@ -254,8 +254,8 @@ static void vTask_Power_Core(void *pvParameters)
 
     while (1)
     {
-        v_val = Power_GetVoltage();
-        c_val = Power_GetCurrent();
+        v_val = Driver_Power_GetVoltage();
+        c_val = Driver_Power_GetCurrent();
 
         Bot_State_Push_Power(v_val, c_val);
 
