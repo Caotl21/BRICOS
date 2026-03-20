@@ -78,6 +78,5 @@ bool bsp_timer_init(const bsp_timer_cfg_t *cfg)
 
 uint32_t bsp_timer_get_ticks(const bsp_timer_cfg_t *cfg)
 {
-    const timer_hw_t *hw = &timer_hw_info[cfg->timer];
-    return (uint32_t)(hw->tim->CNT);
+    return (uint32_t)(&timer_hw_info[cfg->timer].tim->CNT);
 }

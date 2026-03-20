@@ -14,6 +14,6 @@ typedef struct {
 bool bsp_timer_init(const bsp_timer_cfg_t *cfg);
 
 // 仅硬件读计数
-uint32_t bsp_timer_get_ticks(void);
+uint32_t bsp_timer_get_ticks(const bsp_timer_cfg_t *cfg);
 
 #endif /* __BSP_TIMER_H */

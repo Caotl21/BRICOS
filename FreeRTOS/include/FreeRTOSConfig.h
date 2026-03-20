@@ -130,8 +130,8 @@
 /*                                FreeRTOS������ʱ�������״̬�ռ��йص�����ѡ��                                 */
 /***************************************************************************************************************/
 #define configGENERATE_RUN_TIME_STATS	        1                       //Ϊ1ʱ��������ʱ��ͳ�ƹ���
-#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()  ConfigureTimeForRunTimeStats()//��ʱ��3�ṩʱ��ͳ�Ƶ�ʱ����Ƶ��Ϊ10K��������Ϊ100us
-#define portGET_RUN_TIME_COUNTER_VALUE()		  BSP_Timer_GetRunTimeTicks()	//��ȡʱ��ͳ��ʱ��ֵ
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()  System_Runtime_Monitor_Init()//��ʱ��3�ṩʱ��ͳ�Ƶ�ʱ����Ƶ��Ϊ10K��������Ϊ100us
+#define portGET_RUN_TIME_COUNTER_VALUE()		  System_Runtime_GetCounter()	//��ȡʱ��ͳ��ʱ��ֵ
 
 #define configUSE_TRACE_FACILITY				1                       //Ϊ1���ÿ��ӻ����ٵ���
 #define configUSE_STATS_FORMATTING_FUNCTIONS	1                       //���configUSE_TRACE_FACILITYͬʱΪ1ʱ���������3������
