@@ -22,6 +22,7 @@
 /* 任务相关 */
 #include "task_sensor.h"
 #include "task_comm.h"
+#include "task_nrt_cmd.h"
 
 int main()
 {
@@ -42,7 +43,7 @@ int main()
 	/* 初始化系统基础组件 */
 	System_SysTick_Init(168);
 	Sys_BootFlag_MarkBootSuccess();
-    Log_Init();
+  Log_Init();
 
 	Bot_Data_Pool_Init();   // 初始化全局数据池
 //		LOG_INFO("======================================");
@@ -56,7 +57,7 @@ int main()
 
 	Task_Sensor_Init(); // 创建并启动所有传感器任务
 	Task_Comm_Init();
-
+	Task_NRT_Cmd_Init();
 	vTaskStartScheduler(); // 启动 FreeRTOS 调度器，开始多任务运行
 
 
