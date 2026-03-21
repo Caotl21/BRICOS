@@ -82,9 +82,8 @@ static uint32_t bsp_adc_map_sample_time(bsp_adc_sample_t t)
 
 bool bsp_adc_init(bsp_adc_ch_t *ch_list, uint8_t ch_num, uint16_t *val_array, bsp_adc_config_t *cfg)
 {
-    if (ch_list == NULL || val_array == NULL || ch_num == 0 || ch_num > BSP_ADC_MAX) {
-        return false;
-    }
+    if (ch_list == NULL || ch_num == 0 || ch_num > BSP_ADC_MAX) return false;
+    if (cfg->dma_enable && val_array == NULL) return false;
 
     const bsp_adc_config_t *use_cfg = (cfg != NULL) ? cfg : &s_adc_default_cfg;
 
@@ -180,5 +179,23 @@ bool bsp_adc_init(bsp_adc_ch_t *ch_list, uint8_t ch_num, uint16_t *val_array, bs
     ADC_SoftwareStartConv(adc);
 
     return true;
+}
+
+uint16_t bsp_adc_read_raw(bsp_adc_ch_t ch)
+{
+    if (ch >= BSP_ADC_MAX) {
+        return 0;
+    }
+
+    const adc_hw_info_t *hw = &s_adc_hw_info[ch];
+    ADC_TypeDef *adc = hw->adc;
+
+    ADC_RegularChannelConfig(adc, hw->adc_channel, 1, bsp_adc_map_sample_time(BSP_ADC_SAMPLE_480CYC));
+
+    ADC_SoftwareStartConv(adc);
+    while (ADC_GetFlagStatus(adc, ADC_FLAG_EOC) == RESET) {
+    }
+
+    return ADC_GetConversionValue(adc);
 }
 

@@ -29,7 +29,7 @@ bool System_Runtime_Monitor_Init(void)
     };
     res = bsp_adc_init(adc_ch_list, 1, NULL, &adc_cfg);
     if (!res)  return false;
-    
+
     return res;
 }
 
@@ -77,4 +77,21 @@ uint32_t System_Runtime_GetCpuUsagePercent(void)
     }
 
     return cpu_usage;
+}
+
+uint32_t System_Runtime_GetChipTemperature(void)
+{
+    uint16_t raw = bsp_adc_read_raw(BSP_ADC_CHIPTEMP);
+
+    // Vref 假定 3.3V，12-bit ADC
+    float vsense = ((float)raw / 4096.0f) * 3.3f;
+
+    // STM32F4 温度公式: T = (Vsense - 0.76) / 0.0025 + 25
+    float temp_c = ((vsense - 0.76f) / 0.0025f) + 25.0f;
+
+    if (temp_c < 0.0f) {
+        return 0U;
+    }
+
+    return (uint32_t)(temp_c * 100.0f + 0.5f); // 0.01C
 }
