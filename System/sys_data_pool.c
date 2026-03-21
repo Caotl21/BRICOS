@@ -53,6 +53,23 @@ void Bot_Params_Pull(bot_params_t *out_params) {
     SYS_EXIT_CRITICAL();
 }
 
+void Bot_State_LeakStatus_Pull(bool *out_is_leaking)
+{
+    // 1. 防御性编程：严防野指针传进来导致死机
+    if (out_is_leaking == NULL) {
+        return; 
+    }
+    
+    // 2. 进门上锁 (保护共享资源的读写一致性)
+    taskENTER_CRITICAL(); 
+    
+    // 3. 往指针指向的地址写入数据
+    memcpy(out_is_leaking, &s_bricsbot_state.is_leak_detected, sizeof(bool));
+    
+    // 4. 出门解锁
+    taskEXIT_CRITICAL();  
+}
+
 // --- Setter API 实现 ---
 void Bot_State_Push_IMU(float r, float p, float y, float gx, float gy, float gz) {
     SYS_ENTER_CRITICAL();

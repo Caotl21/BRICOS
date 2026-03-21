@@ -127,6 +127,7 @@ void Bot_Data_Pool_Init(void);
 void Bot_State_Pull(bot_state_t *out_state);
 void Bot_Target_Pull(bot_target_t *out_target);
 void Bot_Params_Pull(bot_params_t *out_params);
+void Bot_State_LeakStatus_Pull(bool *out_is_leaking);
 
 // ---------------------------------------------------------
 // [推送] Setter API
