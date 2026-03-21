@@ -11,7 +11,7 @@ void Driver_Thruster_Init(void){
 }
 
 // 设置单路推力
-void Driver_Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent){
+void Driver_Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent) {
     if (ch < BSP_PWM_THRUSTER_1 || ch > BSP_PWM_THRUSTER_6) return;
 
     // 安全限幅
@@ -28,4 +28,11 @@ void Driver_Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent){
 
     // 设置 PWM 输出
     bsp_pwm_set_pulse_us(ch, pulse_us);
+}
+
+// 设置所有推进器为怠速（1500us）
+void Driver_Thruster_Set_Idle(void) {
+    for(int i=0;i<THRUSTER_COUNT;i++){
+        bsp_pwm_set_pulse_us((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), THRUSTER_PWM_STOP);
+    }
 }

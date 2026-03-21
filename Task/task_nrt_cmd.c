@@ -5,11 +5,13 @@
 
 #include "driver_hydrocore.h"
 #include "driver_param.h"
+
 #include "sys_data_pool.h"
 #include "sys_port.h"
 #include "sys_boot_flag.h"
 #include "sys_log.h"
 
+// 接收OTA升级命令的回调函数
 static void On_Receive_OTA_Cmd(const uint8_t *payload, uint16_t len){
     if(len == 4 && payload[0] == 0xDE && payload[1] == 0xAD && payload[2] == 0xBE && payload[3] == 0xEF){      
         Sys_BootFlag_RequestEnterBootloader();
@@ -19,30 +21,53 @@ static void On_Receive_OTA_Cmd(const uint8_t *payload, uint16_t len){
     }
 }
 
+// 接收设置PID参数命令的回调函数(暂无实现，需要更新参数再写入Flash后重启)
 static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
-    if(len != sizeof(bot_params_t)){
-        return;
-    }
-
-    bot_params_t new_params;
-    memcpy(&new_params, payload, sizeof(bot_params_t));
-
-    if (new_params.pid_roll.kp < 0 || new_params.pid_pitch.kp < 0 || new_params.pid_yaw.kp < 0 || new_params.pid_depth.kp < 0) {
-        return;
-    }
-
-    // 将新的参数写入全局数据池，供控制任务读取
-    Bot_Params_Push_PID(PARAM_ID_ROLL, new_params.pid_roll.kp, new_params.pid_roll.ki, new_params.pid_roll.kd);
-    Bot_Params_Push_PID(PARAM_ID_PITCH, new_params.pid_pitch.kp, new_params.pid_pitch.ki, new_params.pid_pitch.kd);
-    Bot_Params_Push_PID(PARAM_ID_YAW, new_params.pid_yaw.kp, new_params.pid_yaw.ki, new_params.pid_yaw.kd);
-    Bot_Params_Push_PID(PARAM_ID_DEPTH, new_params.pid_depth.kp, new_params.pid_depth.ki, new_params.pid_depth.kd);
-    Driver_PidParam_Save(&new_params);
+    
 
     bsp_cpu_reset();
 }
 
+// 接收设置系统模式命令的回调函数(切换待机/加锁/解锁)
+static void On_Receive_Sys_Mode_Cmd(const uint8_t *payload, uint16_t len){
+    if(len != 1) return;
+
+    bot_sys_mode_e new_mode = (bot_sys_mode_e)payload[0];
+    if(new_mode > SYS_MODE_MOTION_ARMED) return;
+
+    Bot_Params_Request_SysMode(new_mode);
+}
+
+// 接收设置运动模式命令的回调函数(切换手动/自稳/自主导航)
+static void On_Receive_Motion_Mode_Cmd(const uint8_t *payload, uint16_t len){
+    if(len != 1) return;
+
+    bot_run_mode_e new_mode = (bot_run_mode_e)payload[0];
+    if(new_mode > MOTION_STATE_AUTO) return;
+
+    Bot_Params_Request_MotionState(new_mode);
+}
+
+// 接收设置舵机命令的回调函数
+static void On_Receive_Servo_Cmd(const uint8_t *payload, uint16_t len){
+    if(len != 1) return;
+
+    uint8_t servo_angle = payload[0];
+
+    Driver_Servo_SetAngle(BSP_PWM_SERVO_1, servo_angle); // 相机云台舵机角度 (0-180)
+}
+
+// 接收设置探照灯强度命令的回调函数 (暂未实现，后续可以根据协议定义增加)
+static void On_Receive_Light_Cmd(const uint8_t *payload, uint16_t len){
+    // 解析 payload，设置探照灯亮度
+    // 例如：payload[0] = light1_pwm (0-100)，payload[1] = light2_pwm (0-100)
+}   
+
 void Task_NRT_Cmd_Init(void){
     Driver_Protocol_Register(DATA_TYPE_OTA, On_Receive_OTA_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_PID_PARAM, On_Receive_Set_PID_Param_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_SET_SYS_MODE, On_Receive_Sys_Mode_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_SET_MOTION_MODE, On_Receive_Motion_Mode_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_SET_SERVO, On_Receive_Servo_Cmd);
 }
 

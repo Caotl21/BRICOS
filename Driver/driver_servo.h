@@ -12,7 +12,8 @@
 #define SERVO_PWM_MAX_RIGHT 2000
 
 // 函数声明
-void Driver_Servo_SetAngle(bsp_pwm_ch_t ch, float angle);
+void Driver_Servo_SetAngle(bsp_pwm_ch_t ch, uint8_t angle);
+
 
 #endif // __SERVO_DRIVER_H
 

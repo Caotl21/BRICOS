@@ -2,6 +2,7 @@
 
 #include "sys_monitor.h"
 #include "sys_log.h"
+#include "sys_data_pool.h"
 
 TaskHandle_t Monitor_Task_Handler = NULL;
 
@@ -14,10 +15,10 @@ static void vTask_Monitor_Core(void *pvParameters)
 
     while (1) {
         uint32_t cpu  = System_Runtime_GetCpuUsagePercent();
-        uint32_t cnt  = System_Runtime_GetCounter();
         uint32_t temp = System_Runtime_GetChipTemperature();
 
-        LOG_INFO("CPU=%lu%%, RT_CNT=%lu, TEMP=%lu", cpu, cnt, temp);
+        Bot_State_Push_SysStatus((float)cpu, (float)temp);
+        LOG_INFO("CPU=%lu%%, TEMP=%lu", cpu, temp);
 
         vTaskDelayUntil(&xLastWakeTime, xPeriod);
     }

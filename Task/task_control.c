@@ -1,139 +1,328 @@
-//#include "sys_data_pool.h"
-//#include "sys_pid_algo.h"
-//#include "driver_thruster.h"
-//#include "FreeRTOS.h"
-//#include "sys_log.h"
+#include "sys_data_pool.h"
+#include "sys_pid_algo.h"
+#include "driver_thruster.h"
+#include "FreeRTOS.h"
+#include "sys_log.h"
+#include <string.h>
 
-////控制器实例
-//Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
-//PID_Controller_t pid_depth;
+#define TASK_CONTROL_PERIOD_S    (0.01f)
 
-//static void Normalize_Thruster_Outputs(float *thruster_pwm, uint8_t count, float max_output)
-//{
-//    float max_pwm = 0.0f;
-//    for (uint8_t i = 0; i < count; i++)
-//    {
-//        if (thruster_pwm[i] > max_pwm) max_pwm = thruster_pwm[i];
-//    }
+// 控制器实例
+Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
+PID_Controller_t pid_depth;
 
-//    if (max_pwm > max_output)
-//    {
-//        float scale = max_output / max_pwm;
-//        for (uint8_t i = 0; i < count; i++)
-//        {
-//            thruster_pwm[i] *= scale;
-//        }
-//    }
-//}
+static float Clamp_Symmetric(float value, float limit)
+{
+    if (limit <= 0.0f)
+    {
+        return value;
+    }
 
-//static void TAM_Mixer(Bot_Wrench_t *wrench_out, float *thruster_pwm)
-//{
-//    // 简单的六轴全向推进器推力分配矩阵
-//    // 水平推进器分配
-//    thruster_pwm[0] = wrench_out->force_x - wrench_out->force_y + wrench_out->force_z - wrench_out->torque_x + wrench_out->torque_y - wrench_out->torque_z; // Thruster 1
-//    thruster_pwm[1] = wrench_out->force_x + wrench_out->force_y + wrench_out->force_z - wrench_out->torque_x - wrench_out->torque_y + wrench_out->torque_z; // Thruster 2
-//    thruster_pwm[2] = wrench_out->force_x - wrench_out->force_y + wrench_out->force_z + wrench_out->torque_x + wrench_out->torque_y + wrench_out->torque_z; // Thruster 3
-//    thruster_pwm[3] = wrench_out->force_x + wrench_out->force_y + wrench_out->force_z + wrench_out->torque_x - wrench_out->torque_y - wrench_out->torque_z; // Thruster 4
-//    // 垂直推进器分配
-//    thruster_pwm[4] = wrench_out->force_x - wrench_out->force_y - wrench_out->force_z + wrench_out->torque_x - wrench_out->torque_y - wrench_out->torque_z; // Thruster 5
-//    thruster_pwm[5] = wrench_out->force_x + wrench_out->force_y - wrench_out->force_z + wrench_out->torque_x + wrench_out->torque_y - wrench_out->torque_z; // Thruster 6
+    if (value > limit)
+    {
+        return limit;
+    }
+    if (value < -limit)
+    {
+        return -limit;
+    }
 
-//    Normalize_Thruster_Outputs(&thruster_pwm[0], 4, 100.0f);
-//    Normalize_Thruster_Outputs(&thruster_pwm[4], 2, 100.0f);
-//}
+    return value;
+}
 
-//void Task_Control(void *pvParameters) 
-//{
-//    bot_state_t  local_state;
-//    bot_target_t local_target;
-//    bot_params_t local_params;
+static float Normalize_Angle_Error(float error_deg)
+{
+    while (error_deg > 180.0f)
+    {
+        error_deg -= 360.0f;
+    }
 
-//    Bot_Wrench_t wrench_out;
-//    
-//    float thruster_pwm[THRUSTER_COUNT] = {0}; // 最终输出到电调的 PWM 波数组
-//    
-//    TickType_t xLastWakeTime = xTaskGetTickCount();
+    while (error_deg < -180.0f)
+    {
+        error_deg += 360.0f;
+    }
 
-//    for(;;) 
-//    {
-//        // 获取最新全局快照
-//        Bot_State_Pull(&local_state);
-//        Bot_Target_Pull(&local_target);
-//        Bot_Params_Pull(&local_params);
-//        
-//        switch (local_params.sys_mode) 
-//        {
-//            case SYS_MODE_STANDBY:
-//                // 待机模式：低功耗模式
-//                //Thruster_Stop_All();
-//                break;
-//                
-//            case SYS_MODE_ACTIVE_DISARMED:
-//                // 加锁模式：解算 PID，但输出被强制拦截为 0，推进器不转动
-//                Thruster_Set_Idle(); // 发送 1500us 中位信号
-//                break;
-//                
-//            case SYS_MODE_MOTION_ARMED:
+    return error_deg;
+}
 
-//                if (local_target.target_mode != local_params.motion_mode)
-//                {
-//                    // 目标模式和当前运动模式不匹配，安全起见先停机
-//                    Thruster_Set_Idle();
-//                    LOG_ERROR("Motion mode mismatch!");
-//                    break;
-//                }
-//                else
-//                {
-//                    switch (local_params.motion_mode) 
-//                    {
-//                        case MOTION_STATE_MANUAL:
-//                            // [纯手动模式]：直接把摇杆量扔给推力分配矩阵
-//                            
-//                            break;
-//                            
-//                        case MOTION_STATE_STABILIZE:
-//                            // [自稳定深模式]：完整的串级 PID 控制
+static void Reset_PID(PID_Controller_t *pid)
+{
+    if (pid == NULL)
+    {
+        return;
+    }
 
-//                            // Roll 和 Pitch 的控制逻辑 -- 维持稳定
-//                            float target_roll_rate  = PID_Calc(&pid_roll.outer,  local_target.target_roll,  local_state.roll);
-//                            wrench_out.torque_x     = PID_Calc(&pid_roll.inner,  target_roll_rate,    local_state.gyro_x);
-//            
-//                            float target_pitch_rate = PID_Calc(&pid_pitch.outer, local_target.target_pitch, local_state.pitch);
-//                            wrench_out.torque_y     = PID_Calc(&pid_pitch.inner, target_pitch_rate,   local_state.gyro_y);
-//                            
-//                            // Yaw 的控制逻辑 -- 定向控制
-//                            float target_yaw_rate   = PID_Calc(&pid_yaw.outer,   local_target.target_yaw,   local_state.yaw);
-//                            wrench_out.torque_z     = PID_Calc(&pid_yaw.inner,   target_yaw_rate,     local_state.gyro_z);
-//                            
-//                            // Depth 的控制逻辑 -- 定深控制
-//                            wrench_out.force_z      = PID_Calc(&pid_depth, local_target.target_depth, local_state.depth_m);
+    pid->error_int = 0.0f;
+    pid->error_last = 0.0f;
+}
 
-//                            // X/Y 方向的平移控制逻辑 -- 目前简单映射为摇杆量开环
-//                            wrench_out.force_x      = local_target.manual_thrust_x;
-//                            wrench_out.force_y      = local_target.manual_thrust_y;
-//                            
-//                            break;
-//                            
-//                        case MOTION_STATE_AUTO:
-//                            // [自主导航模式]：由轨迹规划算法生成 target_roll/pitch/depth
-//                            // 逻辑类似于 STABILIZE，但 target 数据不是操作手给的，而是算法生成的
-//                            // Run_Trajectory_Planner(&local_target, &local_state);
-//                            // ... 调用 PID ...
-//                            break;
-//                    }
-//                }
-//                
-//                
-//                TAM_Mixer(&wrench_out, thruster_pwm);
-//                break;
-//        }
+static void Reset_Cascade_PID(Cascade_PID_t *pid)
+{
+    if (pid == NULL)
+    {
+        return;
+    }
 
-//        // 输出到电调
-//        for (int i = 0; i < THRUSTER_COUNT; i++) {
-//            Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), thruster_pwm[i]);
-//        }
+    Reset_PID(&pid->outer);
+    Reset_PID(&pid->inner);
+}
 
-//        // 绝对延时，保证 100Hz 的严格周期
-//        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
-//    }
-//}
+static void Reset_All_Controllers(void)
+{
+    Reset_Cascade_PID(&pid_roll);
+    Reset_Cascade_PID(&pid_pitch);
+    Reset_Cascade_PID(&pid_yaw);
+    Reset_PID(&pid_depth);
+}
+
+static void Sync_PID_Config(PID_Controller_t *runtime, const PID_Controller_t *config)
+{
+    if ((runtime == NULL) || (config == NULL))
+    {
+        return;
+    }
+
+    runtime->kp = config->kp;
+    runtime->ki = config->ki;
+    runtime->kd = config->kd;
+    runtime->integral_max = config->integral_max;
+    runtime->output_max = config->output_max;
+}
+
+static void Sync_Cascade_Config(Cascade_PID_t *runtime, const Cascade_PID_t *config)
+{
+    if ((runtime == NULL) || (config == NULL))
+    {
+        return;
+    }
+
+    Sync_PID_Config(&runtime->outer, &config->outer);
+    Sync_PID_Config(&runtime->inner, &config->inner);
+}
+
+static float PID_Update(PID_Controller_t *pid, float target, float measurement, float dt_s, uint8_t wrap_angle)
+{
+    float error;
+    float derivative;
+    float output;
+
+    if ((pid == NULL) || (dt_s <= 0.0f))
+    {
+        return 0.0f;
+    }
+
+    error = target - measurement;
+    if (wrap_angle)
+    {
+        error = Normalize_Angle_Error(error);
+    }
+
+    pid->error_int += error * dt_s;
+    pid->error_int = Clamp_Symmetric(pid->error_int, pid->integral_max);
+
+    derivative = (error - pid->error_last) / dt_s;
+    output = (pid->kp * error) + (pid->ki * pid->error_int) + (pid->kd * derivative);
+    output = Clamp_Symmetric(output, pid->output_max);
+
+    pid->error_last = error;
+    return output;
+}
+
+static float Cascade_PID_Update(Cascade_PID_t *pid,
+                                float angle_target,
+                                float angle_measurement,
+                                float rate_measurement,
+                                float dt_s,
+                                uint8_t wrap_angle)
+{
+    float target_rate;
+
+    if (pid == NULL)
+    {
+        return 0.0f;
+    }
+
+    target_rate = PID_Update(&pid->outer, angle_target, angle_measurement, dt_s, wrap_angle);
+    return PID_Update(&pid->inner, target_rate, rate_measurement, dt_s, 0u);
+}
+
+static void Normalize_Thruster_Outputs(float *thruster_pwm, uint8_t count, float max_output)
+{
+    float max_pwm = 0.0f;
+    for (uint8_t i = 0; i < count; i++)
+    {
+        float abs_pwm = (thruster_pwm[i] >= 0.0f) ? thruster_pwm[i] : -thruster_pwm[i];
+        if (abs_pwm > max_pwm) max_pwm = abs_pwm;
+    }
+
+    if (max_pwm > max_output)
+    {
+        float scale = max_output / max_pwm;
+        for (uint8_t i = 0; i < count; i++)
+        {
+            thruster_pwm[i] *= scale;
+        }
+    }
+}
+
+static void TAM_Mixer(Bot_Wrench_t *wrench_out, float *thruster_pwm)
+{
+    // 简单的六轴全向推进器推力分配矩阵
+    // 水平推进器分配
+    thruster_pwm[0] = wrench_out->force_x - wrench_out->force_y + wrench_out->force_z - wrench_out->torque_x + wrench_out->torque_y - wrench_out->torque_z; // Thruster 1
+    thruster_pwm[1] = wrench_out->force_x + wrench_out->force_y + wrench_out->force_z - wrench_out->torque_x - wrench_out->torque_y + wrench_out->torque_z; // Thruster 2
+    thruster_pwm[2] = wrench_out->force_x - wrench_out->force_y + wrench_out->force_z + wrench_out->torque_x + wrench_out->torque_y + wrench_out->torque_z; // Thruster 3
+    thruster_pwm[3] = wrench_out->force_x + wrench_out->force_y + wrench_out->force_z + wrench_out->torque_x - wrench_out->torque_y - wrench_out->torque_z; // Thruster 4
+    // 垂直推进器分配
+    thruster_pwm[4] = wrench_out->force_x - wrench_out->force_y - wrench_out->force_z + wrench_out->torque_x - wrench_out->torque_y - wrench_out->torque_z; // Thruster 5
+    thruster_pwm[5] = wrench_out->force_x + wrench_out->force_y - wrench_out->force_z + wrench_out->torque_x + wrench_out->torque_y - wrench_out->torque_z; // Thruster 6
+
+    Normalize_Thruster_Outputs(&thruster_pwm[0], 4, 100.0f);
+    Normalize_Thruster_Outputs(&thruster_pwm[4], 2, 100.0f);
+}
+
+void Task_Control(void *pvParameters) 
+{
+    bot_sys_mode_e    last_sys_mode = (bot_sys_mode_e)0xFF;
+    bot_run_mode_e    last_motion_mode = (bot_run_mode_e)0xFF;
+    bot_body_state_t  local_state;
+    bot_target_t      local_target;
+    bot_params_t      local_params;
+
+    float thruster_pwm[THRUSTER_COUNT] = {0}; // 最终输出到电调的 PWM 波数组
+
+    (void)pvParameters;
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+
+    while(1)
+    {
+        Bot_Wrench_t wrench_out;
+
+        memset(&wrench_out, 0, sizeof(wrench_out));
+        memset(thruster_pwm, 0, sizeof(thruster_pwm));
+
+        // 获取最新全局快照
+        Bot_State_Pull(&local_state);
+        Bot_Target_Pull(&local_target);
+        Bot_Params_Pull(&local_params);
+
+        if ((local_params.sys_mode != last_sys_mode) || (local_params.motion_mode != last_motion_mode))
+        {
+            Reset_All_Controllers();
+            last_sys_mode = local_params.sys_mode;
+            last_motion_mode = local_params.motion_mode;
+        }
+
+        Sync_Cascade_Config(&pid_roll, &local_params.pid_roll);
+        Sync_Cascade_Config(&pid_pitch, &local_params.pid_pitch);
+        Sync_Cascade_Config(&pid_yaw, &local_params.pid_yaw);
+        Sync_PID_Config(&pid_depth, &local_params.pid_depth);
+
+        switch (local_params.sys_mode) 
+        {
+            case SYS_MODE_STANDBY:
+                // 待机模式：低功耗模式
+                Reset_All_Controllers();
+                break;
+
+            case SYS_MODE_ACTIVE_DISARMED:
+                // 加锁模式：解算 PID，但输出被强制拦截为 0，推进器不转动
+                Reset_All_Controllers();
+                Driver_Thruster_Set_Idle(); // 发送 1500us 中位信号
+                break;
+
+            case SYS_MODE_MOTION_ARMED:
+
+                if (local_target.target_mode != local_params.motion_mode)
+                {
+                    // 目标模式和当前运动模式不匹配，安全起见先停机
+                    Reset_All_Controllers();
+                    Driver_Thruster_Set_Idle();
+                    LOG_ERROR("Motion mode mismatch!");
+                    break;
+                }
+                else
+                {
+                    switch (local_params.motion_mode) 
+                    {
+                        case MOTION_STATE_MANUAL:
+                            // [纯手动模式]：直接把摇杆量扔给推力分配矩阵
+                            wrench_out.force_x = local_target.cmd.manual_cmd.surge;
+                            wrench_out.force_y = local_target.cmd.manual_cmd.sway;
+                            wrench_out.force_z = local_target.cmd.manual_cmd.heave;
+                            wrench_out.torque_z = local_target.cmd.manual_cmd.yaw_cmd;
+                            break;
+
+                        case MOTION_STATE_STABILIZE:
+                            // [自稳定深模式]：串级 PID 控制姿态 + 开环控制平移
+
+                            // Roll 和 Pitch 的控制逻辑 -- 维持稳定 target不需要下发直接为0
+                            wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
+                                                                     0.0f,
+                                                                     local_state.roll,
+                                                                     local_state.gyro_x,
+                                                                     TASK_CONTROL_PERIOD_S,
+                                                                     0u);
+                            wrench_out.torque_y = Cascade_PID_Update(&pid_pitch,
+                                                                     0.0f,
+                                                                     local_state.pitch,
+                                                                     local_state.gyro_y,
+                                                                     TASK_CONTROL_PERIOD_S,
+                                                                     0u);
+
+                            // Yaw 的控制逻辑 -- 定向控制 跟踪target_yaw
+                            wrench_out.torque_z = Cascade_PID_Update(&pid_yaw,
+                                                                     local_target.cmd.stab_cmd.target_yaw,
+                                                                     local_state.yaw,
+                                                                     local_state.gyro_z,
+                                                                     TASK_CONTROL_PERIOD_S,
+                                                                     1u);
+
+                            // Depth 的控制逻辑 -- 定深控制 单环PID控制深度
+                            {
+                                float target_depth = local_target.cmd.stab_cmd.target_depth;
+
+                                if (target_depth < 0.0f)
+                                {
+                                    target_depth = 0.0f;
+                                }
+                                if (target_depth > local_params.failsafe_max_depth)
+                                {
+                                    target_depth = local_params.failsafe_max_depth;
+                                }
+
+                                wrench_out.force_z = PID_Update(&pid_depth,
+                                                                target_depth,
+                                                                local_state.depth_m,
+                                                                TASK_CONTROL_PERIOD_S,
+                                                                0u);
+                            }
+
+                            // X/Y 方向的平移控制逻辑 -- 目前简单映射为摇杆量开环
+                            wrench_out.force_x = local_target.cmd.stab_cmd.surge;
+                            wrench_out.force_y = local_target.cmd.stab_cmd.sway;
+                            break;
+
+                        case MOTION_STATE_AUTO:
+                            // [自主导航模式]：由轨迹规划算法生成 target_roll/pitch/depth
+                            // 逻辑类似于 STABILIZE，但 target 数据不是操作手给的，而是算法生成的
+                            // Run_Trajectory_Planner(&local_target, &local_state);
+                            // ... 调用 PID ...
+                            break;
+                    }
+                }
+                
+                
+                TAM_Mixer(&wrench_out, thruster_pwm);
+                break;
+        }
+
+        // 输出到电调
+        for (int i = 0; i < THRUSTER_COUNT; i++) {
+            Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), thruster_pwm[i]);
+        }
+
+        // 绝对延时，保证 100Hz 的严格周期
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
+    }
+}

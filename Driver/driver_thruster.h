@@ -14,6 +14,7 @@
 // 函数声明
 void Driver_Thruster_Init(void);
 void Driver_Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent);
+void Driver_Thruster_Set_Idle(void); 
 
 #endif // __THRUSTER_DRIVER_H
 
