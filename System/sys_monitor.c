@@ -1,5 +1,6 @@
 #include "sys_monitor.h"
 #include "bsp_timer.h"
+#include "bsp_adc.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include <string.h>
@@ -15,9 +16,20 @@ bool System_Runtime_Monitor_Init(void)
         .tick_us = 50 // 50us 计一次数，20kHz 计数频率
     };
     res = bsp_timer_init(&timer_cfg);
-    
+    if (!res)  return false;
     sys_monitor_timer_cfg = timer_cfg; // 保存配置以供后续读取计数时使用
 
+    // 初始化ADC硬件
+    bsp_adc_ch_t adc_ch_list[] = { BSP_ADC_CHIPTEMP };
+    const bsp_adc_config_t adc_cfg = {
+        .sample_time = BSP_ADC_SAMPLE_3CYC,
+        .scan_enable = false,
+        .continuous_enable = false,
+        .dma_enable = false
+    };
+    res = bsp_adc_init(adc_ch_list, 1, NULL, &adc_cfg);
+    if (!res)  return false;
+    
     return res;
 }
 

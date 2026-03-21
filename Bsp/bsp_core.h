@@ -37,6 +37,7 @@ typedef enum {
 typedef enum {
     BSP_ADC_VOLTAGE = 0,    // 电池总电压
     BSP_ADC_CURRENT,        // 系统总电流
+    BSP_ADC_CHIPTEMP,       // 芯片温度
     BSP_ADC_MAX
 } bsp_adc_ch_t;
 

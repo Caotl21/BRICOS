@@ -21,10 +21,18 @@ bool Driver_Power_Init(void)
         BSP_ADC_VOLTAGE, 
         BSP_ADC_CURRENT
     };
+
+    static const bsp_adc_config_t s_power_adc_cfg = {
+        .sample_time = BSP_ADC_SAMPLE_3CYC, // 较长采样时间以降低内阻影响
+        .scan_enable = true,
+        .continuous_enable = true,
+        .dma_enable = true
+    };
     
     // 调用底层 BSP 接口启动 ADC 和 DMA
     // 参数2: 通道数量为 2
-    return bsp_adc_init(ch_list, 2, s_adc_raw_values);
+    // 参数4: 使用自定义的 ADC 配置
+    return bsp_adc_init(ch_list, 2, s_adc_raw_values, &s_power_adc_cfg);
 }
 
 float Driver_Power_GetVoltage(void)
