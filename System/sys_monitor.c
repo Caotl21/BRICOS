@@ -22,7 +22,7 @@ bool System_Runtime_Monitor_Init(void)
     // 初始化ADC硬件
     bsp_adc_ch_t adc_ch_list[] = { BSP_ADC_CHIPTEMP };
     const bsp_adc_config_t adc_cfg = {
-        .sample_time = BSP_ADC_SAMPLE_3CYC,
+        .sample_time = BSP_ADC_SAMPLE_480CYC,
         .scan_enable = false,
         .continuous_enable = false,
         .dma_enable = false
