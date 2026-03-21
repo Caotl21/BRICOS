@@ -80,7 +80,7 @@ static uint32_t bsp_adc_map_sample_time(bsp_adc_sample_t t)
     }
 }
 
-bool bsp_adc_init(bsp_adc_ch_t *ch_list, uint8_t ch_num, uint16_t *val_array, bsp_adc_config_t *cfg)
+bool bsp_adc_init(bsp_adc_ch_t *ch_list, uint8_t ch_num, uint16_t *val_array, const bsp_adc_config_t *cfg)
 {
     if (ch_list == NULL || val_array == NULL || ch_num == 0 || ch_num > BSP_ADC_MAX) {
         return false;

@@ -30,7 +30,7 @@ typedef struct {
  * @param  cfg       ADC配置参数 (采样时间、扫描模式、连续转换、DMA等)
  * @return 1:成功 0:失败
  */
-bool bsp_adc_init(bsp_adc_ch_t *ch_list, uint8_t ch_num, uint16_t *val_array, bsp_adc_config_t *cfg);
+bool bsp_adc_init(bsp_adc_ch_t *ch_list, uint8_t ch_num, uint16_t *val_array, const bsp_adc_config_t *cfg);
 
 
 #endif /* _BSP_ADC_H_ */
