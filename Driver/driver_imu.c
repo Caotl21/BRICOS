@@ -23,7 +23,7 @@ static imu_dev_t s_devs[IMU_MAX_NUM] = {0};
 // --- JY901S：初始化以及解析 ---
 static void Init_JY901S(void) 
 {
-    bsp_uart_start_dma_rx_circular(BSP_UART_IMU1,
+    bsp_uart_start_dma_rx_circular(BSP_UART_IMU2,
                                    Driver_IMU_GetRxBuf(IMU_JY901S),
                                    Driver_IMU_GetBufSize(IMU_JY901S));
                                    
@@ -124,12 +124,12 @@ static bool Parse_JY901S(imu_dev_t *dev, imu_data_t *out_data)
 static void IM948_Hardware_Tx(uint8_t *pBuf, uint16_t len)
 {
     // 调用 BSP 层的接口，把数据实打实地从外设串口 2 发出去
-    bsp_uart_send_buffer(BSP_UART_IMU2, pBuf, len);
+    bsp_uart_send_buffer(BSP_UART_IMU1, pBuf, len);
 }
 
 static void Init_IM948(void) 
 {
-    bsp_uart_start_dma_rx_circular(BSP_UART_IMU2,
+    bsp_uart_start_dma_rx_circular(BSP_UART_IMU1,
                                    Driver_IMU_GetRxBuf(IMU_IM948),
                                    Driver_IMU_GetBufSize(IMU_IM948));
 

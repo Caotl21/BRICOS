@@ -113,7 +113,7 @@ static void vTask_IMU_Core(void *pvParameters)
     while (1)
     {
         // --- 轮询 JY901S ---
-        uint16_t remain_1 = bsp_uart_get_dma_rx_remaining(BSP_UART_IMU1);
+        uint16_t remain_1 = bsp_uart_get_dma_rx_remaining(BSP_UART_IMU2);
         Driver_IMU_Poll_DMA_Update(IMU_JY901S, remain_1);
         
         if (Driver_IMU_Process(IMU_JY901S, &data_jy901s) == true) 
@@ -126,7 +126,7 @@ static void vTask_IMU_Core(void *pvParameters)
         }
 
         // --- 轮询 IM948 ---
-        uint16_t remain_2 = bsp_uart_get_dma_rx_remaining(BSP_UART_IMU2);
+        uint16_t remain_2 = bsp_uart_get_dma_rx_remaining(BSP_UART_IMU1);
         Driver_IMU_Poll_DMA_Update(IMU_IM948, remain_2);
         
         if (Driver_IMU_Process(IMU_IM948, &data_im948) == true) 
@@ -140,11 +140,11 @@ static void vTask_IMU_Core(void *pvParameters)
         }
         if(++log_divider >= 50) // 每 50 次循环打印一次日志 (即每 1000ms)
         {
-            LOG_INFO("IMU_JY901S Quat[W:%.2f X:%.2f Y:%.2f Z:%.2f]", 
+            LOG_INFO("IMU_JY901S Quat[0:%.2f 1:%.2f 2:%.2f 3:%.2f]", 
                       g_imu_body_frame[IMU_JY901S].quat[0], g_imu_body_frame[IMU_JY901S].quat[1], 
                       g_imu_body_frame[IMU_JY901S].quat[2], g_imu_body_frame[IMU_JY901S].quat[3]);
             
-            LOG_INFO("IMU_IM948  Quat[W:%.2f X:%.2f Y:%.2f Z:%.2f]", 
+            LOG_INFO("IMU_IM948  Quat[0:%.2f 1:%.2f 2:%.2f 3:%.2f]", 
                       g_imu_body_frame[IMU_IM948].quat[0], g_imu_body_frame[IMU_IM948].quat[1], 
                       g_imu_body_frame[IMU_IM948].quat[2], g_imu_body_frame[IMU_IM948].quat[3]);
             log_divider = 0;
