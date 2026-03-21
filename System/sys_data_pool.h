@@ -42,6 +42,7 @@ typedef struct {
     // --- 报警标志 ---
     bool is_leak_detected; // 是否漏水
     bool is_imu_error;     // IMU是否异常
+    bool is_voltage_error; // 电压是否异常
 } bot_state_t;
 
 // ============================================================================
@@ -105,9 +106,12 @@ typedef struct {
     bot_sys_mode_e sys_mode;     // 当前系统状态 (待机/加锁/解锁)
     
     // --- PID 参数矩阵 ---
-    pid_param_t pid_roll;
-    pid_param_t pid_pitch;
-    pid_param_t pid_yaw;
+    pid_param_t pid_roll_angle; // 姿态环 PID
+    pid_param_t pid_pitch_angle;
+    pid_param_t pid_yaw_angle;
+    pid_param_t pid_pitch_rate;  // 速率环 PID
+    pid_param_t pid_roll_rate;
+    pid_param_t pid_yaw_rate;
     pid_param_t pid_depth;
     
     // --- 安全保护参数 ---
