@@ -32,5 +32,6 @@ typedef struct {
  */
 bool bsp_adc_init(bsp_adc_ch_t *ch_list, uint8_t ch_num, uint16_t *val_array, const bsp_adc_config_t *cfg);
 
+uint16_t bsp_adc_read_raw(bsp_adc_ch_t ch);
 
 #endif /* _BSP_ADC_H_ */

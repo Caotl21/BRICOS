@@ -13,10 +13,11 @@ static void vTask_Monitor_Core(void *pvParameters)
     (void)pvParameters;
 
     while (1) {
-        uint32_t cpu = System_Runtime_GetCpuUsagePercent();
-        uint32_t cnt = System_Runtime_GetCounter();
+        uint32_t cpu  = System_Runtime_GetCpuUsagePercent();
+        uint32_t cnt  = System_Runtime_GetCounter();
+        uint32_t temp = System_Runtime_GetChipTemperature();
 
-        LOG_INFO("CPU=%lu%%, RT_CNT=%lu", cpu, cnt);
+        LOG_INFO("CPU=%lu%%, RT_CNT=%lu, TEMP=%lu", cpu, cnt, temp);
 
         vTaskDelayUntil(&xLastWakeTime, xPeriod);
     }
