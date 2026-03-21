@@ -30,12 +30,14 @@ typedef struct {
     // --- 中频状态 (10Hz MS5837) ---
     float depth_m;        // 当前深度 (米)
     float water_temp_c;   // 外水温 (摄氏度)
-    
-    // --- 低频环境与系统状态 (1~2Hz) ---
     float cabin_temp_c;   // 舱内温度 (DHT11)
     float cabin_humi;     // 舱内湿度 (DHT11)
+    
+    // --- 系统状态 (1~2Hz) ---
     float bat_voltage_v;  // 电池电压 (ADC)
     float bat_current_a;  // 电池总电流 (ADC)
+    float chip_temp;      // 芯片温度 (ADC)
+    float cpu_usage;      // CPU使用率 (监控任务计算)
     
     // --- 报警标志 ---
     bool is_leak_detected; // 是否漏水

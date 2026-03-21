@@ -1,4 +1,5 @@
 #include "bsp_adc.h"
+#include "bsp_delay.h"
 #include "stm32f4xx.h"
 #include "stm32f4xx_adc.h"
 #include "stm32f4xx_gpio.h"
@@ -16,6 +17,7 @@ typedef struct {
     uint16_t gpio_pin;
     uint8_t adc_channel;
     uint8_t needs_gpio;
+    uint8_t need_temp;
 } adc_hw_info_t;
 
 typedef struct {
@@ -32,21 +34,24 @@ static const adc_hw_info_t s_adc_hw_info[BSP_ADC_MAX] = {
         .gpio_port = GPIOF,
         .gpio_pin = GPIO_Pin_9,
         .adc_channel = ADC_Channel_7,
-        .needs_gpio = 1
+        .needs_gpio = 1,
+        .need_temp = 0
     },
     [BSP_ADC_CURRENT] = {
         .adc = ADC3,
         .gpio_port = GPIOF,
         .gpio_pin = GPIO_Pin_10,
         .adc_channel = ADC_Channel_8,
-        .needs_gpio = 1
+        .needs_gpio = 1,
+        .need_temp = 0
     },
     [BSP_ADC_CHIPTEMP] = {
         .adc = ADC1,
         .gpio_port = 0,
         .gpio_pin = 0,
         .adc_channel = ADC_Channel_16,
-        .needs_gpio = 0
+        .needs_gpio = 0,
+        .need_temp = 1
     }
 };
 
@@ -112,6 +117,11 @@ bool bsp_adc_init(bsp_adc_ch_t *ch_list, uint8_t ch_num, uint16_t *val_array, co
     if (core->dma_stream != NULL) {
         RCC_AHB1PeriphClockCmd(core->dma_rcc, ENABLE);
     }
+
+    if(hw0->need_temp)  ADC_TempSensorVrefintCmd(ENABLE);
+    bsp_delay_us(10);
+
+
 
     // GPIO 只配 needs_gpio 的通道
     GPIO_InitTypeDef GPIO_InitStructure;
