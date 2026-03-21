@@ -14,10 +14,10 @@
 
 // 命令码定义
 #define DATA_TYPE_THRUSTER        0x01
-#define DATA_TYPE_SERVO           0x02
-#define DATA_TYPE_LIGHT           0x03
-#define DATA_TYPE_SENSOR_RT		  0x04
-#define DATA_TYPE_SENSOR_NRT      0x05
+
+#define DATA_TYPE_STATE_BODY      0x02
+#define DATA_TYPE_STATE_SYS       0x03
+#define DATA_TYPE_STATE_ACTUATOR  0x04
 
 #define DATA_TYPE_OTA             0x10
 #define DATA_TYPE_SET_PID_PARAM   0x11
@@ -31,6 +31,7 @@ typedef void (*protocol_cmd_handler_t)(const uint8_t *payload, uint16_t len);
 void Driver_Protocol_Register(uint8_t cmd_id, protocol_cmd_handler_t handler);
 
 void Driver_Protocol_Dispatch(const uint8_t *raw_frame, uint16_t total_len);
+void Driver_Protocol_SendFrame(bsp_uart_port_t port, uint8_t cmd_id, const uint8_t *payload, uint8_t payload_len);
 
 #endif // __DRIVER_HYDROCORE_H
 

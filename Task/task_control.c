@@ -1,7 +1,10 @@
 #include "sys_data_pool.h"
 #include "sys_pid_algo.h"
 #include "driver_thruster.h"
+#include "driver_hydrocore.h"
 #include "FreeRTOS.h"
+#include "task.h"
+#include "task_control.h"
 #include "sys_log.h"
 #include <string.h>
 
@@ -10,6 +13,7 @@
 // 控制器实例
 Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
 PID_Controller_t pid_depth;
+TaskHandle_t Control_Task_Handler = NULL;
 
 static float Clamp_Symmetric(float value, float limit)
 {
@@ -181,7 +185,20 @@ static void TAM_Mixer(Bot_Wrench_t *wrench_out, float *thruster_pwm)
     Normalize_Thruster_Outputs(&thruster_pwm[4], 2, 100.0f);
 }
 
-void Task_Control(void *pvParameters) 
+static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
+{
+    if (body_state == NULL)
+    {
+        return;
+    }
+
+    Driver_Protocol_SendFrame(BSP_UART_OPI_RT,
+                              DATA_TYPE_STATE_BODY,
+                              (const uint8_t *)body_state,
+                              (uint8_t)sizeof(*body_state));
+}
+
+static void vTask_Control(void *pvParameters) 
 {
     bot_sys_mode_e    last_sys_mode = (bot_sys_mode_e)0xFF;
     bot_run_mode_e    last_motion_mode = (bot_run_mode_e)0xFF;
@@ -322,7 +339,19 @@ void Task_Control(void *pvParameters)
             Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), thruster_pwm[i]);
         }
 
+        Report_Body_State_To_OrangePi(&local_state);
+
         // 绝对延时，保证 100Hz 的严格周期
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
     }
+}
+
+void Task_Control_Init(void)
+{
+    xTaskCreate((TaskFunction_t)vTask_Control,
+                (const char *)"Task_Control",
+                (uint16_t)CONTROL_STK_SIZE,
+                (void *)NULL,
+                (UBaseType_t)CONTROL_TASK_PRIO,
+                (TaskHandle_t *)&Control_Task_Handler);
 }

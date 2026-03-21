@@ -18,9 +18,7 @@ static void On_Motion_Ctrl_Received(const uint8_t *payload, uint16_t len){
     }
 
     Bot_Target_Push((const bot_target_t *)payload);
-
-    // 释放一个信号量，立刻使能 task_control 任务去解算最新姿态
-    Driver_Protocol_SignalMotionCtrlUpdated();
+    
 }
 
 void Task_RT_Cmd_Init(void){

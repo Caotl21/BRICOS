@@ -141,6 +141,15 @@ void Bot_State_Push_SysStatus(float cpu_usage, float chip_temp) {
     SYS_EXIT_CRITICAL();
 }
 
+void Bot_Actuator_Pull(bot_actuator_state_t *out_state)
+{
+    if (out_state == NULL) return;
+
+    SYS_ENTER_CRITICAL();
+    memcpy(out_state, &s_bricsbot_actuator_target, sizeof(bot_actuator_state_t));
+    SYS_EXIT_CRITICAL();
+}
+
 // --- 控制与配置更新系列 ---
 void Bot_Target_Push(const bot_target_t *new_target) {
     if (new_target == NULL) return;

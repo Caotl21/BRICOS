@@ -5,6 +5,8 @@
 #include "stm32f4xx_rcc.h"
 #include "stm32f4xx_gpio.h"
 #include "misc.h"
+#include "FreeRTOS.h"
+#include "semphr.h"
 
 #include <stdbool.h>
 
@@ -142,6 +144,20 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
 
 /* 实例化映射表 */
 static uart_ctx_t s_uart_ctx[BSP_UART_MAX] = {0};
+static SemaphoreHandle_t s_uart_tx_mutex[BSP_UART_MAX] = {NULL};
+
+static void prv_uart_tx_mutex_init(bsp_uart_port_t port)
+{
+    if (port >= BSP_UART_MAX)
+    {
+        return;
+    }
+
+    if (s_uart_tx_mutex[port] == NULL)
+    {
+        s_uart_tx_mutex[port] = xSemaphoreCreateMutex();
+    }
+}
 
 /* --- 注册回调函数 --- */
 void bsp_uart_register_rx_cb(bsp_uart_port_t port, bsp_uart_rx_cb_t cb) {
@@ -309,6 +325,7 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
     // 5. 使能外设
     // ==========================================
     USART_Cmd(hw->uart_base, ENABLE);
+    prv_uart_tx_mutex_init(port);
 
     return true;
 }
@@ -448,13 +465,12 @@ void bsp_uart_send_buffer(bsp_uart_port_t port, const uint8_t *data, uint16_t le
     if(port >= BSP_UART_MAX || data == NULL || len == 0) return;
 
     USART_TypeDef* uart = s_uart_hw_info[port].uart_base;
+    SemaphoreHandle_t tx_mutex = s_uart_tx_mutex[port];
 
-    // =======================================================
-    // [进阶预留] 
-    // 如果你在 FreeRTOS 中多个任务会同时调用此函数发数据，
-    // 请在此处获取互斥锁 (Mutex)，防止数据交错乱码：
-    // xSemaphoreTake(s_uart_tx_mutex[port], portMAX_DELAY);
-    // =======================================================
+    if (tx_mutex != NULL)
+    {
+        xSemaphoreTake(tx_mutex, portMAX_DELAY);
+    }
 
     for (uint16_t i = 0; i < len; i++) {
         // 等待发送缓冲区空
@@ -464,11 +480,10 @@ void bsp_uart_send_buffer(bsp_uart_port_t port, const uint8_t *data, uint16_t le
 
     while(USART_GetFlagStatus(uart, USART_FLAG_TC) == RESET); // 等待最后一个字节发送完成
 
-    // =======================================================
-    // [进阶预留]
-    // 在此处释放互斥锁：
-    // xSemaphoreGive(s_uart_tx_mutex[port]);
-    // =======================================================
+    if (tx_mutex != NULL)
+    {
+        xSemaphoreGive(tx_mutex);
+    }
 }
 
 bool bsp_uart_send_dma(bsp_uart_port_t port, uint8_t *data, uint16_t len) {

@@ -1,5 +1,6 @@
 #include "driver_hydrocore.h"
 #include <stddef.h>
+#include <string.h>
 
 // O(1) 极速路由表：占用 256 * 4 = 1024 字节 RAM，换取绝对的实时性
 static protocol_cmd_handler_t s_handlers[256] = {NULL};
@@ -43,5 +44,33 @@ void Driver_Protocol_Dispatch(const uint8_t *raw_frame, uint16_t total_len) {
     if (handler != NULL) {
         handler(&raw_frame[4], raw_frame[3]); // 调用处理函数，传递数据载荷和长度
     }
+}
+
+void Driver_Protocol_SendFrame(bsp_uart_port_t port, uint8_t cmd_id, const uint8_t *payload, uint8_t payload_len)
+{
+    uint8_t frame[262];
+    uint16_t total_len;
+
+    total_len = (uint16_t)payload_len + 7u;
+    if (total_len > sizeof(frame))
+    {
+        return;
+    }
+
+    frame[0] = PACKET_START_BYTE1;
+    frame[1] = PACKET_START_BYTE2;
+    frame[2] = cmd_id;
+    frame[3] = payload_len;
+
+    if ((payload_len > 0u) && (payload != NULL))
+    {
+        memcpy(&frame[4], payload, payload_len);
+    }
+
+    frame[4u + payload_len] = calculate_checksum(&frame[2], (uint16_t)payload_len + 2u);
+    frame[5u + payload_len] = PACKET_END_BYTE1;
+    frame[6u + payload_len] = PACKET_END_BYTE2;
+
+    bsp_uart_send_buffer(port, frame, total_len);
 }
 

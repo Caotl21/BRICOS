@@ -5,6 +5,7 @@
 
 #include "driver_hydrocore.h"
 #include "driver_param.h"
+#include "driver_servo.h"
 
 #include "sys_data_pool.h"
 #include "sys_port.h"

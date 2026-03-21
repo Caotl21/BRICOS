@@ -148,6 +148,7 @@ void Bot_State_Push_Power(float vol, float cur);
 
 // 系统状态更新：由 Task_Monitor 调用更新
 void Bot_State_Push_SysStatus(float cpu_usage, float chip_temp);
+void Bot_Actuator_Pull(bot_actuator_state_t *out_state);
 
 // 目标更新：由 Task_Comm_RT 接收到指令后调用
 void Bot_Target_Push(const bot_target_t *new_target);
