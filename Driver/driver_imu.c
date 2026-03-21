@@ -129,20 +129,22 @@ static void IM948_Hardware_Tx(uint8_t *pBuf, uint16_t len)
 
 static void Init_IM948(void) 
 {
-    bsp_uart_start_dma_rx_circular(BSP_UART_IMU1,
-                                   Driver_IMU_GetRxBuf(IMU_IM948),
-                                   Driver_IMU_GetBufSize(IMU_IM948));
+    
 
     IM948_RegisterTxCallback(IM948_Hardware_Tx);
+    
     bsp_delay_ms(200);// 延时一下让传感器上电准备完毕，传感器上电后需要初始化完毕后才会接收指令的
 
     Cmd_03(); // 唤醒传感器
-    
     // 设置设备参数
     Cmd_12(5, 255, 0, 0, 3, 25, 2, 4, 9, 0x35); 
     Cmd_19(); // 开启数据主动上报
     bsp_delay_ms(100);
     Cmd_40(2);
+    bsp_uart_start_dma_rx_circular(BSP_UART_IMU1,
+                                   Driver_IMU_GetRxBuf(IMU_IM948),
+                                   Driver_IMU_GetBufSize(IMU_IM948));
+    
    
 }
 
