@@ -3,7 +3,7 @@
 #include <string.h>
 #include "FreeRTOS.h"
 #include "semphr.h"
-#include "bsp_uart.h"
+#include "driver_hydrocore.h"
 
 // 不做本地存储；仅临时格式化缓冲
 #define LOG_TMP_BUF_SIZE 192
@@ -69,8 +69,11 @@ void Log_Print(log_level_t level, const char *fmt, ...)
     msg_buf[total_len++] = '\n';
     msg_buf[total_len] = '\0';
 
-    // 走 UART4 (BSP_UART_OPI_NRT)
-    bsp_uart_send_buffer(BSP_UART_OPI_NRT, (const uint8_t *)msg_buf, (uint16_t)total_len);
+    // 走 UART4，但以协议帧形式发送，避免和其他二进制数据混流
+    Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                              DATA_TYPE_LOG,
+                              (const uint8_t *)msg_buf,
+                              (uint8_t)total_len);
 
 exit_unlock:
     if (s_log_mutex != NULL) {

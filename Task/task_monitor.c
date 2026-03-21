@@ -1,8 +1,8 @@
 #include "task_monitor.h"
 
-#include <stdio.h>
+#include <string.h>
 
-#include "bsp_uart.h"
+#include "driver_hydrocore.h"
 #include "driver_param.h"
 #include "sys_data_pool.h"
 #include "sys_log.h"
@@ -10,87 +10,70 @@
 
 TaskHandle_t Monitor_Task_Handler = NULL;
 
-static void Send_Sys_Report_To_OrangePi(const bot_sys_state_t *sys_state,
-                                        const bot_params_t *params)
+typedef struct
 {
-    char report_buf[192];
-    int len;
-    int water_temp_x100;
-    int cabin_temp_x100;
-    int cabin_humi_x100;
-    int volt_x100;
-    int curr_x100;
-    int chip_temp_x100;
-    int cpu_x100;
-    int leak_flag;
-    int imu_flag;
-    int low_voltage_flag;
+    uint8_t sys_mode;
+    uint8_t motion_mode;
+    float water_temp_c;
+    float cabin_temp_c;
+    float cabin_humi;
+    float bat_voltage_v;
+    float bat_current_a;
+    float chip_temp;
+    float cpu_usage;
+    uint8_t is_leak_detected;
+    uint8_t is_imu_error;
+    uint8_t is_voltage_error;
+} bot_sys_report_t;
 
-    if ((sys_state == NULL) || (params == NULL))
+typedef struct
+{
+    uint8_t servo_angle;
+    uint8_t light1_pwm;
+    uint8_t light2_pwm;
+} bot_actuator_report_t;
+
+static uint16_t Serialize_Sys_Report(uint8_t *buf,
+                                     const bot_sys_state_t *sys_state,
+                                     const bot_params_t *params)
+{
+    uint16_t offset = 0;
+
+    if ((buf == NULL) || (sys_state == NULL) || (params == NULL))
     {
-        return;
+        return 0u;
     }
 
-    leak_flag = sys_state->is_leak_detected ? 1 : 0;
-    imu_flag = sys_state->is_imu_error ? 1 : 0;
-    low_voltage_flag = (sys_state->bat_voltage_v < params->failsafe_low_voltage) ? 1 : 0;
-    water_temp_x100 = (int)(sys_state->water_temp_c * 100.0f);
-    cabin_temp_x100 = (int)(sys_state->cabin_temp_c * 100.0f);
-    cabin_humi_x100 = (int)(sys_state->cabin_humi * 100.0f);
-    volt_x100 = (int)(sys_state->bat_voltage_v * 100.0f);
-    curr_x100 = (int)(sys_state->bat_current_a * 100.0f);
-    chip_temp_x100 = (int)(sys_state->chip_temp * 100.0f);
-    cpu_x100 = (int)(sys_state->cpu_usage * 100.0f);
+    buf[offset++] = (uint8_t)params->sys_mode;
+    buf[offset++] = (uint8_t)params->motion_mode;
 
-    len = snprintf(report_buf, sizeof(report_buf),
-                   "[SYS] mode=%u motion=%u water_x100=%d cabin_t_x100=%d cabin_h_x100=%d volt_x100=%d curr_x100=%d chip_x100=%d cpu_x100=%d leak=%d imu=%d lowv=%d\r\n",
-                   (unsigned int)params->sys_mode,
-                   (unsigned int)params->motion_mode,
-                   water_temp_x100,
-                   cabin_temp_x100,
-                   cabin_humi_x100,
-                   volt_x100,
-                   curr_x100,
-                   chip_temp_x100,
-                   cpu_x100,
-                   leak_flag,
-                   imu_flag,
-                   low_voltage_flag);
+    memcpy(&buf[offset], &sys_state->water_temp_c, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &sys_state->cabin_temp_c, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &sys_state->cabin_humi, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &sys_state->bat_voltage_v, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &sys_state->bat_current_a, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &sys_state->chip_temp, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &sys_state->cpu_usage, sizeof(float)); offset += sizeof(float);
 
-    if (len > 0)
-    {
-        if (len > (int)sizeof(report_buf))
-        {
-            len = (int)sizeof(report_buf);
-        }
-        bsp_uart_send_buffer(BSP_UART_OPI_NRT, (const uint8_t *)report_buf, (uint16_t)len);
-    }
+    buf[offset++] = sys_state->is_leak_detected ? 1u : 0u;
+    buf[offset++] = sys_state->is_imu_error ? 1u : 0u;
+    buf[offset++] = (sys_state->bat_voltage_v < params->failsafe_low_voltage) ? 1u : 0u;
+
+    return offset;
 }
 
-static void Send_Actuator_Report_To_OrangePi(const bot_actuator_state_t *actuator_state)
+static uint16_t Serialize_Actuator_Report(uint8_t *buf, const bot_actuator_state_t *actuator_state)
 {
-    char report_buf[96];
-    int len;
-
-    if (actuator_state == NULL)
+    if ((buf == NULL) || (actuator_state == NULL))
     {
-        return;
+        return 0u;
     }
 
-    len = snprintf(report_buf, sizeof(report_buf),
-                   "[ACT] servo=%u light1=%u light2=%u\r\n",
-                   (unsigned int)actuator_state->servo_angle,
-                   (unsigned int)actuator_state->light1_pwm,
-                   (unsigned int)actuator_state->light2_pwm);
+    buf[0] = actuator_state->servo_angle;
+    buf[1] = actuator_state->light1_pwm;
+    buf[2] = actuator_state->light2_pwm;
 
-    if (len > 0)
-    {
-        if (len > (int)sizeof(report_buf))
-        {
-            len = (int)sizeof(report_buf);
-        }
-        bsp_uart_send_buffer(BSP_UART_OPI_NRT, (const uint8_t *)report_buf, (uint16_t)len);
-    }
+    return 3u;
 }
 
 static void vTask_Monitor_Core(void *pvParameters)
@@ -105,6 +88,10 @@ static void vTask_Monitor_Core(void *pvParameters)
         bot_sys_state_t sys_state;
         bot_params_t params;
         bot_actuator_state_t actuator_state;
+        uint8_t sys_report_buf[2u + (7u * sizeof(float)) + 3u];
+        uint8_t actuator_report_buf[3u];
+        uint16_t sys_report_len;
+        uint16_t actuator_report_len;
         uint32_t cpu = System_Runtime_GetCpuUsagePercent();
         uint32_t temp = System_Runtime_GetChipTemperature();
 
@@ -113,8 +100,24 @@ static void vTask_Monitor_Core(void *pvParameters)
         Bot_Params_Pull(&params);
         Bot_Actuator_Pull(&actuator_state);
 
-        Send_Sys_Report_To_OrangePi(&sys_state, &params);
-        Send_Actuator_Report_To_OrangePi(&actuator_state);
+        sys_report_len = Serialize_Sys_Report(sys_report_buf, &sys_state, &params);
+        actuator_report_len = Serialize_Actuator_Report(actuator_report_buf, &actuator_state);
+
+        if (sys_report_len != 0u)
+        {
+            Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                                      DATA_TYPE_STATE_SYS,
+                                      sys_report_buf,
+                                      (uint8_t)sys_report_len);
+        }
+
+        if (actuator_report_len != 0u)
+        {
+            Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                                      DATA_TYPE_STATE_ACTUATOR,
+                                      actuator_report_buf,
+                                      (uint8_t)actuator_report_len);
+        }
 
         if (++log_divider >= 5u) {
             log_divider = 0u;

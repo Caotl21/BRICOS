@@ -18,6 +18,7 @@
 #define DATA_TYPE_STATE_BODY      0x02
 #define DATA_TYPE_STATE_SYS       0x03
 #define DATA_TYPE_STATE_ACTUATOR  0x04
+#define DATA_TYPE_LOG             0x05
 
 #define DATA_TYPE_OTA             0x10
 #define DATA_TYPE_SET_PID_PARAM   0x11
