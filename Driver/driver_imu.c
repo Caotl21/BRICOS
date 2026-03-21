@@ -26,6 +26,7 @@ static void Init_JY901S(void)
     bsp_uart_start_dma_rx_circular(BSP_UART_IMU1,
                                    Driver_IMU_GetRxBuf(IMU_JY901S),
                                    Driver_IMU_GetBufSize(IMU_JY901S));
+                                   
 }
 
 static bool JY901S_Parse_Payload(const uint8_t *frame, imu_data_t *out_data)

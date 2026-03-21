@@ -83,7 +83,6 @@ uint32_t System_Runtime_GetCpuUsagePercent(void)
 uint32_t System_Runtime_GetChipTemperature(void)
 {
     uint16_t raw = bsp_adc_read_raw(BSP_ADC_CHIPTEMP);
-    LOG_DEBUG("Chip temp is %d", raw);
 
     // Vref 假定 3.3V，12-bit ADC
     float vsense = ((float)raw / 4096.0f) * 3.3f;

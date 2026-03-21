@@ -32,3 +32,4 @@ void Task_Monitor_Init(void)
                 (UBaseType_t)MONITOR_TASK_PRIO,
                 (TaskHandle_t *)&Monitor_Task_Handler);
 }
+

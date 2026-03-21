@@ -273,8 +273,7 @@ static void vTask_DHT11_Core(void *pvParameters)
 
     uint8_t t_val = 0;
     uint8_t h_val = 0;
-    
-    bot_state_t current_state; 
+    bool is_already_leaking = false;
 
     while (1)
     {
@@ -286,11 +285,11 @@ static void vTask_DHT11_Core(void *pvParameters)
         if (Driver_DHT11_Read_Data(&t_val, &h_val) == 0) 
         {
             //拉取全局快照，看看其他传感器有没有触发过漏水
-            Bot_State_Pull(&current_state);
+            Bot_State_LeakStatus_Pull(&is_already_leaking);
             
             //多重漏水融合判定 (核心逻辑！)
             // 如果原本就已经漏水了，或者现在的湿度超过了设定的死亡阈值，就判定为漏水
-            bool is_now_leaking = current_state.is_leak_detected || (h_val >= CABIN_HUMI_LEAK_THRESHOLD);
+            bool is_now_leaking = is_already_leaking || (h_val >= CABIN_HUMI_LEAK_THRESHOLD);
             
             //把温湿度和融合后的漏水状态一起安全地推入池中
             Bot_State_Push_CabinEnv((float)t_val, (float)h_val, is_now_leaking);

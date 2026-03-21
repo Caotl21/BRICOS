@@ -1008,6 +1008,16 @@
               <FileType>5</FileType>
               <FilePath>..\System\sys_systick.h</FilePath>
             </File>
+            <File>
+              <FileName>sys_monitor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\System\sys_monitor.c</FilePath>
+            </File>
+            <File>
+              <FileName>sys_monitor.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_monitor.h</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

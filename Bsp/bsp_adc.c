@@ -200,7 +200,7 @@ uint16_t bsp_adc_read_raw(bsp_adc_ch_t ch)
     const adc_hw_info_t *hw = &s_adc_hw_info[ch];
     ADC_TypeDef *adc = hw->adc;
 
-    ADC_RegularChannelConfig(adc, hw->adc_channel, 1, bsp_adc_map_sample_time(BSP_ADC_SAMPLE_3CYC));
+    ADC_RegularChannelConfig(adc, hw->adc_channel, 1, bsp_adc_map_sample_time(BSP_ADC_SAMPLE_480CYC));
 
     ADC_SoftwareStartConv(adc);
     while (ADC_GetFlagStatus(adc, ADC_FLAG_EOC) == RESET) {
