@@ -68,6 +68,4 @@ bool Sys_BootFlag_CheckAndClearEnterBootloader(void)
 
     flag.enter_bootloader = 0; // 清除标志
     return Sys_BootFlag_Save(&flag);
-    
-    return true;
 }

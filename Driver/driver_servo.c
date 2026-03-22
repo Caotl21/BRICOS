@@ -7,11 +7,10 @@ void Driver_Servo_SetAngle(bsp_pwm_ch_t ch, uint8_t angle){
 
     // 安全限幅
     if (angle > 180) angle = 180;
-    if (angle < 0) angle = 0;
 
     // 根据正负计算对应的脉宽
     uint16_t pulse_us;
-    if (angle >= 0) {
+    if (angle > 0) {
         pulse_us = SERVO_PWM_STOP + (uint16_t)((SERVO_PWM_MAX_LEFT - SERVO_PWM_STOP) * (angle / 180));
     } else {
         pulse_us = SERVO_PWM_STOP + (uint16_t)((SERVO_PWM_MAX_RIGHT - SERVO_PWM_STOP) * (angle / 180));

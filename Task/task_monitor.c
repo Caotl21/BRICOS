@@ -85,7 +85,8 @@ static void vTask_Monitor_Core(void *pvParameters)
             Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
                                       DATA_TYPE_STATE_SYS,
                                       sys_report_buf,
-                                      (uint8_t)sys_report_len);
+                                      (uint8_t)sys_report_len,
+                                      USE_DMA);
         }
 
         if (actuator_report_len != 0u)
@@ -93,7 +94,8 @@ static void vTask_Monitor_Core(void *pvParameters)
             Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
                                       DATA_TYPE_STATE_ACTUATOR,
                                       actuator_report_buf,
-                                      (uint8_t)actuator_report_len);
+                                      (uint8_t)actuator_report_len,
+                                      USE_DMA);
         }
 
         if (++log_divider >= 5u) {

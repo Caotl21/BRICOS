@@ -230,7 +230,8 @@ static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
     Driver_Protocol_SendFrame(BSP_UART_OPI_RT,
                               DATA_TYPE_STATE_BODY,
                               report_buf,
-                              (uint8_t)report_len);
+                              (uint8_t)report_len,
+                              USE_CPU);
 }
 
 static void vTask_Control(void *pvParameters) 

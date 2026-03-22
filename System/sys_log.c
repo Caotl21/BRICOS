@@ -4,7 +4,6 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "driver_hydrocore.h"
-#include "sys_log.h"
 
 // 不做本地存储；仅临时格式化缓冲
 #define LOG_TMP_BUF_SIZE 192
@@ -17,7 +16,7 @@ static const char *Log_Level_To_Prefix(log_level_t level)
         case LOG_LEVEL_ERROR:   return "[ERROR] ";
         case LOG_LEVEL_WARNING: return "[WARNING] ";
         case LOG_LEVEL_INFO:    return "[INFO] ";
-				case LOG_LEVEL_DEBUG:   return "[DEBUG]";  
+		case LOG_LEVEL_DEBUG:   return "[DEBUG]";  
         default:                return "[INFO] ";
     }
 }
@@ -31,20 +30,22 @@ void Log_Init(void)
 
 void Log_Print(log_level_t level, const char *fmt, ...)
 {
-    char msg_buf[LOG_TMP_BUF_SIZE];
+    static char msg_buf[LOG_TMP_BUF_SIZE];
     int prefix_len;
     int body_len;
     int total_len;
     va_list ap;
+    BaseType_t mutex_taken = pdFALSE;
 
     if (fmt == NULL) {
         return;
     }
 
     if (s_log_mutex != NULL) {
-        if (xSemaphoreTake(s_log_mutex, pdMS_TO_TICKS(5)) != pdTRUE) {
+        if (xSemaphoreTake(s_log_mutex, 0) != pdTRUE) {
             return;
         }
+        mutex_taken = pdTRUE;
     }
 
     prefix_len = snprintf(msg_buf, sizeof(msg_buf), "%s", Log_Level_To_Prefix(level));
@@ -71,14 +72,15 @@ void Log_Print(log_level_t level, const char *fmt, ...)
     msg_buf[total_len] = '\0';
 
     // 走 UART4，但以协议帧形式发送，避免和其他二进制数据混流
-    bsp_uart_send_buffer(BSP_UART_OPI_NRT, (const uint8_t *)msg_buf, (uint16_t)total_len);
-    // Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
-    //                           DATA_TYPE_LOG,
-    //                           (const uint8_t *)msg_buf,
-    //                           (uint8_t)total_len);
+    //bsp_uart_send_buffer(BSP_UART_OPI_NRT, (const uint8_t *)msg_buf, (uint16_t)total_len);
+    Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                               DATA_TYPE_LOG,
+                               (const uint8_t *)msg_buf,
+                               (uint8_t)total_len,
+                               USE_DMA);
 
 exit_unlock:
-    if (s_log_mutex != NULL) {
+    if ((s_log_mutex != NULL) && (mutex_taken == pdTRUE)) {
         xSemaphoreGive(s_log_mutex);
     }
 }

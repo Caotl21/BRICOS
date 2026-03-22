@@ -64,7 +64,7 @@ static const adc_core_info_t s_adc_core_info[] = {
 };
 
 static const bsp_adc_config_t s_adc_default_cfg = {
-    .sample_time = ADC_SampleTime_3Cycles,
+    .sample_time = BSP_ADC_SAMPLE_3CYC,
     .scan_enable = true,
     .continuous_enable = true,
     .dma_enable = true

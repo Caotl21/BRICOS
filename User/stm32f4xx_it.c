@@ -143,9 +143,19 @@ void USART3_IRQHandler(void)
     bsp_uart_isr_handler(BSP_UART_OPI_RT);
 }
 
+void DMA1_Stream3_IRQHandler(void)
+{
+    bsp_uart_dma_tx_isr_handler(BSP_UART_OPI_RT);
+}
+
 void UART4_IRQHandler(void)
 {
     bsp_uart_isr_handler(BSP_UART_OPI_NRT);
+}
+
+void DMA1_Stream4_IRQHandler(void)
+{
+    bsp_uart_dma_tx_isr_handler(BSP_UART_OPI_NRT);
 }
 
 /******************************************************************************/

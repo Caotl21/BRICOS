@@ -99,9 +99,16 @@ void bsp_uart_send_buffer(bsp_uart_port_t port, const uint8_t *data, uint16_t le
  * @param port - 串口端口枚举 (如 BSP_UART_OPI)
  * @param data - 待发送的数据缓冲区指针
  * @param len - 待发送的数据长度，单位字节
- * @note 目前此函数不实现 DMA 发送，后续可根据需要添加。DMA 发送适合频繁发送大量数据的场景，可以极大降低 CPU 负载。
+ * @note 该函数会启动 DMA 并阻塞等待发送完成，适合 UART3 / UART4 这类管理通道。
  */
 bool bsp_uart_send_dma(bsp_uart_port_t port, uint8_t *data, uint16_t len);
+
+/**
+ * @brief UART DMA TX 中断服务处理函数
+ * @param port - 串口端口枚举
+ * @note 由对应的 DMAx_Streamy_IRQHandler 调用，用于唤醒正在等待 DMA 完成的任务。
+ */
+void bsp_uart_dma_tx_isr_handler(bsp_uart_port_t port);
 
 /**
  * @brief 串口中断服务程序
