@@ -7,6 +7,7 @@
 #include "bsp_uart.h"
 #include "bsp_delay.h"
 #include "bsp_gpio.h"
+
 /*  Sys相关	 */
 #include "sys_log.h"
 #include "sys_data_pool.h"
@@ -62,10 +63,10 @@ int main()
 	
 	Task_NRT_Cmd_Init();
 	Task_Monitor_Init(); 
-	// LOG_INFO("======================================");
-    // LOG_INFO("   BRICOS System Booting...       ");
-    // LOG_INFO("   Sensor Tasks Initialization...     ");
-	// LOG_INFO("======================================");
+	LOG_INFO("======================================");
+    LOG_INFO("   BRICOS System Booting...       ");
+    LOG_INFO("   Tasks Initialization...     ");
+	LOG_INFO("======================================");
 	vTaskStartScheduler(); // 启动 FreeRTOS 调度器，开始多任务运行
 
 
