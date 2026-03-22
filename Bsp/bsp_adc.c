@@ -14,6 +14,7 @@
 typedef struct {
     ADC_TypeDef* adc;
     GPIO_TypeDef* gpio_port;
+    uint32_t gpio_rcc;
     uint16_t gpio_pin;
     uint8_t adc_channel;
     uint8_t needs_gpio;
@@ -32,6 +33,7 @@ static const adc_hw_info_t s_adc_hw_info[BSP_ADC_MAX] = {
     [BSP_ADC_VOLTAGE] = {
         .adc = ADC3,
         .gpio_port = GPIOF,
+        .gpio_rcc = RCC_AHB1Periph_GPIOF,
         .gpio_pin = GPIO_Pin_9,
         .adc_channel = ADC_Channel_7,
         .needs_gpio = 1,
@@ -40,6 +42,7 @@ static const adc_hw_info_t s_adc_hw_info[BSP_ADC_MAX] = {
     [BSP_ADC_CURRENT] = {
         .adc = ADC3,
         .gpio_port = GPIOF,
+        .gpio_rcc = RCC_AHB1Periph_GPIOF,
         .gpio_pin = GPIO_Pin_10,
         .adc_channel = ADC_Channel_8,
         .needs_gpio = 1,
@@ -133,6 +136,7 @@ bool bsp_adc_init(bsp_adc_ch_t *ch_list, uint8_t ch_num, uint16_t *val_array, co
     for (uint8_t i = 0; i < ch_num; i++) {
         const adc_hw_info_t *hw = &s_adc_hw_info[ch_list[i]];
         if (hw->needs_gpio) {
+            RCC_AHB1PeriphClockCmd(hw->gpio_rcc, ENABLE);
             GPIO_InitStructure.GPIO_Pin = hw->gpio_pin;
             GPIO_Init(hw->gpio_port, &GPIO_InitStructure);
         }

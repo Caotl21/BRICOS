@@ -54,16 +54,17 @@ int main()
 //    LOG_INFO("           OTA Success!!!!       ");
 //    LOG_INFO("======================================");
     /* 打印开机横幅，验证日志系统正常工作 */
-    LOG_INFO("======================================");
-    LOG_INFO("   BRICOS System Booting...       ");
-    LOG_INFO("   Sensor Tasks Initialization...     ");
-	LOG_INFO("======================================");
 
+	Task_Comm_Init();
 	Task_Sensor_Init(); // 创建并启动所有传感器任务
 	Task_Control_Init(); // 创建并启动 100Hz 运动控制任务
-	Task_Comm_Init();
+	
 	Task_NRT_Cmd_Init();
 	Task_Monitor_Init(); 
+	// LOG_INFO("======================================");
+    // LOG_INFO("   BRICOS System Booting...       ");
+    // LOG_INFO("   Sensor Tasks Initialization...     ");
+	// LOG_INFO("======================================");
 	vTaskStartScheduler(); // 启动 FreeRTOS 调度器，开始多任务运行
 
 
