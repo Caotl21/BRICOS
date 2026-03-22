@@ -36,6 +36,7 @@ int main()
 	bsp_delay_init(); // 初始化 DWT 延时模块
 	bsp_uart_init_default(); // 初始化所有串口设备，统一配置为 115200-8N1
 	bsp_gpio_init();
+	bsp_pwm_init(1500); // 初始化 PWM 输出模块
 
 
 	/*  Driver层初始化	*/

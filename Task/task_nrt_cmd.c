@@ -55,7 +55,7 @@ static void On_Receive_Servo_Cmd(const uint8_t *payload, uint16_t len){
 
     uint8_t servo_angle = payload[0];
 
-    Driver_Servo_SetAngle(BSP_PWM_SERVO_1, servo_angle); // 相机云台舵机角度 (0-180)
+    Driver_Servo_SetAngle(BSP_PWM_SERVO_2, servo_angle); // 相机云台舵机角度 (0-180)
 }
 
 // 接收设置探照灯强度命令的回调函数 (暂未实现，后续可以根据协议定义增加)

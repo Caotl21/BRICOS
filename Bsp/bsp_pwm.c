@@ -4,6 +4,8 @@
 #include "stm32f4xx_gpio.h"
 #include "stm32f4xx_rcc.h"
 
+#include "sys_log.h"
+
 /* ---  只读硬件字典结构体 --- */
 typedef struct {
     TIM_TypeDef* tim;        // 定时器基地址
@@ -229,13 +231,13 @@ bool bsp_pwm_init(uint16_t init_pulse_us) {
         TIM_TimeBaseInit(hw->tim, &TIM_TimeBaseInitStructure);
         
         // 配置 PWM 模式
+        TIM_OCStructInit(&TIM_OCInitStructure);
         TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
         TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
         TIM_OCInitStructure.TIM_Pulse = init_pulse_us; // 初始占空比/脉宽设为 0
         TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
-        TIM_OCStructInit(&TIM_OCInitStructure);
-
         hw->pwm_oc_init(hw->tim, &TIM_OCInitStructure);
+
         hw->tim_oc_preload_config(hw->tim, TIM_OCPreload_Enable);
 
         TIM_Cmd(hw->tim, ENABLE);
@@ -253,7 +255,7 @@ bool bsp_pwm_init(uint16_t init_pulse_us) {
 void bsp_pwm_set_pulse_us(bsp_pwm_ch_t ch, uint16_t pulse_us) 
 {
     if (ch >= BSP_PWM_MAX) return;
-
+    
     TIM_TypeDef* tim = pwm_hw_info[ch].tim;
     uint8_t ch_num = pwm_hw_info[ch].ch;
 
