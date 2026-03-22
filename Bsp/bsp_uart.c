@@ -7,6 +7,7 @@
 #include "misc.h"
 #include "FreeRTOS.h"
 #include "semphr.h"
+#include "task.h"
 
 #include <stdbool.h>
 
@@ -43,6 +44,13 @@ typedef struct {
     uint32_t            dma_channel;
     uint32_t            dma_priority;
     uint32_t            dma_rx_clear_flags;
+    uint32_t            dma_tx_clear_flags;
+    uint32_t            dma_tx_it_tc;
+    uint32_t            dma_tx_it_te;
+    uint32_t            dma_tx_it_dme;
+    uint32_t            dma_tx_it_fe;
+    uint8_t             dma_tx_irqn;
+    uint32_t            dma_tx_nvic_priority;
 } uart_hw_info_t;
 
 typedef struct {
@@ -70,9 +78,17 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .irqn = 0,  // 零中断架构 不需要NVIC配置
         .nvic_priority = 0,
         .dma_rx_stream = DMA2_Stream2,
+        .dma_tx_stream = NULL,
         .dma_channel = DMA_Channel_4,
         .dma_priority = DMA_Priority_High,
-        .dma_rx_clear_flags = DMA_FLAG_TCIF2 | DMA_FLAG_HTIF2 | DMA_FLAG_TEIF2 | DMA_FLAG_DMEIF2 | DMA_FLAG_FEIF2
+        .dma_rx_clear_flags = DMA_FLAG_TCIF2 | DMA_FLAG_HTIF2 | DMA_FLAG_TEIF2 | DMA_FLAG_DMEIF2 | DMA_FLAG_FEIF2,
+        .dma_tx_clear_flags = 0,
+        .dma_tx_it_tc = 0,
+        .dma_tx_it_te = 0,
+        .dma_tx_it_dme = 0,
+        .dma_tx_it_fe = 0,
+        .dma_tx_irqn = 0,
+        .dma_tx_nvic_priority = 0
     },
 
     [BSP_UART_IMU2] = {
@@ -91,9 +107,17 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .irqn = 0,
         .nvic_priority = 0,
         .dma_rx_stream = DMA1_Stream5,
+        .dma_tx_stream = NULL,
         .dma_channel = DMA_Channel_4,
         .dma_priority = DMA_Priority_High,
-        .dma_rx_clear_flags = DMA_FLAG_TCIF5 | DMA_FLAG_HTIF5 | DMA_FLAG_TEIF5 | DMA_FLAG_DMEIF5 | DMA_FLAG_FEIF5
+        .dma_rx_clear_flags = DMA_FLAG_TCIF5 | DMA_FLAG_HTIF5 | DMA_FLAG_TEIF5 | DMA_FLAG_DMEIF5 | DMA_FLAG_FEIF5,
+        .dma_tx_clear_flags = 0,
+        .dma_tx_it_tc = 0,
+        .dma_tx_it_te = 0,
+        .dma_tx_it_dme = 0,
+        .dma_tx_it_fe = 0,
+        .dma_tx_irqn = 0,
+        .dma_tx_nvic_priority = 0
     },
 
     [BSP_UART_OPI_RT] = {
@@ -115,7 +139,14 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .dma_tx_stream = DMA1_Stream3,
         .dma_channel = DMA_Channel_4,
         .dma_priority = DMA_Priority_VeryHigh, // 实时通信优先级更高
-        .dma_rx_clear_flags = DMA_FLAG_TCIF1 | DMA_FLAG_HTIF1 | DMA_FLAG_TEIF1 | DMA_FLAG_DMEIF1 | DMA_FLAG_FEIF1
+        .dma_rx_clear_flags = DMA_FLAG_TCIF1 | DMA_FLAG_HTIF1 | DMA_FLAG_TEIF1 | DMA_FLAG_DMEIF1 | DMA_FLAG_FEIF1,
+        .dma_tx_clear_flags = DMA_FLAG_TCIF3 | DMA_FLAG_HTIF3 | DMA_FLAG_TEIF3 | DMA_FLAG_DMEIF3 | DMA_FLAG_FEIF3,
+        .dma_tx_it_tc = DMA_IT_TCIF3,
+        .dma_tx_it_te = DMA_IT_TEIF3,
+        .dma_tx_it_dme = DMA_IT_DMEIF3,
+        .dma_tx_it_fe = DMA_IT_FEIF3,
+        .dma_tx_irqn = DMA1_Stream3_IRQn,
+        .dma_tx_nvic_priority = 6
     },
 
     [BSP_UART_OPI_NRT] = {
@@ -137,7 +168,14 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .dma_tx_stream = DMA1_Stream4,
         .dma_channel = DMA_Channel_4,
         .dma_priority = DMA_Priority_Medium, // 非实时通信优先级较低
-        .dma_rx_clear_flags = DMA_FLAG_TCIF2 | DMA_FLAG_HTIF2 | DMA_FLAG_TEIF2 | DMA_FLAG_DMEIF2 | DMA_FLAG_FEIF2
+        .dma_rx_clear_flags = DMA_FLAG_TCIF2 | DMA_FLAG_HTIF2 | DMA_FLAG_TEIF2 | DMA_FLAG_DMEIF2 | DMA_FLAG_FEIF2,
+        .dma_tx_clear_flags = DMA_FLAG_TCIF4 | DMA_FLAG_HTIF4 | DMA_FLAG_TEIF4 | DMA_FLAG_DMEIF4 | DMA_FLAG_FEIF4,
+        .dma_tx_it_tc = DMA_IT_TCIF4,
+        .dma_tx_it_te = DMA_IT_TEIF4,
+        .dma_tx_it_dme = DMA_IT_DMEIF4,
+        .dma_tx_it_fe = DMA_IT_FEIF4,
+        .dma_tx_irqn = DMA1_Stream4_IRQn,
+        .dma_tx_nvic_priority = 7
     }
 
 };
@@ -145,6 +183,8 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
 /* 实例化映射表 */
 static uart_ctx_t s_uart_ctx[BSP_UART_MAX] = {0};
 static SemaphoreHandle_t s_uart_tx_mutex[BSP_UART_MAX] = {NULL};
+static SemaphoreHandle_t s_uart_tx_sync_sem[BSP_UART_MAX] = {NULL};
+static volatile bool s_uart_tx_error[BSP_UART_MAX] = {false};
 
 static void prv_uart_tx_mutex_init(bsp_uart_port_t port)
 {
@@ -156,6 +196,19 @@ static void prv_uart_tx_mutex_init(bsp_uart_port_t port)
     if (s_uart_tx_mutex[port] == NULL)
     {
         s_uart_tx_mutex[port] = xSemaphoreCreateMutex();
+    }
+}
+
+static void prv_uart_tx_sync_init(bsp_uart_port_t port)
+{
+    if (port >= BSP_UART_MAX)
+    {
+        return;
+    }
+
+    if (s_uart_tx_sync_sem[port] == NULL)
+    {
+        s_uart_tx_sync_sem[port] = xSemaphoreCreateBinary();
     }
 }
 
@@ -324,8 +377,23 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
     // ==========================================
     // 5. 使能外设
     // ==========================================
+    if (hw->dma_tx_stream != NULL)
+    {
+        if (hw->dma_tx_irqn != 0)
+        {
+            NVIC_InitStructure.NVIC_IRQChannel = hw->dma_tx_irqn;
+            NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = hw->dma_tx_nvic_priority;
+            NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+            NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+            NVIC_Init(&NVIC_InitStructure);
+        }
+
+        DMA_ITConfig(hw->dma_tx_stream, DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_IT_FE, ENABLE);
+    }
+
     USART_Cmd(hw->uart_base, ENABLE);
     prv_uart_tx_mutex_init(port);
+    prv_uart_tx_sync_init(port);
 
     return true;
 }
@@ -486,9 +554,157 @@ void bsp_uart_send_buffer(bsp_uart_port_t port, const uint8_t *data, uint16_t le
     }
 }
 
-bool bsp_uart_send_dma(bsp_uart_port_t port, uint8_t *data, uint16_t len) {
-    return false; // 目前不实现 DMA 发送，后续可根据需要添加
+bool bsp_uart_send_dma(bsp_uart_port_t port, uint8_t *data, uint16_t len)
+{
+    const uart_hw_info_t* hw;
+    DMA_Stream_TypeDef* dma_tx;
+    SemaphoreHandle_t tx_mutex;
+    SemaphoreHandle_t sync_sem;
+    bool should_signal = false;
+
+    if (port >= BSP_UART_MAX || data == NULL || len == 0 || s_uart_hw_info[port].dma_tx_stream == NULL)
+    {
+        return false;
+    }
+
+    hw = &s_uart_hw_info[port];
+    dma_tx = hw->dma_tx_stream;
+    tx_mutex = s_uart_tx_mutex[port];
+
+    if (tx_mutex != NULL)
+    {
+        xSemaphoreTake(tx_mutex, portMAX_DELAY);
+    }
+
+    prv_uart_tx_sync_init(port);
+    sync_sem = s_uart_tx_sync_sem[port];
+    if (sync_sem == NULL)
+    {
+        if (tx_mutex != NULL)
+        {
+            xSemaphoreGive(tx_mutex);
+        }
+        return false;
+    }
+
+    s_uart_tx_error[port] = false;
+
+    while ((dma_tx->CR & DMA_SxCR_EN) != 0u)
+    {
+        ;
+    }
+
+    DMA_Cmd(dma_tx, DISABLE);
+    USART_DMACmd(hw->uart_base, USART_DMAReq_Tx, DISABLE);
+    DMA_ClearFlag(dma_tx, hw->dma_tx_clear_flags);
+
+    while (xSemaphoreTake(sync_sem, 0) == pdTRUE)
+    {
+        ;
+    }
+
+    DMA_DeInit(dma_tx);
+
+    {
+        DMA_InitTypeDef DMA_InitStructure;
+        DMA_InitStructure.DMA_Channel = hw->dma_channel;
+        DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&hw->uart_base->DR;
+        DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)data;
+        DMA_InitStructure.DMA_BufferSize = len;
+        DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
+        DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+        DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+        DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+        DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
+        DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
+        DMA_InitStructure.DMA_Priority = hw->dma_priority;
+        DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
+        DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
+        DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
+        DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+        DMA_Init(dma_tx, &DMA_InitStructure);
+    }
+
+    DMA_ITConfig(dma_tx, DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_IT_FE, ENABLE);
+    USART_DMACmd(hw->uart_base, USART_DMAReq_Tx, ENABLE);
+    DMA_Cmd(dma_tx, ENABLE);
+
+    if (xSemaphoreTake(sync_sem, portMAX_DELAY) != pdTRUE)
+    {
+        DMA_Cmd(dma_tx, DISABLE);
+        USART_DMACmd(hw->uart_base, USART_DMAReq_Tx, DISABLE);
+        if (tx_mutex != NULL)
+        {
+            xSemaphoreGive(tx_mutex);
+        }
+        return false;
+    }
+
+    if (s_uart_tx_error[port] == false)
+    {
+        while (USART_GetFlagStatus(hw->uart_base, USART_FLAG_TC) == RESET)
+        {
+            ;
+        }
+    }
+
+    if (tx_mutex != NULL)
+    {
+        xSemaphoreGive(tx_mutex);
+    }
+
+    should_signal = (s_uart_tx_error[port] == false);
+    return should_signal;
 }
 
+void bsp_uart_dma_tx_isr_handler(bsp_uart_port_t port)
+{
+    const uart_hw_info_t* hw;
+    DMA_Stream_TypeDef* dma_tx;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    bool should_signal = false;
 
+    if (port >= BSP_UART_MAX || s_uart_hw_info[port].dma_tx_stream == NULL)
+    {
+        return;
+    }
 
+    hw = &s_uart_hw_info[port];
+    dma_tx = hw->dma_tx_stream;
+
+    if (hw->dma_tx_it_tc != 0u && DMA_GetITStatus(dma_tx, hw->dma_tx_it_tc) != RESET)
+    {
+        DMA_ClearITPendingBit(dma_tx, hw->dma_tx_it_tc);
+        should_signal = true;
+    }
+
+    if (hw->dma_tx_it_te != 0u && DMA_GetITStatus(dma_tx, hw->dma_tx_it_te) != RESET)
+    {
+        DMA_ClearITPendingBit(dma_tx, hw->dma_tx_it_te);
+        s_uart_tx_error[port] = true;
+        should_signal = true;
+    }
+
+    if (hw->dma_tx_it_dme != 0u && DMA_GetITStatus(dma_tx, hw->dma_tx_it_dme) != RESET)
+    {
+        DMA_ClearITPendingBit(dma_tx, hw->dma_tx_it_dme);
+        s_uart_tx_error[port] = true;
+        should_signal = true;
+    }
+
+    if (hw->dma_tx_it_fe != 0u && DMA_GetITStatus(dma_tx, hw->dma_tx_it_fe) != RESET)
+    {
+        DMA_ClearITPendingBit(dma_tx, hw->dma_tx_it_fe);
+        s_uart_tx_error[port] = true;
+        should_signal = true;
+    }
+
+    if (should_signal && s_uart_tx_sync_sem[port] != NULL)
+    {
+        DMA_Cmd(dma_tx, DISABLE);
+        USART_DMACmd(hw->uart_base, USART_DMAReq_Tx, DISABLE);
+        xSemaphoreGiveFromISR(s_uart_tx_sync_sem[port], &xHigherPriorityTaskWoken);
+    }
+
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}

@@ -1,76 +1,110 @@
 #include "driver_hydrocore.h"
+
 #include <stddef.h>
 #include <string.h>
 
-// O(1) 极速路由表：占用 256 * 4 = 1024 字节 RAM，换取绝对的实时性
-static protocol_cmd_handler_t s_handlers[256] = {NULL};
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "task.h"
 
-// 内部函数：计算异或校验和
-static uint8_t calculate_checksum(const uint8_t *data, uint16_t len) {
-    uint8_t checksum = 0;
-    for (uint16_t i = 0; i < len; i++) {
-        checksum ^= data[i]; // 简单异或校验
+static protocol_cmd_handler_t s_handlers[256] = {NULL};
+static SemaphoreHandle_t s_protocol_mutex = NULL;
+static uint8_t s_tx_frame[262];
+
+static void prv_protocol_mutex_init(void)
+{
+    taskENTER_CRITICAL();
+    if (s_protocol_mutex == NULL) {
+        s_protocol_mutex = xSemaphoreCreateMutex();
     }
+    taskEXIT_CRITICAL();
+}
+
+static uint8_t calculate_checksum(const uint8_t *data, uint16_t len)
+{
+    uint8_t checksum = 0;
+
+    for (uint16_t i = 0; i < len; i++) {
+        checksum ^= data[i];
+    }
+
     return checksum;
 }
 
-// 注册协议命令处理函数
-void Driver_Protocol_Register(uint8_t cmd_id, protocol_cmd_handler_t handler) {
+void Driver_Protocol_Register(uint8_t cmd_id, protocol_cmd_handler_t handler)
+{
     s_handlers[cmd_id] = handler;
 }
 
-// 串口数据包解包与分发
-void Driver_Protocol_Dispatch(const uint8_t *raw_frame, uint16_t total_len) {
-    // 最小包长度检查：2字节帧头 + 1字节命令 + 1字节长度 + 1字节校验 + 2字节帧尾 = 7字节
-    if (total_len < 7 || raw_frame == NULL) return;
-
-    // 帧头检查
-    if (raw_frame[0] != PACKET_START_BYTE1 || raw_frame[1] != PACKET_START_BYTE2) return;
-
-    // 包长度验证：帧头(2) + 命令(1) + 长度(1) + 数据(payload_len) + 校验(1) + 帧尾(2)
-    if (total_len < (uint16_t)(raw_frame[3] + 7)) return; 
-
-    // 帧尾检查
-    if (raw_frame[total_len - 2] != PACKET_END_BYTE1 || raw_frame[total_len - 1] != PACKET_END_BYTE2) return;
-
-    // 校验和验证
-    uint8_t checksum = calculate_checksum(&raw_frame[2], raw_frame[3] + 2); // 从命令码开始到数据末尾的校验
-    if (checksum != raw_frame[4 + raw_frame[3]]) {
+void Driver_Protocol_Dispatch(const uint8_t *raw_frame, uint16_t total_len)
+{
+    if (total_len < 7u || raw_frame == NULL) {
         return;
     }
 
-    // 查找并调用对应的处理函数
+    if (raw_frame[0] != PACKET_START_BYTE1 || raw_frame[1] != PACKET_START_BYTE2) {
+        return;
+    }
+
+    if (total_len < (uint16_t)(raw_frame[3] + 7u)) {
+        return;
+    }
+
+    if (raw_frame[total_len - 2u] != PACKET_END_BYTE1 || raw_frame[total_len - 1u] != PACKET_END_BYTE2) {
+        return;
+    }
+
+    if (calculate_checksum(&raw_frame[2], (uint16_t)raw_frame[3] + 2u) != raw_frame[4u + raw_frame[3]]) {
+        return;
+    }
+
     protocol_cmd_handler_t handler = s_handlers[raw_frame[2]];
     if (handler != NULL) {
-        handler(&raw_frame[4], raw_frame[3]); // 调用处理函数，传递数据载荷和长度
+        handler(&raw_frame[4], raw_frame[3]);
     }
 }
 
-void Driver_Protocol_SendFrame(bsp_uart_port_t port, uint8_t cmd_id, const uint8_t *payload, uint8_t payload_len)
+void Driver_Protocol_SendFrame(bsp_uart_port_t port, uint8_t cmd_id, const uint8_t *payload, uint8_t payload_len, protocol_send_mode_t send_mode)
 {
-    uint8_t frame[262];
     uint16_t total_len;
 
+    prv_protocol_mutex_init();
+    if (s_protocol_mutex != NULL) {
+        if (xSemaphoreTake(s_protocol_mutex, portMAX_DELAY) != pdTRUE) {
+            return;
+        }
+    }
+
     total_len = (uint16_t)payload_len + 7u;
-    if (total_len > sizeof(frame))
-    {
+    if (total_len > sizeof(s_tx_frame)) {
+        if (s_protocol_mutex != NULL) {
+            xSemaphoreGive(s_protocol_mutex);
+        }
         return;
     }
 
-    frame[0] = PACKET_START_BYTE1;
-    frame[1] = PACKET_START_BYTE2;
-    frame[2] = cmd_id;
-    frame[3] = payload_len;
+    s_tx_frame[0] = PACKET_START_BYTE1;
+    s_tx_frame[1] = PACKET_START_BYTE2;
+    s_tx_frame[2] = cmd_id;
+    s_tx_frame[3] = payload_len;
 
-    if ((payload_len > 0u) && (payload != NULL))
-    {
-        memcpy(&frame[4], payload, payload_len);
+    if ((payload_len > 0u) && (payload != NULL)) {
+        memcpy(&s_tx_frame[4], payload, payload_len);
     }
 
-    frame[4u + payload_len] = calculate_checksum(&frame[2], (uint16_t)payload_len + 2u);
-    frame[5u + payload_len] = PACKET_END_BYTE1;
-    frame[6u + payload_len] = PACKET_END_BYTE2;
+    s_tx_frame[4u + payload_len] = calculate_checksum(&s_tx_frame[2], (uint16_t)payload_len + 2u);
+    s_tx_frame[5u + payload_len] = PACKET_END_BYTE1;
+    s_tx_frame[6u + payload_len] = PACKET_END_BYTE2;
 
-    bsp_uart_send_buffer(port, frame, total_len);
+    if (send_mode == USE_DMA) {
+        if (!bsp_uart_send_dma(port, s_tx_frame, (uint16_t)total_len)) {
+            bsp_uart_send_buffer(port, s_tx_frame, total_len);
+        }
+    } else {
+        bsp_uart_send_buffer(port, s_tx_frame, total_len);
+    }
+
+    if (s_protocol_mutex != NULL) {
+        xSemaphoreGive(s_protocol_mutex);
+    }
 }
-

@@ -72,6 +72,7 @@
 #define FREERTOS_CONFIG_H
 
 #include "sys_log.h"
+#include "sys_monitor.h"
 #include "bsp_timer.h"
 //��Բ�ͬ�ı��������ò�ͬ��stdint.h�ļ�
 #if defined(__ICCARM__) || defined(__CC_ARM) || defined(__GNUC__)

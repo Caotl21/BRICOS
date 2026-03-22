@@ -171,19 +171,16 @@ bool Bot_Params_Request_SysMode(bot_sys_mode_e requested_mode)
     if (requested_mode == SYS_MODE_MOTION_ARMED) {
         // 检查是否漏水
         if (s_bricsbot_sys_state.is_leak_detected) {
-            LOG_ERROR("Cannot ARM: Leak detected!");
             SYS_EXIT_CRITICAL();
             return false;
         }
         // 检查 IMU 是否健康
         if (s_bricsbot_sys_state.is_imu_error) {
-            LOG_ERROR("Cannot ARM: IMU error detected!");
             SYS_EXIT_CRITICAL();
             return false;
         }
         // 检查电压是否过低
         if (s_bricsbot_sys_state.bat_voltage_v < s_bricsbot_params.failsafe_low_voltage) {
-            LOG_ERROR("Cannot ARM: Low voltage detected!");
             SYS_EXIT_CRITICAL();
             return false;
         }
@@ -193,7 +190,6 @@ bool Bot_Params_Request_SysMode(bot_sys_mode_e requested_mode)
     
     // 检查通过，或者请求的是加锁/待机(这些总是允许的)
     s_bricsbot_params.sys_mode = requested_mode;
-    LOG_INFO("System mode changed to %d", requested_mode);
     
     SYS_EXIT_CRITICAL();
     return true;
@@ -207,14 +203,12 @@ bool Bot_Params_Request_MotionState(bot_run_mode_e requested_state)
     // 如果请求切入“定深定向自稳”，必须确保深度计数据是新的
     if (requested_state == MOTION_STATE_STABILIZE || requested_state == MOTION_STATE_AUTO) {
         if(s_bricsbot_sys_state.is_imu_error) { 
-            LOG_ERROR("Cannot switch motion state: IMU error detected!");
             SYS_EXIT_CRITICAL();
             return false;
         }
     }
     
     s_bricsbot_params.motion_mode = requested_state;
-    LOG_INFO("Motion state changed to %d", requested_state);
     SYS_EXIT_CRITICAL();
     return true;
 }

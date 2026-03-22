@@ -193,17 +193,53 @@ static void TAM_Mixer(Bot_Wrench_t *wrench_out, float *thruster_pwm, bot_tam_t *
     Normalize_Thruster_Outputs(&thruster_pwm[4], 2, 100.0f);
 }
 
+static uint16_t Serialize_Body_Report(uint8_t *buf, const bot_body_state_t *body_state)
+{
+    uint16_t offset = 0;
+
+    if ((buf == NULL) || (body_state == NULL))
+    {
+        return 0u;
+    }
+
+    memcpy(&buf[offset], &body_state->roll, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->pitch, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->yaw, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->gyro_x, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->gyro_y, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->gyro_z, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->vel_x, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->vel_y, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->vel_z, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->acc_x, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->acc_y, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->acc_z, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->depth_m, sizeof(float)); offset += sizeof(float);
+
+    return offset;
+}
+
 static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
 {
+    uint8_t report_buf[13u * sizeof(float)];
+    uint16_t report_len;
+
     if (body_state == NULL)
+    {
+        return;
+    }
+
+    report_len = Serialize_Body_Report(report_buf, body_state);
+    if (report_len == 0u)
     {
         return;
     }
 
     Driver_Protocol_SendFrame(BSP_UART_OPI_RT,
                               DATA_TYPE_STATE_BODY,
-                              (const uint8_t *)body_state,
-                              (uint8_t)sizeof(*body_state));
+                              report_buf,
+                              (uint8_t)report_len,
+                              USE_CPU);
 }
 
 static void vTask_Control(void *pvParameters) 

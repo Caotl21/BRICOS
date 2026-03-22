@@ -10,29 +10,6 @@
 
 TaskHandle_t Monitor_Task_Handler = NULL;
 
-typedef struct
-{
-    uint8_t sys_mode;
-    uint8_t motion_mode;
-    float water_temp_c;
-    float cabin_temp_c;
-    float cabin_humi;
-    float bat_voltage_v;
-    float bat_current_a;
-    float chip_temp;
-    float cpu_usage;
-    uint8_t is_leak_detected;
-    uint8_t is_imu_error;
-    uint8_t is_voltage_error;
-} bot_sys_report_t;
-
-typedef struct
-{
-    uint8_t servo_angle;
-    uint8_t light1_pwm;
-    uint8_t light2_pwm;
-} bot_actuator_report_t;
-
 static uint16_t Serialize_Sys_Report(uint8_t *buf,
                                      const bot_sys_state_t *sys_state,
                                      const bot_params_t *params)
@@ -108,7 +85,8 @@ static void vTask_Monitor_Core(void *pvParameters)
             Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
                                       DATA_TYPE_STATE_SYS,
                                       sys_report_buf,
-                                      (uint8_t)sys_report_len);
+                                      (uint8_t)sys_report_len,
+                                      USE_DMA);
         }
 
         if (actuator_report_len != 0u)
@@ -116,7 +94,8 @@ static void vTask_Monitor_Core(void *pvParameters)
             Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
                                       DATA_TYPE_STATE_ACTUATOR,
                                       actuator_report_buf,
-                                      (uint8_t)actuator_report_len);
+                                      (uint8_t)actuator_report_len,
+                                      USE_DMA);
         }
 
         if (++log_divider >= 5u) {

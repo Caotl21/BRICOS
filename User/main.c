@@ -7,6 +7,7 @@
 #include "bsp_uart.h"
 #include "bsp_delay.h"
 #include "bsp_gpio.h"
+
 /*  Sys相关	 */
 #include "sys_log.h"
 #include "sys_data_pool.h"
@@ -35,6 +36,7 @@ int main()
 	bsp_delay_init(); // 初始化 DWT 延时模块
 	bsp_uart_init_default(); // 初始化所有串口设备，统一配置为 115200-8N1
 	bsp_gpio_init();
+	bsp_pwm_init(1500); // 初始化 PWM 输出模块
 
 
 	/*  Driver层初始化	*/
@@ -55,16 +57,17 @@ int main()
 //    LOG_INFO("======================================");
     /* 打印开机横幅，验证日志系统正常工作 */
 
+	/* 任务创建与调度 */
 	Task_Comm_Init();
 	Task_Sensor_Init(); // 创建并启动所有传感器任务
 	Task_Control_Init(); // 创建并启动 100Hz 运动控制任务
 	
 	Task_NRT_Cmd_Init();
 	Task_Monitor_Init(); 
-	// LOG_INFO("======================================");
-    // LOG_INFO("   BRICOS System Booting...       ");
-    // LOG_INFO("   Sensor Tasks Initialization...     ");
-	// LOG_INFO("======================================");
+	LOG_INFO("======================================");
+    LOG_INFO("   BRICOS System Booting...       ");
+    LOG_INFO("   Tasks Initialization...     ");
+	LOG_INFO("======================================");
 	vTaskStartScheduler(); // 启动 FreeRTOS 调度器，开始多任务运行
 
 
