@@ -70,18 +70,12 @@ void Bot_Params_Pull(bot_params_t *out_params) {
 
 void Bot_State_LeakStatus_Pull(bool *out_is_leaking)
 {
-    // 1. 防御性编程：严防野指针传进来导致死机
     if (out_is_leaking == NULL) {
         return; 
     }
     
-    // 2. 进门上锁 (保护共享资源的读写一致性)
     taskENTER_CRITICAL(); 
-    
-    // 3. 往指针指向的地址写入数据
     memcpy(out_is_leaking, &s_bricsbot_sys_state.is_leak_detected, sizeof(bool));
-    
-    // 4. 出门解锁
     taskEXIT_CRITICAL();  
 }
 
@@ -147,6 +141,18 @@ void Bot_Actuator_Pull(bot_actuator_state_t *out_state)
 
     SYS_ENTER_CRITICAL();
     memcpy(out_state, &s_bricsbot_actuator_target, sizeof(bot_actuator_state_t));
+    SYS_EXIT_CRITICAL();
+}
+
+// --- 看门狗打卡 ---
+void Bot_Task_CheckIn_Monitor(monitor_task_id_t task_id)
+{
+    if (task_id >= MAX_MONITOR_TASKS) {
+        LOG_ERROR("Invalid task ID %u in Bot_Task_CheckIn_Monitor", task_id);
+        return;
+    }
+    SYS_ENTER_CRITICAL();
+    s_bricsbot_sys_state.task_last_tick[task_id] = xTaskGetTickCount(); // 监控任务心跳
     SYS_EXIT_CRITICAL();
 }
 

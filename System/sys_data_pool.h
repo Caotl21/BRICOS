@@ -11,6 +11,16 @@
 #define PARAM_ID_YAW        2
 #define PARAM_ID_DEPTH      3
 
+typedef enum {
+    TASK_ID_CONTROL = 0,
+    TASK_ID_IMU,
+    TASK_ID_MS5837,
+    TASK_ID_POWER,
+    TASK_ID_DHT11,
+    TASK_ID_MONITOR,
+    MAX_MONITOR_TASKS
+} monitor_task_id_t;
+
 // ============================================================================
 //  状态池 (State) - 包含所有传感器的高频/低频融合数据
 // ============================================================================
@@ -46,6 +56,8 @@ typedef struct{
     // --- 故障状态 ---
     bool is_leak_detected; // 漏水检测 (数字输入)
     bool is_imu_error;     // IMU错误标志 (IMU自检或数据异常时置位)
+
+    uint32_t task_last_tick[MAX_MONITOR_TASKS]; // 各监控任务的最后心跳Tick (用于 Watchdog)
     
 } bot_sys_state_t;
 
@@ -117,7 +129,6 @@ typedef struct {
     float failsafe_low_voltage;  // 低压报警线
 } bot_params_t;
 
-
 // ============================================================================
 // 全局 API 接口 (在 bot_data_pool.c 中实现临界区保护)
 // ============================================================================
@@ -157,6 +168,9 @@ void Bot_Target_Push(const bot_target_t *new_target);
 void Bot_Params_Push_PID(uint8_t pid_id, float p, float i, float d);
 void Bot_Params_Push_Servo(uint8_t angle);
 void Bot_Params_Push_Light(uint8_t light1_pwm, uint8_t light2_pwm);
+
+// 看门狗打卡：由各个任务定期调用，参数为任务ID (0~MAX_MONITOR_TASKS-1)
+void Bot_Task_CheckIn_Monitor(monitor_task_id_t task_id);
 
 // ---------------------------------------------------------
 // [切换] change mode API
