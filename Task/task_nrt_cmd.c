@@ -28,7 +28,7 @@ static void prv_extract_pid_params(PID_Controller_t *dest, const uint8_t *src)
 {
     float temp_buf[5];
     
-    // 💡 架构师防坑：使用 memcpy 拷贝到局部 float 数组
+    // 架构师防坑：使用 memcpy 拷贝到局部 float 数组
     // 彻底避免 Cortex-M4 在直接解引用非 4 字节对齐的内存时触发 UsageFault 死机
     memcpy(temp_buf, src, PAYLOAD_SIZE_PER_PID);
     

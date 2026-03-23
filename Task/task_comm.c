@@ -7,7 +7,7 @@
 #include "task_comm.h"
 
 // 定义双缓冲 (Ping-Pong Buffers)
-#define RX_BUF_SIZE 128
+#define RX_BUF_SIZE 180
 static uint8_t s_ping_buf[RX_BUF_SIZE];
 static uint8_t s_pong_buf[RX_BUF_SIZE];
 static uint8_t *s_active_rt_dma_buf = s_ping_buf; // DMA 当前正在写的数组

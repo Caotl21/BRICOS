@@ -295,6 +295,7 @@ static void vTask_Control(void *pvParameters)
                 // 加锁模式：解算 PID，但输出被强制拦截为 0，推进器不转动
                 Reset_All_Controllers();
                 Driver_Thruster_Set_Idle(); // 发送 1500us 中位信号
+                // Driver_Thruster_SetSpeed(BSP_PWM_THRUSTER_3, 20);
                 break;
 
             case SYS_MODE_MOTION_ARMED:
@@ -401,6 +402,22 @@ void Task_Control_Init(void)
     //只更新一次
     static bot_params_t  local_params;
     Bot_Params_Pull(&local_params);
+    LOG_INFO("Control Task PID Config Loaded: Roll PID (%.2f, %.2f, %.2f), Pitch PID (%.2f, %.2f, %.2f), Yaw PID (%.2f, %.2f, %.2f), Depth PID (%.2f, %.2f, %.2f)",
+             local_params.pid_roll.outer.kp, local_params.pid_roll.outer.ki, local_params.pid_roll.outer.kd,
+             local_params.pid_pitch.outer.kp, local_params.pid_pitch.outer.ki, local_params.pid_pitch.outer.kd,
+             local_params.pid_yaw.outer.kp, local_params.pid_yaw.outer.ki, local_params.pid_yaw.outer.kd,
+             local_params.pid_depth.kp, local_params.pid_depth.ki, local_params.pid_depth.kd);
+    LOG_INFO("Control Task TAM Matrix:");
+    for (uint8_t t = 0; t < local_params.tam_config.active_thrusters; t++) {
+        LOG_INFO(" Thruster %d: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f]",
+                 t + 1,
+                 local_params.tam_config.matrix[t][0],
+                 local_params.tam_config.matrix[t][1],
+                 local_params.tam_config.matrix[t][2],
+                 local_params.tam_config.matrix[t][3],
+                 local_params.tam_config.matrix[t][4],
+                 local_params.tam_config.matrix[t][5]);
+    }
 
     xTaskCreate((TaskFunction_t)vTask_Control,
                 (const char *)"Task_Control",
