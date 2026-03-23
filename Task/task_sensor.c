@@ -151,6 +151,7 @@ static void vTask_IMU_Core(void *pvParameters)
         }
 
         // 严格睡眠 20ms
+        Bot_Task_CheckIn_Monitor(TASK_ID_IMU);
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }
@@ -233,6 +234,8 @@ static void vTask_MS5837_Core(void *pvParameters)
                 break;
         }
 
+        Bot_Task_CheckIn_Monitor(TASK_ID_MS5837);
+
         // 严格的 10ms 节拍推进
         vTaskDelayUntil(&xLastWakeTime, xFrequency); 
     }
@@ -258,6 +261,7 @@ static void vTask_Power_Core(void *pvParameters)
 
         LOG_INFO("Power - Vol: %.2fV, Cur: %.2fA", v_val, c_val);
 
+        Bot_Task_CheckIn_Monitor(TASK_ID_POWER);
         vTaskDelayUntil(&xLastWakeTime, xFrequency); 
     }
 }
@@ -302,6 +306,7 @@ static void vTask_DHT11_Core(void *pvParameters)
         }
 
         // 3. 睡满 2 秒
+        Bot_Task_CheckIn_Monitor(TASK_ID_DHT11);
         vTaskDelayUntil(&xLastWakeTime, xFrequency); 
     }
 }

@@ -389,6 +389,8 @@ static void vTask_Control(void *pvParameters)
 
         Report_Body_State_To_OrangePi(&local_state);
 
+        Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
+
         // 绝对延时，保证 100Hz 的严格周期
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
     }

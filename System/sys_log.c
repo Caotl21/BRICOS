@@ -55,7 +55,7 @@ static void Log_Task_Core(void *pvParameters)
     }
 }
 
-void Log_Init(void)
+void System_Log_Init(void)
 {
     if (s_log_mutex == NULL) {
         s_log_mutex = xSemaphoreCreateMutex();
