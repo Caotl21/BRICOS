@@ -30,6 +30,7 @@ typedef enum {
 #define DATA_TYPE_SET_SYS_MODE    0x12
 #define DATA_TYPE_SET_MOTION_MODE 0x13
 #define DATA_TYPE_SET_SERVO       0x14
+#define DATA_TYPE_SET_TAM         0x15
 
 
 typedef void (*protocol_cmd_handler_t)(const uint8_t *payload, uint16_t len);

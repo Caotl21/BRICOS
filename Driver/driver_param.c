@@ -1,5 +1,6 @@
 #include "driver_param.h"
 #include "bsp_flash.h"
+#include "bsp_cpu.h"
 #include <string.h>
 
 #define PID_PARAM_MAGIC      ((uint32_t)0x50494450)  // "PIDP"
@@ -108,6 +109,28 @@ void Driver_PidParam_FillDefault(bot_params_t *params)
 
     params->failsafe_max_depth = 10.0f;
     params->failsafe_low_voltage = 10.0f;
+
+
+    // ==========================================
+    // 动态推力分配矩阵 (TAM) 默认初始化
+    // ==========================================
+    params->tam_config.active_thrusters = 6; 
+
+    const float default_tam[6][TAM_MAX_DOF] = {
+        /* T1 */ {  0.707107f, -0.707107f,  0.0f,  0.0f,       0.0f, -0.180100f },
+        /* T2 */ {  0.707107f,  0.707107f,  0.0f,  0.0f,       0.0f,  0.180666f },
+        /* T3 */ { -0.707107f, -0.707107f,  0.0f,  0.0f,       0.0f,  0.180100f },
+        /* T4 */ { -0.707107f,  0.707107f,  0.0f,  0.0f,       0.0f, -0.180666f },
+        /* T5 */ {  0.0f,       0.0f,       1.0f,  0.123500f,  0.0f,  0.0f      },
+        /* T6 */ {  0.0f,       0.0f,       1.0f, -0.123500f,  0.0f,  0.0f      }
+    };
+
+    // 拷贝至参数池 (按推进器数量逐行拷贝)
+    for (int t = 0; t < 6; t++) {
+        for (int dof = 0; dof < TAM_MAX_DOF; dof++) {
+            params->tam_config.matrix[t][dof] = default_tam[t][dof];
+        }
+    }
 }
 
 bool Driver_PidParam_Load(bot_params_t *out_params)
@@ -128,6 +151,12 @@ bool Driver_PidParam_Load(bot_params_t *out_params)
 
     memcpy(out_params, &blob.params, sizeof(bot_params_t));
     prv_clear_runtime_state(out_params);
+
+    // 防止读取到不可理喻的推进器数量导致后续数组越界
+    if (out_params->tam_config.active_thrusters > TAM_MAX_THRUSTERS) {
+        out_params->tam_config.active_thrusters = TAM_MAX_THRUSTERS;
+    }
+
     return true;
 }
 
@@ -153,6 +182,6 @@ bool Driver_PidParam_Save(const bot_params_t *in_params)
     {
         return false;
     }
-
+    bsp_cpu_reset();
     return true;
 }

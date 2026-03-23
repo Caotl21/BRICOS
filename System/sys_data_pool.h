@@ -114,6 +114,17 @@ typedef enum {
     MOTION_STATE_AUTO      = 2  // 自主导航 (上位机下发航点或速度矢量)
 } bot_run_mode_e;
 
+#define TAM_MAX_THRUSTERS   8   // 最大预留支持 8 个推进器
+#define TAM_MAX_DOF         6   // 6自由度 (Surge, Sway, Heave, Roll, Pitch, Yaw)
+
+typedef struct {
+    uint8_t active_thrusters;
+    uint8_t pad[3];             
+    
+    // 行 = 推进器(8)，列 = 自由度(6)
+    float matrix[TAM_MAX_THRUSTERS][TAM_MAX_DOF]; 
+} bot_tam_t;
+
 typedef struct {
     bot_run_mode_e motion_mode;  // 当前机器人运动模式
     bot_sys_mode_e sys_mode;     // 当前系统状态 (待机/加锁/解锁)
@@ -127,6 +138,9 @@ typedef struct {
     // --- 安全保护参数 ---
     float failsafe_max_depth;    // 最大允许下潜深度
     float failsafe_low_voltage;  // 低压报警线
+
+    bot_tam_t tam_config;
+
 } bot_params_t;
 
 // ============================================================================
