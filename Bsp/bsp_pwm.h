@@ -32,6 +32,8 @@ bool bsp_pwm_init(uint16_t init_pulse_us);
  */
 void bsp_pwm_set_pulse_us(bsp_pwm_ch_t ch, uint16_t pulse_us); 
 
+uint16_t bsp_pwm_get_pulse_us(bsp_pwm_ch_t ch);
+
 /**
  * @brief 设置指定 PWM 通道的占空比 (单位：百分比 %)
  * @param ch - PWM 通道枚举 (如 BSP_PWM_LIGHT_1)

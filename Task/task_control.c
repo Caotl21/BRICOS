@@ -380,12 +380,11 @@ static void vTask_Control(void *pvParameters)
                 
                 
                 TAM_Mixer(&wrench_out, thruster_pwm, &local_params->tam_config);
+                // 输出到电调
+                for (int i = 0; i < THRUSTER_COUNT; i++) {
+                    Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), thruster_pwm[i]);
+                }
                 break;
-        }
-
-        // 输出到电调
-        for (int i = 0; i < THRUSTER_COUNT; i++) {
-            Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), thruster_pwm[i]);
         }
 
         Report_Body_State_To_OrangePi(&local_state);

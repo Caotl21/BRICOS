@@ -268,6 +268,23 @@ void bsp_pwm_set_pulse_us(bsp_pwm_ch_t ch, uint16_t pulse_us)
     }
 }
 
+
+uint16_t bsp_pwm_get_pulse_us(bsp_pwm_ch_t ch)
+{
+    if (ch >= BSP_PWM_MAX) return 0;
+
+    TIM_TypeDef* tim = pwm_hw_info[ch].tim;
+    uint8_t ch_num = pwm_hw_info[ch].ch;
+
+    switch (ch_num) {
+        case 1: return (uint16_t)tim->CCR1;
+        case 2: return (uint16_t)tim->CCR2;
+        case 3: return (uint16_t)tim->CCR3;
+        case 4: return (uint16_t)tim->CCR4;
+        default: return 0;
+    }
+}
+
 /* -------------------------------------------------------------------------
  * 函数名：bsp_pwm_set_duty
  * 功  能：设置指定 PWM 通道的占空比 (单位：百分比 %)
