@@ -93,6 +93,11 @@ static void IMU_Align_To_BodyFrame(imu_data_t *imu)
     imu->quat[3] =  temp;         // Z_new = W_old
 }
 
+static void IMU_Fuse(const imu_data_t frames[], imu_data_t *out)
+{
+    if ((frames == NULL) || (out == NULL)) return;
+    *out = frames[IMU_IM948];
+}
 
 /* =========================================================
  * 任务 1：传感器数据获取
@@ -103,6 +108,7 @@ static void vTask_IMU_Core(void *pvParameters)
 {
     imu_data_t data_jy901s;
     imu_data_t data_im948;
+    imu_data_t fused_imu;
     uint8_t log_divider = 0;
 
     // 设定 20ms 的绝对轮询节拍 (50Hz)
@@ -138,6 +144,7 @@ static void vTask_IMU_Core(void *pvParameters)
             // 存入全局数组
             g_imu_body_frame[IMU_IM948] = data_im948;
         }
+        IMU_Fuse(g_imu_body_frame, &fused_imu);
         if(++log_divider >= 50) // 每 50 次循环打印一次日志 (即每 1000ms)
         {
             LOG_INFO("IMU_JY901S Quat[0:%.2f 1:%.2f 2:%.2f 3:%.2f]", 

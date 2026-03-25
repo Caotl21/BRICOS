@@ -169,6 +169,18 @@ static void Normalize_Thruster_Outputs(float *thruster_pwm, uint8_t count, float
     }
 }
 
+static float Thruster_Map(float total_thrust)
+{
+    float pwm;
+    if(total_thrust < 0) pwm = total_thrust * 25.0f; 
+    else pwm = total_thrust * 8.0f;
+
+        // 简单比例映射：系数 100
+    if (pwm > 100.0f) pwm = 100.0f;
+    if (pwm < -100.0f) pwm = -100.0f;
+    return pwm;
+}
+
 static void TAM_Mixer(Bot_Wrench_t *wrench_out, float *thruster_pwm, bot_tam_t *tam_config)
 {
     float wrench_array[TAM_MAX_DOF] = {
@@ -186,7 +198,7 @@ static void TAM_Mixer(Bot_Wrench_t *wrench_out, float *thruster_pwm, bot_tam_t *
             total_thrust += tam_config->matrix[t][dof] * wrench_array[dof];
         }
         
-        thruster_pwm[t] = total_thrust; 
+        thruster_pwm[t] = Thruster_Map(total_thrust); 
     }
     
     Normalize_Thruster_Outputs(&thruster_pwm[0], 4, 100.0f);
@@ -271,6 +283,7 @@ static void vTask_Control(void *pvParameters)
         // 获取最新全局快照
         Bot_State_Pull(&local_state);
         Bot_Target_Pull(&local_target);
+        Bot_MODE_Pull(local_params);
         
         if ((local_params->sys_mode != last_sys_mode) || (local_params->motion_mode != last_motion_mode))
         {
@@ -289,6 +302,7 @@ static void vTask_Control(void *pvParameters)
             case SYS_MODE_STANDBY:
                 // 待机模式：低功耗模式
                 Reset_All_Controllers();
+                Driver_Thruster_Set_Idle();
                 break;
 
             case SYS_MODE_ACTIVE_DISARMED:
@@ -299,6 +313,7 @@ static void vTask_Control(void *pvParameters)
                 break;
 
             case SYS_MODE_MOTION_ARMED:
+                
 
                 if (local_target.target_mode != local_params->motion_mode)
                 {
@@ -385,6 +400,9 @@ static void vTask_Control(void *pvParameters)
                 for (int i = 0; i < THRUSTER_COUNT; i++) {
                     Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), thruster_pwm[i]);
                 }
+                LOG_DEBUG("Thruster PWMs: [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f]",
+                          thruster_pwm[0], thruster_pwm[1], thruster_pwm[2],
+                          thruster_pwm[3], thruster_pwm[4], thruster_pwm[5]);
                 break;
         }
 

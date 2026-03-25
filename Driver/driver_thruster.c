@@ -24,7 +24,7 @@ void Driver_Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent) {
     if (force_percent >= 0.0f) {
         pulse_us = THRUSTER_PWM_STOP + (uint16_t)((THRUSTER_PWM_MAX_FWD - THRUSTER_PWM_STOP) * (force_percent / 100.0f));
     } else {
-        pulse_us = THRUSTER_PWM_STOP + (uint16_t)((THRUSTER_PWM_MAX_REV - THRUSTER_PWM_STOP) * (force_percent / 100.0f));
+        pulse_us = THRUSTER_PWM_STOP - (uint16_t)((THRUSTER_PWM_MAX_REV - THRUSTER_PWM_STOP) * (force_percent / 100.0f));
     }
 
     // 设置 PWM 输出

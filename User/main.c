@@ -59,6 +59,7 @@ int main()
 	Task_Sensor_Init(); // 创建并启动所有传感器任务
 	Task_Control_Init(); // 创建并启动 100Hz 运动控制任务
 	Task_NRT_Cmd_Init();
+	Task_RT_Cmd_Init();
 	Task_Monitor_Init(); 
 
 	LOG_INFO("======================================");

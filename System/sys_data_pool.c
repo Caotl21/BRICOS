@@ -68,6 +68,15 @@ void Bot_Params_Pull(bot_params_t *out_params) {
     SYS_EXIT_CRITICAL();
 }
 
+void Bot_MODE_Pull(bot_params_t *out_params) {
+    if (out_params == NULL) return;
+
+    SYS_ENTER_CRITICAL();
+    out_params->motion_mode = s_bricsbot_params.motion_mode;
+    out_params->sys_mode = s_bricsbot_params.sys_mode;
+    SYS_EXIT_CRITICAL();
+}
+
 void Bot_State_LeakStatus_Pull(bool *out_is_leaking)
 {
     if (out_is_leaking == NULL) {

@@ -157,6 +157,7 @@ void Bot_State_Pull(bot_body_state_t *out_state);
 void Bot_Sys_State_Pull(bot_sys_state_t *out_state);
 void Bot_Target_Pull(bot_target_t *out_target);
 void Bot_Params_Pull(bot_params_t *out_params);
+void Bot_MODE_Pull(bot_params_t *out_params);
 void Bot_State_LeakStatus_Pull(bool *out_is_leaking);
 
 // ---------------------------------------------------------
