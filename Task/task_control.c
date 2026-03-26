@@ -2,6 +2,7 @@
 #include "sys_pid_algo.h"
 #include "driver_thruster.h"
 #include "driver_hydrocore.h"
+#include "driver_imu.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "task_control.h"
@@ -214,9 +215,10 @@ static uint16_t Serialize_Body_Report(uint8_t *buf, const bot_body_state_t *body
         return 0u;
     }
 
-    memcpy(&buf[offset], &body_state->roll, sizeof(float)); offset += sizeof(float);
-    memcpy(&buf[offset], &body_state->pitch, sizeof(float)); offset += sizeof(float);
-    memcpy(&buf[offset], &body_state->yaw, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->Quater[0], sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->Quater[1], sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->Quater[2], sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->Quater[3], sizeof(float)); offset += sizeof(float);
     memcpy(&buf[offset], &body_state->gyro_x, sizeof(float)); offset += sizeof(float);
     memcpy(&buf[offset], &body_state->gyro_y, sizeof(float)); offset += sizeof(float);
     memcpy(&buf[offset], &body_state->gyro_z, sizeof(float)); offset += sizeof(float);
@@ -257,7 +259,7 @@ static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
 static void vTask_Control(void *pvParameters) 
 {
     bot_params_t *local_params = (bot_params_t *)pvParameters;
-
+    float local_roll, local_pitch, local_yaw;
     // 严谨的架构师防爆检查
     if (local_params == NULL) {
         vTaskDelete(NULL); // 如果传参失败，直接销毁任务防止死机
@@ -337,17 +339,17 @@ static void vTask_Control(void *pvParameters)
 
                         case MOTION_STATE_STABILIZE:
                             // [自稳定深模式]：串级 PID 控制姿态 + 开环控制平移
-
+                            Driver_IMU_Quaternion_ToEuler_Deg(local_state.Quater, &local_roll, &local_pitch, &local_yaw);
                             // Roll 和 Pitch 的控制逻辑 -- 维持稳定 target不需要下发直接为0
                             wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
                                                                      0.0f,
-                                                                     local_state.roll,
+                                                                     local_roll,
                                                                      local_state.gyro_x,
                                                                      TASK_CONTROL_PERIOD_S,
                                                                      0u);
                             wrench_out.torque_y = Cascade_PID_Update(&pid_pitch,
                                                                      0.0f,
-                                                                     local_state.pitch,
+                                                                     local_pitch,
                                                                      local_state.gyro_y,
                                                                      TASK_CONTROL_PERIOD_S,
                                                                      0u);
@@ -355,7 +357,7 @@ static void vTask_Control(void *pvParameters)
                             // Yaw 的控制逻辑 -- 定向控制 跟踪target_yaw
                             wrench_out.torque_z = Cascade_PID_Update(&pid_yaw,
                                                                      local_target.cmd.stab_cmd.target_yaw,
-                                                                     local_state.yaw,
+                                                                     local_yaw,
                                                                      local_state.gyro_z,
                                                                      TASK_CONTROL_PERIOD_S,
                                                                      1u);
@@ -409,7 +411,6 @@ static void vTask_Control(void *pvParameters)
         Report_Body_State_To_OrangePi(&local_state);
 
         Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
-
         // 绝对延时，保证 100Hz 的严格周期
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
     }

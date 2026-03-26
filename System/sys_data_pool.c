@@ -89,14 +89,15 @@ void Bot_State_LeakStatus_Pull(bool *out_is_leaking)
 }
 
 // --- Setter API 实现 ---
-void Bot_State_Push_IMU(float r, float p, float y, float gx, float gy, float gz) {
+void Bot_State_Push_IMU(bot_body_state_t *imu_data) {
     SYS_ENTER_CRITICAL();
-    s_bricsbot_state.roll = r;
-    s_bricsbot_state.pitch = p;
-    s_bricsbot_state.yaw = y;
-    s_bricsbot_state.gyro_x = gx;
-    s_bricsbot_state.gyro_y = gy;
-    s_bricsbot_state.gyro_z = gz;
+    memcpy(s_bricsbot_state.Quater, imu_data->Quater, sizeof(float) * 4);
+    s_bricsbot_state.gyro_x = imu_data->gyro_x;
+    s_bricsbot_state.gyro_y = imu_data->gyro_y;
+    s_bricsbot_state.gyro_z = imu_data->gyro_z;
+    s_bricsbot_state.acc_x = imu_data->acc_x;
+    s_bricsbot_state.acc_y = imu_data->acc_y;
+    s_bricsbot_state.acc_z = imu_data->acc_z;
     SYS_EXIT_CRITICAL();
 }
 

@@ -3,8 +3,11 @@
 #include "bsp_delay.h"
 #include "bsp_uart.h"
 #include "im948_CMD.h"
+#include <math.h>
 
 #define IMU_FIFO_SIZE 256
+
+#define RAD_TO_DEG (57.29577951308232f)
 
 // 统一的环形缓冲区设备结构体
 typedef struct {
@@ -214,4 +217,31 @@ bool Driver_IMU_Process(imu_id_t id, imu_data_t *out_data) {
         case IMU_IM948:  return Parse_IM948(&s_devs[id], out_data);
         default:         return false;
     }
+}
+
+void Driver_IMU_Quaternion_ToEuler_Deg(const float q[4], float *roll_deg, float *pitch_deg, float *yaw_deg)
+{
+    // q: [w, x, y, z]
+    float w = q[0];
+    float x = q[1];
+    float y = q[2];
+    float z = q[3];
+
+    // intermediate products
+    float tx = 2.0f * (w * x + y * z);
+    float ty = 1.0f - 2.0f * (x * x + y * y);
+    float roll = atan2f(tx, ty);
+
+    float sp = 2.0f * (w * y - z * x);
+    if (sp > 1.0f) sp = 1.0f;
+    if (sp < -1.0f) sp = -1.0f;
+    float pitch = asinf(sp);
+
+    float tz = 2.0f * (w * z + x * y);
+    float tw = 1.0f - 2.0f * (y * y + z * z);
+    float yaw = atan2f(tz, tw);
+
+    if (roll_deg)  *roll_deg  = roll  * RAD_TO_DEG;
+    if (pitch_deg) *pitch_deg = pitch * RAD_TO_DEG;
+    if (yaw_deg)   *yaw_deg   = yaw   * RAD_TO_DEG;
 }
