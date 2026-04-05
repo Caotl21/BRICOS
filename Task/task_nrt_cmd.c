@@ -8,6 +8,7 @@
 #include "driver_servo.h"
 
 #include "sys_data_pool.h"
+#include "sys_mode_manager.h"
 #include "sys_port.h"
 #include "sys_boot_flag.h"
 #include "sys_log.h"
@@ -41,7 +42,7 @@ static void prv_extract_pid_params(PID_Controller_t *dest, const uint8_t *src)
     dest->output_max   = temp_buf[4];
 }
 
-// 接收设置PID参数命令的回调函数(暂无实现，需要更新参数再写入Flash后重启)
+// 接收设置PID参数命令的回调函数(需要更新参数再写入Flash后重启)
 static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
     
     if (payload == NULL) return;
@@ -109,7 +110,7 @@ static void On_Receive_Sys_Mode_Cmd(const uint8_t *payload, uint16_t len){
         return;
     }
 
-    res = Bot_Params_Request_SysMode(new_mode);
+    res = (System_ModeManager_RequestSysMode(new_mode) == SYS_MODE_MGR_OK);
     if (!res) {
         Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, INVALID_PARAM, 0, USE_DMA);
     } else {
@@ -131,7 +132,7 @@ static void On_Receive_Motion_Mode_Cmd(const uint8_t *payload, uint16_t len){
         return;
     }
 
-    res = Bot_Params_Request_MotionState(new_mode);
+    res = (System_ModeManager_RequestMotionMode(new_mode) == SYS_MODE_MGR_OK);
     if (!res) {
         Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_DMA);
     } else {

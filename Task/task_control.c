@@ -4,6 +4,7 @@
 #include "sys_data_pool.h"
 #include "sys_pid_algo.h"
 #include "sys_log.h"
+#include "sys_mode_manager.h"
 
 #include "driver_thruster.h"
 #include "driver_hydrocore.h"
@@ -268,8 +269,8 @@ static void vTask_Control(void *pvParameters)
     if (local_params == NULL) {
         vTaskDelete(NULL); // 如果传参失败，直接销毁任务防止死机
     }
-    bot_sys_mode_e    last_sys_mode = (bot_sys_mode_e)0xFF;
-    bot_run_mode_e    last_motion_mode = (bot_run_mode_e)0xFF;
+    bot_sys_mode_e    current_sys_mode = (bot_sys_mode_e)0xFF;
+    bot_run_mode_e    current_motion_mode = (bot_run_mode_e)0xFF;
     bot_body_state_t  local_state;
     bot_target_t      local_target;
 
@@ -289,21 +290,14 @@ static void vTask_Control(void *pvParameters)
         // 获取最新全局快照
         Bot_State_Pull(&local_state);
         Bot_Target_Pull(&local_target);
-        Bot_MODE_Pull(local_params);
-        
-        if ((local_params->sys_mode != last_sys_mode) || (local_params->motion_mode != last_motion_mode))
-        {
-            Reset_All_Controllers();
-            last_sys_mode = local_params->sys_mode;
-            last_motion_mode = local_params->motion_mode;
-        }
+        System_ModeManager_Pull(&current_sys_mode, &current_motion_mode, NULL);
 
         Sync_Cascade_Config(&pid_roll, &local_params->pid_roll);
         Sync_Cascade_Config(&pid_pitch, &local_params->pid_pitch);
         Sync_Cascade_Config(&pid_yaw, &local_params->pid_yaw);
         Sync_PID_Config(&pid_depth, &local_params->pid_depth);
 
-        switch (local_params->sys_mode) 
+        switch (current_sys_mode) 
         {
             case SYS_MODE_STANDBY:
                 // 待机模式：低功耗模式
@@ -318,9 +312,8 @@ static void vTask_Control(void *pvParameters)
                 break;
 
             case SYS_MODE_MOTION_ARMED:
-                
-
-                if (local_target.target_mode != local_params->motion_mode)
+                // 运动模式：正常控制逻辑，计算 PID 输出并驱动推进器
+                if (local_target.target_mode != current_motion_mode)
                 {
                     // 目标模式和当前运动模式不匹配，安全起见先停机
                     Reset_All_Controllers();
@@ -330,7 +323,7 @@ static void vTask_Control(void *pvParameters)
                 }
                 else
                 {
-                    switch (local_params->motion_mode) 
+                    switch (current_motion_mode) 
                     {
                         case MOTION_STATE_MANUAL:
                             // [纯手动模式]：直接把摇杆量扔给推力分配矩阵

@@ -1,10 +1,14 @@
-#include "sys_monitor.h"
-#include "sys_log.h"
-#include "bsp_timer.h"
-#include "bsp_adc.h"
+#include <string.h>
+
 #include "FreeRTOS.h"
 #include "task.h"
-#include <string.h>
+
+#include "bsp_timer.h"
+#include "bsp_adc.h"
+
+#include "sys_monitor.h"
+#include "sys_log.h"
+
 
 static bsp_timer_cfg_t sys_monitor_timer_cfg = { .timer = BSP_TIM_SYSCOUNT, .tick_us = 0U };
 

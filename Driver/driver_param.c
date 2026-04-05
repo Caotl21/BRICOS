@@ -4,7 +4,7 @@
 #include <string.h>
 
 #define PID_PARAM_MAGIC      ((uint32_t)0x50494450)  // "PIDP"
-#define PID_PARAM_VERSION    ((uint16_t)2)
+#define PID_PARAM_VERSION    ((uint16_t)3)
 
 typedef struct
 {
@@ -89,9 +89,6 @@ void Driver_PidParam_FillDefault(bot_params_t *params)
     if (params == NULL) return;
 
     memset(params, 0, sizeof(*params));
-
-    params->motion_mode = MOTION_STATE_MANUAL;
-    params->sys_mode = SYS_MODE_ACTIVE_DISARMED;
 
     prv_fill_cascade_pid(&params->pid_roll,
                          2.0f, 0.0f, 0.2f, 30.0f, 45.0f,

@@ -65,7 +65,9 @@ static uint32_t prv_collect_safety_faults(const bot_sys_state_t *sys_state, cons
 
 static uint16_t Serialize_Sys_Report(uint8_t *buf,
                                      const bot_sys_state_t *sys_state,
-                                     const bot_params_t *params)
+                                     const bot_params_t *params,
+                                     bot_sys_mode_e sys_mode,
+                                     bot_run_mode_e motion_mode)
 {
     uint16_t offset = 0;
 
@@ -74,8 +76,8 @@ static uint16_t Serialize_Sys_Report(uint8_t *buf,
         return 0u;
     }
 
-    buf[offset++] = (uint8_t)params->sys_mode;
-    buf[offset++] = (uint8_t)params->motion_mode;
+    buf[offset++] = (uint8_t)sys_mode;
+    buf[offset++] = (uint8_t)motion_mode;
 
     memcpy(&buf[offset], &sys_state->water_temp_c, sizeof(float)); offset += sizeof(float);
     memcpy(&buf[offset], &sys_state->cabin_temp_c, sizeof(float)); offset += sizeof(float);
@@ -117,6 +119,9 @@ static void vTask_Monitor_Core(void *pvParameters)
     static bot_sys_state_t sys_state;
     static bot_params_t params;
     static bot_actuator_state_t actuator_state;
+    bot_sys_mode_e current_sys_mode;
+    bot_run_mode_e current_motion_mode;
+
     uint32_t last_ticks[MAX_MONITOR_TASKS];
     uint8_t sys_report_buf[2u + (7u * sizeof(float)) + 3u];
     uint8_t actuator_report_buf[3u];
@@ -138,10 +143,11 @@ static void vTask_Monitor_Core(void *pvParameters)
         Bot_Params_Pull(&params);
         Bot_Actuator_Pull(&actuator_state);
         Bot_Task_LastTick_Pull(last_ticks, MAX_MONITOR_TASKS);
+        System_ModeManager_Pull(&current_sys_mode, &current_motion_mode, NULL);
 
         bool all_tasks_healthy = true;
         for (uint8_t i = 0; i < MAX_MONITOR_TASKS; i++) {
-            if (!prv_is_task_watch_enabled(params.sys_mode, i)) continue;
+            if (!prv_is_task_watch_enabled(current_sys_mode, i)) continue;
 
             uint32_t last_tick = last_ticks[i];
             uint32_t diff_ms = (current_tick >= last_tick) ? (current_tick - last_tick) : (0xFFFFFFFF - last_tick + current_tick);
@@ -158,15 +164,19 @@ static void vTask_Monitor_Core(void *pvParameters)
         }
 
         if (failsafe_faults != SYS_FAULT_NONE) {
-            (void)Bot_Params_Enter_Failsafe(failsafe_faults);
+            (void)System_ModeManager_EnterFailsafe(failsafe_faults);
         }
 
-        if (all_tasks_healthy && (failsafe_faults == SYS_FAULT_NONE) && (params.sys_mode != SYS_MODE_FAILSAFE)) {
+        if (all_tasks_healthy && (failsafe_faults == SYS_FAULT_NONE) && (current_sys_mode != SYS_MODE_FAILSAFE)) {
             LOG_INFO("All tasks healthy!! CPU=%lu%%, TEMP=%lu", cpu, temp);
             bsp_wdg_feed();
         }
 
-        sys_report_len = Serialize_Sys_Report(sys_report_buf, &sys_state, &params);
+        sys_report_len = Serialize_Sys_Report(sys_report_buf,
+                                              &sys_state,
+                                              &params,
+                                              current_sys_mode,
+                                              current_motion_mode);
         actuator_report_len = Serialize_Actuator_Report(actuator_report_buf, &actuator_state);
 
         if (sys_report_len != 0u)

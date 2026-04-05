@@ -29,11 +29,11 @@ typedef enum {
  * 说明：所有 Request/Enter 接口都通过该状态码向调用方反馈结果。
  * ============================================================================ */
 typedef enum {
-    SYS_MODE_MGR_OK = 0,           /* 操作成功 */
-    SYS_MODE_MGR_INVALID_PARAM,    /* 参数非法 */
-    SYS_MODE_MGR_INVALID_TRANSITION,/* 状态迁移不合法 */
-    SYS_MODE_MGR_SAFETY_BLOCKED,   /* 被安全条件阻止 */
-    SYS_MODE_MGR_FAULT_LATCHED     /* 故障锁存中，不允许请求通过 */
+    SYS_MODE_MGR_OK = 0,                    /* 操作成功 */
+    SYS_MODE_MGR_INVALID_PARAM,             /* 参数非法 */
+    SYS_MODE_MGR_INVALID_TRANSITION,        /* 状态迁移不合法 */
+    SYS_MODE_MGR_SAFETY_BLOCKED,            /* 被安全条件阻止 */
+    SYS_MODE_MGR_FAULT_LATCHED              /* 故障锁存中，不允许请求通过 */
 } sys_mode_mgr_status_t;
 
 /* ============================================================================
@@ -55,10 +55,9 @@ typedef enum {
 
 /**
  * @brief  初始化 Mode Manager。
- * @param  boot_mode 上电初始系统模式（非法值会被降级为 SYS_MODE_STANDBY）。
- * @note   建议在 RTOS 调度启动前调用一次。
+ * @note   建议在 RTOS 调度启动前调用一次。上电初始系统模式 SYS_MODE_STANDBY
  */
-void System_ModeManager_Init(bot_sys_mode_e boot_mode);
+void System_ModeManager_Init(void);
 
 /* ============================================================================
  * 模式切换接口（请求型）
@@ -99,9 +98,7 @@ sys_mode_mgr_status_t System_ModeManager_EnterFailsafe(uint32_t fault_flags);
  * @param  out_motion_mode 输出：当前运动模式，可为 NULL。
  * @param  out_fault_flags 输出：当前故障锁存位，可为 NULL。
  */
-void System_ModeManager_Pull(bot_sys_mode_e *out_sys_mode,
-                             bot_run_mode_e *out_motion_mode,
-                             uint32_t *out_fault_flags);
+void System_ModeManager_Pull(bot_sys_mode_e *out_sys_mode, bot_run_mode_e *out_motion_mode, uint32_t *out_fault_flags);
 
 /* ============================================================================
  * 便捷 Getter
