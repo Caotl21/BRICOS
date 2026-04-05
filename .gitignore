@@ -25,3 +25,7 @@ Project/Listings/*.map
 
 # User-specific Keil UI state
 Project/*.uvguix.*
+
+Boot/
+
+*.md
