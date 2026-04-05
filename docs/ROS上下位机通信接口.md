@@ -48,6 +48,7 @@
 | `0x03` | MCU -> 上位机 | NRT | `DATA_TYPE_STATE_SYS` |
 | `0x04` | MCU -> 上位机 | NRT | `DATA_TYPE_STATE_ACTUATOR` |
 | `0x05` | MCU -> 上位机 | NRT | `DATA_TYPE_LOG` |
+| `0xFF` | MCU -> 上位机 | NRT | `DATA_TYPE_CMD_ACK` |
 | `0x10` | 上位机 -> MCU | NRT | `DATA_TYPE_OTA` |
 | `0x11` | 上位机 -> MCU | NRT | `DATA_TYPE_SET_PID_PARAM` |
 | `0x12` | 上位机 -> MCU | NRT | `DATA_TYPE_SET_SYS_MODE` |
@@ -116,6 +117,19 @@
 - 文本末尾带 `\r\n`
 - 当前最大 payload 约 `191` 字节
 
+### 4.5 `DATA_TYPE_CMD_ACK` (`0xFF`)
+
+来源：`UART4`
+
+Payload 长度：`4` 字节
+
+| 偏移 | 字段 | 类型 | 说明 |
+| --- | --- | --- | --- |
+| 0 | `cmd_ack`   | `uint8_t` | ACK ID |
+| 1 | `cmd_id`    | `uint8_t` | 对应命令 ID |
+| 2 | `ack_code`  | `uint8_t` | ACK 状态码 |
+| 3 | `seqnumber` | `uint8_t` | 序列号 |
+
 ---
 
 ## 5. 下行命令（ROS -> MCU）
@@ -133,12 +147,12 @@
 
 ### 5.2 `0x10 DATA_TYPE_OTA`（NRT）
 
-- Payload 固定 4 字节：`DE AD BE EF`
+- Payload 固定 5 字节：`SeqNumber` 和 `DE AD BE EF`
 - 收到后进入 Bootloader 并复位
 
 ### 5.3 `0x11 DATA_TYPE_SET_PID_PARAM`（NRT）
 
-- Payload 长度：`140` 字节（`7组 * 5float`）
+- Payload 长度：`141` 字节（`SeqNumber` 和 `7组 * 5float`）
 - 单组 5float 顺序：`kp, ki, kd, integral_max, output_max`
 - 7组顺序：
   - `roll.outer`
@@ -152,7 +166,7 @@
 
 ### 5.4 `0x12 DATA_TYPE_SET_SYS_MODE`（NRT）
 
-- Payload 长度：`1` 字节
+- Payload 长度：`2` 字节 (`SeqNumber` + `mode`)
 - 取值：
   - `0` = `SYS_MODE_STANDBY`
   - `1` = `SYS_MODE_ACTIVE_DISARMED`
@@ -160,7 +174,7 @@
 
 ### 5.5 `0x13 DATA_TYPE_SET_MOTION_MODE`（NRT）
 
-- Payload 长度：`1` 字节
+- Payload 长度：`2` 字节 (`SeqNumber` + `mode`)
 - 取值：
   - `0` = `MOTION_STATE_MANUAL`
   - `1` = `MOTION_STATE_STABILIZE`
@@ -168,12 +182,12 @@
 
 ### 5.6 `0x14 DATA_TYPE_SET_SERVO`（NRT）
 
-- Payload 长度：`1` 字节
+- Payload 长度：`2` 字节 (`SeqNumber` + `servo_angle`)
 - `servo_angle` 范围 `0~180`（超范围会在底层限幅）
 
 ### 5.7 `0x15 DATA_TYPE_SET_TAM`（NRT）
 
-- Payload 格式：`thruster_count(1B) + matrix_data`
+- Payload 格式：`SeqNumber` 和`thruster_count(1B) + matrix_data`
 - 约束：`thruster_count` 范围 `1~8`
 - 矩阵长度：`thruster_count * 6 * sizeof(float)` 字节
 - 每个推进器 6 个自由度系数顺序：

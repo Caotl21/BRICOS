@@ -62,7 +62,7 @@ void Driver_Protocol_Dispatch(const uint8_t *raw_frame, uint16_t total_len)
     if (handler != NULL) {
         handler(&raw_frame[4], raw_frame[3]);
     } else {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, raw_frame[2], UNKNOWN_CMD, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, raw_frame[2], UNKNOWN_CMD, 0, USE_DMA);
     }
 }
 
@@ -111,12 +111,13 @@ void Driver_Protocol_SendFrame(bsp_uart_port_t port, uint8_t cmd_id, const uint8
     }
 }
 
-void Driver_Protocol_SendAck(bsp_uart_port_t port, uint8_t cmd_id, uint8_t ack_code, protocol_send_mode_t send_mode)
+void Driver_Protocol_SendAck(bsp_uart_port_t port, uint8_t cmd_id, uint8_t ack_code, uint8_t seq_number, protocol_send_mode_t send_mode)
 {
-    uint8_t ack_payload[3];
+    uint8_t ack_payload[4] = {0};
     ack_payload[0] = DATA_TYPE_CMD_ACK;
     ack_payload[1] = cmd_id;
     ack_payload[2] = ack_code;
+    ack_payload[3] = seq_number;
 
     Driver_Protocol_SendFrame(port, DATA_TYPE_CMD_ACK, ack_payload, sizeof(ack_payload), send_mode);
 }
