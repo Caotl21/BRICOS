@@ -1,6 +1,7 @@
 #include "sys_data_pool.h"
 #include "sys_port.h"
 #include "sys_log.h"
+#include "sys_mode_manager.h"
 #include <string.h>
 #include "driver_param.h"
 
@@ -23,15 +24,18 @@ void Bot_Data_Pool_Init(void)
 
     s_bricsbot_actuator_target.servo_angle = 90; // 默认舵机角度为中位
 
-    s_bricsbot_params.motion_mode = MOTION_STATE_MANUAL;
-    s_bricsbot_params.sys_mode = SYS_MODE_STANDBY;
-
     // 从flash读取PID参数
     Driver_PidParam_FillDefault(&s_bricsbot_params);
     if (!Driver_PidParam_Load(&s_bricsbot_params))
     {
         (void)Driver_PidParam_Save(&s_bricsbot_params);
     }
+
+    // 上电默认进入 STANDBY，运动模式保持 MANUAL
+    s_bricsbot_params.motion_mode = MOTION_STATE_MANUAL;
+    s_bricsbot_params.sys_mode = SYS_MODE_STANDBY;
+    System_ModeManager_Init(SYS_MODE_STANDBY);
+
     s_bricsbot_params.failsafe_max_depth = 10.0f; // 默认最大下潜深度10米
     s_bricsbot_params.failsafe_low_voltage = 10.0f; // 默认低压报警线10V
 }
@@ -195,34 +199,52 @@ void Bot_Target_Push(const bot_target_t *new_target) {
 // 尝试切换系统模式 (加锁/解锁)
 bool Bot_Params_Request_SysMode(bot_sys_mode_e requested_mode) 
 {
-    SYS_ENTER_CRITICAL();
-    
-    // 请求解锁 (ARMED)，进行安全检查
-    if (requested_mode == SYS_MODE_MOTION_ARMED) {
-        // 检查是否漏水
-        if (s_bricsbot_sys_state.is_leak_detected) {
-            SYS_EXIT_CRITICAL();
-            return false;
-        }
-        // 检查 IMU 是否健康
-        if (s_bricsbot_sys_state.is_imu_error) {
-            SYS_EXIT_CRITICAL();
-            return false;
-        }
-        // 检查电压是否过低
-        if (s_bricsbot_sys_state.bat_voltage_v < s_bricsbot_params.failsafe_low_voltage) {
-            SYS_EXIT_CRITICAL();
-            return false;
-        }
+    bool ok = false;
+    bot_sys_mode_e next_mode = s_bricsbot_params.sys_mode;
+    sys_mode_mgr_status_t status;
 
-        // 可以添加更多安全检查，如深度是否过深等
+    SYS_ENTER_CRITICAL();
+
+    status = System_ModeManager_RequestMode(requested_mode,
+                                            &s_bricsbot_sys_state,
+                                            &s_bricsbot_params,
+                                            &next_mode);
+    if (status == SYS_MODE_MGR_OK) {
+        s_bricsbot_params.sys_mode = next_mode;
+        ok = true;
     }
-    
-    // 检查通过，或者请求的是加锁/待机(这些总是允许的)
-    s_bricsbot_params.sys_mode = requested_mode;
-    
+
     SYS_EXIT_CRITICAL();
-    return true;
+
+    return ok;
+}
+
+bool Bot_Params_Enter_Failsafe(uint32_t fault_flags)
+{
+    bool ok = false;
+    bot_sys_mode_e next_mode = s_bricsbot_params.sys_mode;
+    sys_mode_mgr_status_t status;
+
+    SYS_ENTER_CRITICAL();
+    status = System_ModeManager_EnterFailsafe(fault_flags, &next_mode);
+    if (status == SYS_MODE_MGR_OK) {
+        s_bricsbot_params.sys_mode = next_mode;
+        ok = true;
+    }
+    SYS_EXIT_CRITICAL();
+
+    return ok;
+}
+
+uint32_t Bot_Params_GetFaultFlags(void)
+{
+    uint32_t flags;
+
+    SYS_ENTER_CRITICAL();
+    flags = System_ModeManager_GetFaultFlags();
+    SYS_EXIT_CRITICAL();
+
+    return flags;
 }
 
 // API: 尝试切换运动状态 (手动/自稳/自动)

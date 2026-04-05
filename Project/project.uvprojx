@@ -1013,6 +1013,16 @@
               <FileType>5</FileType>
               <FilePath>..\System\sys_monitor.h</FilePath>
             </File>
+            <File>
+              <FileName>sys_mode_manager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\System\sys_mode_manager.c</FilePath>
+            </File>
+            <File>
+              <FileName>sys_mode_manager.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_mode_manager.h</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

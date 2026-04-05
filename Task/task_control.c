@@ -409,6 +409,12 @@ static void vTask_Control(void *pvParameters)
                           thruster_pwm[0], thruster_pwm[1], thruster_pwm[2],
                           thruster_pwm[3], thruster_pwm[4], thruster_pwm[5]);
                 break;
+
+            case SYS_MODE_FAILSAFE:
+                // FAILSAFE：强制安全输出，禁止任何推力计算
+                Reset_All_Controllers();
+                Driver_Thruster_Set_Idle();
+                break;
         }
 
         Report_Body_State_To_OrangePi(&local_state);

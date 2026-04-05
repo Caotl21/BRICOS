@@ -107,7 +107,8 @@ typedef struct {
 typedef enum {
     SYS_MODE_STANDBY         = 0, // 待机/低功耗 (推进器断电)
     SYS_MODE_ACTIVE_DISARMED = 1, // 正常工作但加锁 (传感器全开，推力输出锁定为 1500中位)
-    SYS_MODE_MOTION_ARMED    = 2  // 运动解锁 (推进器可以真正转动)
+    SYS_MODE_MOTION_ARMED    = 2, // 运动解锁 (推进器可以真正转动)
+    SYS_MODE_FAILSAFE        = 3  // 故障保护状态 (强制安全输出)
 } bot_sys_mode_e;
 
 typedef enum {
@@ -197,6 +198,8 @@ void Bot_Task_LastTick_Pull(uint32_t *out_ticks, uint8_t len);
 
 // API: 尝试切换系统模式 (加锁/解锁)
 bool Bot_Params_Request_SysMode(bot_sys_mode_e requested_mode);
+bool Bot_Params_Enter_Failsafe(uint32_t fault_flags);
+uint32_t Bot_Params_GetFaultFlags(void);
 
 // API: 尝试切换运动状态 (手动/自稳/自动)
 bool Bot_Params_Request_MotionState(bot_run_mode_e requested_state);

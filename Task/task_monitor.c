@@ -10,6 +10,7 @@
 #include "sys_data_pool.h"
 #include "sys_log.h"
 #include "sys_monitor.h"
+#include "sys_mode_manager.h"
 
 TaskHandle_t Monitor_Task_Handler = NULL;
 
@@ -21,6 +22,46 @@ static const uint32_t TASK_TIMEOUT_THERSHOLDS[MAX_MONITOR_TASKS] = {
     [TASK_ID_DHT11] = pdMS_TO_TICKS(2000),  // DHT11任务心跳阈值 2000ms
     [TASK_ID_MONITOR] = pdMS_TO_TICKS(2000)   // 监控任务自身心跳阈值 2000ms
 };
+
+static uint8_t prv_is_task_watch_enabled(bot_sys_mode_e mode, uint8_t task_id)
+{
+    if (task_id >= MAX_MONITOR_TASKS) {
+        return 0u;
+    }
+
+    if (mode == SYS_MODE_STANDBY) {
+        return (task_id == TASK_ID_MONITOR);
+    }
+
+    if (mode == SYS_MODE_FAILSAFE) {
+        return (task_id == TASK_ID_MONITOR);
+    }
+
+    return 1u;
+}
+
+static uint32_t prv_collect_safety_faults(const bot_sys_state_t *sys_state, const bot_params_t *params)
+{
+    uint32_t faults = SYS_FAULT_NONE;
+
+    if ((sys_state == NULL) || (params == NULL)) {
+        return faults;
+    }
+
+    if (sys_state->is_leak_detected) {
+        faults |= SYS_FAULT_LEAK;
+    }
+
+    if (sys_state->is_imu_error) {
+        faults |= SYS_FAULT_IMU;
+    }
+
+    if ((sys_state->bat_voltage_v > 1.0f) && (sys_state->bat_voltage_v < params->failsafe_low_voltage)) {
+        faults |= SYS_FAULT_LOW_VOLTAGE;
+    }
+
+    return faults;
+}
 
 static uint16_t Serialize_Sys_Report(uint8_t *buf,
                                      const bot_sys_state_t *sys_state,
@@ -87,6 +128,7 @@ static void vTask_Monitor_Core(void *pvParameters)
 
         uint16_t sys_report_len;
         uint16_t actuator_report_len;
+        uint32_t failsafe_faults;
 
         uint32_t cpu = System_Runtime_GetCpuUsagePercent();
         uint32_t temp = System_Runtime_GetChipTemperature();
@@ -99,6 +141,10 @@ static void vTask_Monitor_Core(void *pvParameters)
 
         bool all_tasks_healthy = true;
         for (uint8_t i = 0; i < MAX_MONITOR_TASKS; i++) {
+            if (!prv_is_task_watch_enabled(params.sys_mode, i)) {
+                continue;
+            }
+
             uint32_t last_tick = last_ticks[i];
             uint32_t diff_ms = (current_tick >= last_tick) ? (current_tick - last_tick) : (0xFFFFFFFF - last_tick + current_tick);
             if (diff_ms > TASK_TIMEOUT_THERSHOLDS[i]){
@@ -108,7 +154,16 @@ static void vTask_Monitor_Core(void *pvParameters)
             }
         }
 
-        if (all_tasks_healthy) {
+        failsafe_faults = prv_collect_safety_faults(&sys_state, &params);
+        if (!all_tasks_healthy) {
+            failsafe_faults |= SYS_FAULT_TASK_TIMEOUT;
+        }
+
+        if (failsafe_faults != SYS_FAULT_NONE) {
+            (void)Bot_Params_Enter_Failsafe(failsafe_faults);
+        }
+
+        if (all_tasks_healthy && (failsafe_faults == SYS_FAULT_NONE) && (params.sys_mode != SYS_MODE_FAILSAFE)) {
             LOG_INFO("All tasks healthy!! CPU=%lu%%, TEMP=%lu", cpu, temp);
             bsp_wdg_feed();
         }
