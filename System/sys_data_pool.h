@@ -14,18 +14,6 @@
 #define PARAM_ID_YAW        2
 #define PARAM_ID_DEPTH      3
 
-/* ============================================================================
- * 任务监控 ID（用于心跳看门狗）
- * ============================================================================ */
-typedef enum {
-    TASK_ID_CONTROL = 0,  /* 控制任务 */
-    TASK_ID_IMU,          /* IMU 采集任务 */
-    TASK_ID_MS5837,       /* 深度传感器任务 */
-    TASK_ID_POWER,        /* 电源采样任务 */
-    TASK_ID_DHT11,        /* 舱内温湿度任务 */
-    TASK_ID_MONITOR,      /* 监控任务 */
-    MAX_MONITOR_TASKS
-} monitor_task_id_t;
 
 /* ============================================================================
  * 状态池（State）：机器人本体姿态/速度状态
@@ -167,10 +155,6 @@ void Bot_Target_Push(const bot_target_t *new_target);
 void Bot_Params_Push_PID(uint8_t pid_id, float p, float i, float d);
 void Bot_Params_Push_Servo(uint8_t angle);
 void Bot_Params_Push_Light(uint8_t light1_pwm, uint8_t light2_pwm);
-
-/* --------------------------- 任务心跳监控接口 ------------------------------- */
-void Bot_Task_CheckIn_Monitor(monitor_task_id_t task_id);
-void Bot_Task_LastTick_Pull(uint32_t *out_ticks, uint8_t len);
 
 #endif // __BOT_DATA_POOL_H
 

@@ -205,6 +205,7 @@ static void vTask_Monitor_Core(void *pvParameters)
 
 void Task_Monitor_Init(void)
 {
+    System_Watchdog_Init();
     xTaskCreate((TaskFunction_t)vTask_Monitor_Core,
                 (const char *)"Task_Monitor",
                 (uint16_t)MONITOR_STK_SIZE,

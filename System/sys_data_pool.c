@@ -1,14 +1,14 @@
-#include "sys_data_pool.h"
-#include "sys_port.h"
-#include "sys_log.h"
-
 #include <string.h>
 
 #include "driver_param.h"
 
+#include "sys_data_pool.h"
+#include "sys_port.h"
+#include "sys_log.h"
+
+
 static bot_body_state_t s_bricsbot_state;
 static bot_sys_state_t s_bricsbot_sys_state;
-static uint32_t s_task_last_tick[MAX_MONITOR_TASKS];
 static bot_actuator_state_t s_bricsbot_actuator_target;
 static bot_target_t s_bricsbot_target;
 static bot_params_t s_bricsbot_params;
@@ -17,7 +17,6 @@ void Bot_Data_Pool_Init(void)
 {
     memset(&s_bricsbot_state, 0, sizeof(s_bricsbot_state));
     memset(&s_bricsbot_sys_state, 0, sizeof(s_bricsbot_sys_state));
-    memset(&s_task_last_tick, 0, sizeof(s_task_last_tick));
     memset(&s_bricsbot_actuator_target, 0, sizeof(s_bricsbot_actuator_target));
     memset(&s_bricsbot_target, 0, sizeof(s_bricsbot_target));
     memset(&s_bricsbot_params, 0, sizeof(s_bricsbot_params));
@@ -145,26 +144,6 @@ void Bot_Actuator_Pull(bot_actuator_state_t *out_state)
     SYS_EXIT_CRITICAL();
 }
 
-void Bot_Task_CheckIn_Monitor(monitor_task_id_t task_id)
-{
-    if (task_id >= MAX_MONITOR_TASKS) {
-        LOG_ERROR("Invalid task ID %u in Bot_Task_CheckIn_Monitor", task_id);
-        return;
-    }
-
-    SYS_ENTER_CRITICAL();
-    s_task_last_tick[task_id] = xTaskGetTickCount();
-    SYS_EXIT_CRITICAL();
-}
-
-void Bot_Task_LastTick_Pull(uint32_t *out_ticks, uint8_t len)
-{
-    if ((out_ticks == NULL) || (len < MAX_MONITOR_TASKS)) return;
-
-    SYS_ENTER_CRITICAL();
-    memcpy(out_ticks, s_task_last_tick, sizeof(uint32_t) * MAX_MONITOR_TASKS);
-    SYS_EXIT_CRITICAL();
-}
 
 void Bot_Target_Push(const bot_target_t *new_target)
 {

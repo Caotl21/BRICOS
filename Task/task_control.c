@@ -5,6 +5,7 @@
 #include "sys_pid_algo.h"
 #include "sys_log.h"
 #include "sys_mode_manager.h"
+#include "sys_monitor.h"
 
 #include "driver_thruster.h"
 #include "driver_hydrocore.h"

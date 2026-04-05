@@ -12,6 +12,7 @@
 
 #include "sys_data_pool.h" 
 #include "sys_log.h" 
+#include "sys_monitor.h"
 
 #include "task_sensor.h"
 
