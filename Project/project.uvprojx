@@ -849,11 +849,6 @@
               <FilePath>..\Task\task_control.c</FilePath>
             </File>
             <File>
-              <FileName>task_imu_parse.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Task\task_imu_parse.c</FilePath>
-            </File>
-            <File>
               <FileName>task_monitor.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Task\task_monitor.c</FilePath>
