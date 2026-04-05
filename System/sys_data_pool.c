@@ -6,6 +6,7 @@
 
 static bot_body_state_t       s_bricsbot_state;
 static bot_sys_state_t        s_bricsbot_sys_state;
+static uint32_t               s_task_last_tick[MAX_MONITOR_TASKS];
 static bot_actuator_state_t   s_bricsbot_actuator_target;
 static bot_target_t           s_bricsbot_target;
 static bot_params_t           s_bricsbot_params;
@@ -15,6 +16,7 @@ void Bot_Data_Pool_Init(void)
 {
     memset(&s_bricsbot_state, 0, sizeof(s_bricsbot_state));
     memset(&s_bricsbot_sys_state, 0, sizeof(s_bricsbot_sys_state));
+    memset(&s_task_last_tick, 0, sizeof(s_task_last_tick));
     memset(&s_bricsbot_actuator_target, 0, sizeof(s_bricsbot_actuator_target));
     memset(&s_bricsbot_target, 0, sizeof(s_bricsbot_target));
     memset(&s_bricsbot_params, 0, sizeof(s_bricsbot_params));
@@ -22,7 +24,7 @@ void Bot_Data_Pool_Init(void)
     s_bricsbot_actuator_target.servo_angle = 90; // 默认舵机角度为中位
 
     s_bricsbot_params.motion_mode = MOTION_STATE_MANUAL;
-    s_bricsbot_params.sys_mode = SYS_MODE_ACTIVE_DISARMED;
+    s_bricsbot_params.sys_mode = SYS_MODE_STANDBY;
 
     // 从flash读取PID参数
     Driver_PidParam_FillDefault(&s_bricsbot_params);
@@ -162,9 +164,21 @@ void Bot_Task_CheckIn_Monitor(monitor_task_id_t task_id)
         return;
     }
     SYS_ENTER_CRITICAL();
-    s_bricsbot_sys_state.task_last_tick[task_id] = xTaskGetTickCount(); // 监控任务心跳
+    s_task_last_tick[task_id] = xTaskGetTickCount(); // 监控任务心跳
     SYS_EXIT_CRITICAL();
 }
+
+void Bot_Task_LastTick_Pull(uint32_t *out_ticks, uint8_t len)
+{
+    if ((out_ticks == NULL) || (len < MAX_MONITOR_TASKS)) {
+        return;
+    }
+
+    SYS_ENTER_CRITICAL();
+    memcpy(out_ticks, s_task_last_tick, sizeof(uint32_t) * MAX_MONITOR_TASKS);
+    SYS_EXIT_CRITICAL();
+}
+
 
 // --- 控制与配置更新系列 ---
 void Bot_Target_Push(const bot_target_t *new_target) {

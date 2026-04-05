@@ -61,8 +61,6 @@ typedef struct{
     bool is_leak_detected; // 漏水检测 (数字输入)
     bool is_imu_error;     // IMU错误标志 (IMU自检或数据异常时置位)
 
-    uint32_t task_last_tick[MAX_MONITOR_TASKS]; // 各监控任务的最后心跳Tick (用于 Watchdog)
-    
 } bot_sys_state_t;
 
 typedef struct {
@@ -190,6 +188,8 @@ void Bot_Params_Push_Light(uint8_t light1_pwm, uint8_t light2_pwm);
 
 // 看门狗打卡：由各个任务定期调用，参数为任务ID (0~MAX_MONITOR_TASKS-1)
 void Bot_Task_CheckIn_Monitor(monitor_task_id_t task_id);
+// 拉取任务监控心跳 Tick (Watchdog)
+void Bot_Task_LastTick_Pull(uint32_t *out_ticks, uint8_t len);
 
 // ---------------------------------------------------------
 // [切换] change mode API

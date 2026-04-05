@@ -76,6 +76,7 @@ static void vTask_Monitor_Core(void *pvParameters)
     static bot_sys_state_t sys_state;
     static bot_params_t params;
     static bot_actuator_state_t actuator_state;
+    uint32_t last_ticks[MAX_MONITOR_TASKS];
     uint8_t sys_report_buf[2u + (7u * sizeof(float)) + 3u];
     uint8_t actuator_report_buf[3u];
 
@@ -94,10 +95,11 @@ static void vTask_Monitor_Core(void *pvParameters)
         Bot_Sys_State_Pull(&sys_state);
         Bot_Params_Pull(&params);
         Bot_Actuator_Pull(&actuator_state);
+        Bot_Task_LastTick_Pull(last_ticks, MAX_MONITOR_TASKS);
 
         bool all_tasks_healthy = true;
         for (uint8_t i = 0; i < MAX_MONITOR_TASKS; i++) {
-            uint32_t last_tick = sys_state.task_last_tick[i];
+            uint32_t last_tick = last_ticks[i];
             uint32_t diff_ms = (current_tick >= last_tick) ? (current_tick - last_tick) : (0xFFFFFFFF - last_tick + current_tick);
             if (diff_ms > TASK_TIMEOUT_THERSHOLDS[i]){
                 all_tasks_healthy = false;
