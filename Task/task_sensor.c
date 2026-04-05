@@ -8,6 +8,7 @@
 
 #include "driver_imu.h"
 #include "bsp_uart.h"
+#include <string.h>
 
 #include "sys_log.h" // 引入日志系统
 
@@ -93,6 +94,17 @@ static void IMU_Align_To_BodyFrame(imu_data_t *imu)
     imu->quat[3] =  temp;         // Z_new = W_old
 }
 
+static void IMU_Fuse(const imu_data_t frames[], bot_body_state_t *out)
+{
+    if ((frames == NULL) || (out == NULL)) return;
+    out->acc_x = frames[IMU_IM948].acc[0]; // 以 IM948 为主
+    out->acc_y = frames[IMU_IM948].acc[1];
+    out->acc_z = frames[IMU_IM948].acc[2];
+    out->gyro_x = frames[IMU_IM948].gyro[0];
+    out->gyro_y = frames[IMU_IM948].gyro[1];
+    out->gyro_z = frames[IMU_IM948].gyro[2];
+    memcpy(out->Quater, frames[IMU_JY901S].quat, sizeof(float) * 4);
+}
 
 /* =========================================================
  * 任务 1：传感器数据获取
@@ -103,6 +115,7 @@ static void vTask_IMU_Core(void *pvParameters)
 {
     imu_data_t data_jy901s;
     imu_data_t data_im948;
+    bot_body_state_t fused_imu;
     uint8_t log_divider = 0;
 
     // 设定 20ms 的绝对轮询节拍 (50Hz)
@@ -138,6 +151,8 @@ static void vTask_IMU_Core(void *pvParameters)
             // 存入全局数组
             g_imu_body_frame[IMU_IM948] = data_im948;
         }
+        IMU_Fuse(g_imu_body_frame, &fused_imu);
+        Bot_State_Push_IMU(&fused_imu);
         if(++log_divider >= 50) // 每 50 次循环打印一次日志 (即每 1000ms)
         {
             LOG_INFO("IMU_JY901S Quat[0:%.2f 1:%.2f 2:%.2f 3:%.2f]", 
@@ -283,7 +298,8 @@ static void vTask_DHT11_Core(void *pvParameters)
     {
         // 1. 发起通信并让出 CPU
         Driver_DHT11_Read_Data(&t_val, &h_val); 
-        vTaskDelay(pdMS_TO_TICKS(20)); 
+        // vTaskDelay(pdMS_TO_TICKS(20)); 
+        bsp_delay_ms(30); // DHT11 需要至少 18ms 的等待时间，给它充足的时间完成测量并准备好数据
         
         // 2. 读取成功
         if (Driver_DHT11_Read_Data(&t_val, &h_val) == 0) 

@@ -26,9 +26,7 @@ typedef enum {
 // ============================================================================
 typedef struct {
     // --- 实时控制相关状态 (100Hz) ---
-    float roll;           // 横滚角 (度)
-    float pitch;          // 俯仰角 (度)
-    float yaw;            // 偏航角 (度)
+    float Quater[4];      // 旋转矢量 (度)
     float gyro_x;         // X轴角速度 (度/秒) 
     float gyro_y;         // Y轴角速度 (度/秒) 
     float gyro_z;         // Z轴角速度 (度/秒) 
@@ -40,6 +38,12 @@ typedef struct {
     float acc_z;          // Z轴加速度 (米/秒²)
     float depth_m;        // 当前深度 (米)
 } bot_body_state_t;
+
+typedef struct{
+    float roll;         // 滚转角 (度)
+    float pitch;        // 俯仰角 (度)
+    float yaw;          // 航向角 (度)
+}bot_body_euler_t;
 
 typedef struct{
     // --- 环境状态 (10Hz) ---
@@ -157,6 +161,7 @@ void Bot_State_Pull(bot_body_state_t *out_state);
 void Bot_Sys_State_Pull(bot_sys_state_t *out_state);
 void Bot_Target_Pull(bot_target_t *out_target);
 void Bot_Params_Pull(bot_params_t *out_params);
+void Bot_MODE_Pull(bot_params_t *out_params);
 void Bot_State_LeakStatus_Pull(bool *out_is_leaking);
 
 // ---------------------------------------------------------
@@ -164,7 +169,7 @@ void Bot_State_LeakStatus_Pull(bool *out_is_leaking);
 // ---------------------------------------------------------
 
 // 高频更新：仅由 Task_IMU 调用，只刷新姿态，不碰深度和温度
-void Bot_State_Push_IMU(float r, float p, float y, float gx, float gy, float gz);
+void Bot_State_Push_IMU(bot_body_state_t *imu_data);
 
 // 中低频更新：由 Task_env_sensing 调用
 void Bot_State_Push_DepthTemp(float depth, float water_temp);

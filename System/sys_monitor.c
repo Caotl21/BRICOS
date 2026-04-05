@@ -14,7 +14,11 @@ bool System_Runtime_Monitor_Init(void)
     // 初始化定时器硬件
     bsp_timer_cfg_t timer_cfg = {
         .timer = BSP_TIM_SYSCOUNT,
-        .tick_us = 50 // 50us 计一次数，20kHz 计数频率
+        .tick_us = 50, // 50us 计一次数，20kHz 计数频率
+        .period_ticks = 0, // 不设置周期中断，由软件随时读计数器
+        .enable_nvic = false, // 不启用中断，纯轮询读取
+        .preemption_prio = 0,
+        .sub_prio = 0
     };
     res = bsp_timer_init(&timer_cfg);
     if (!res)  return false;

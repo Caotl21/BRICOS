@@ -2,6 +2,7 @@
 #include "sys_pid_algo.h"
 #include "driver_thruster.h"
 #include "driver_hydrocore.h"
+#include "driver_imu.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "task_control.h"
@@ -169,6 +170,18 @@ static void Normalize_Thruster_Outputs(float *thruster_pwm, uint8_t count, float
     }
 }
 
+static float Thruster_Map(float total_thrust)
+{
+    float pwm;
+    if(total_thrust < 0) pwm = total_thrust * 25.0f; 
+    else pwm = total_thrust * 8.0f;
+
+        // 简单比例映射：系数 100
+    if (pwm > 100.0f) pwm = 100.0f;
+    if (pwm < -100.0f) pwm = -100.0f;
+    return pwm;
+}
+
 static void TAM_Mixer(Bot_Wrench_t *wrench_out, float *thruster_pwm, bot_tam_t *tam_config)
 {
     float wrench_array[TAM_MAX_DOF] = {
@@ -186,7 +199,7 @@ static void TAM_Mixer(Bot_Wrench_t *wrench_out, float *thruster_pwm, bot_tam_t *
             total_thrust += tam_config->matrix[t][dof] * wrench_array[dof];
         }
         
-        thruster_pwm[t] = total_thrust; 
+        thruster_pwm[t] = Thruster_Map(total_thrust); 
     }
     
     Normalize_Thruster_Outputs(&thruster_pwm[0], 4, 100.0f);
@@ -202,9 +215,10 @@ static uint16_t Serialize_Body_Report(uint8_t *buf, const bot_body_state_t *body
         return 0u;
     }
 
-    memcpy(&buf[offset], &body_state->roll, sizeof(float)); offset += sizeof(float);
-    memcpy(&buf[offset], &body_state->pitch, sizeof(float)); offset += sizeof(float);
-    memcpy(&buf[offset], &body_state->yaw, sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->Quater[0], sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->Quater[1], sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->Quater[2], sizeof(float)); offset += sizeof(float);
+    memcpy(&buf[offset], &body_state->Quater[3], sizeof(float)); offset += sizeof(float);
     memcpy(&buf[offset], &body_state->gyro_x, sizeof(float)); offset += sizeof(float);
     memcpy(&buf[offset], &body_state->gyro_y, sizeof(float)); offset += sizeof(float);
     memcpy(&buf[offset], &body_state->gyro_z, sizeof(float)); offset += sizeof(float);
@@ -245,7 +259,7 @@ static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
 static void vTask_Control(void *pvParameters) 
 {
     bot_params_t *local_params = (bot_params_t *)pvParameters;
-
+    float local_roll, local_pitch, local_yaw;
     // 严谨的架构师防爆检查
     if (local_params == NULL) {
         vTaskDelete(NULL); // 如果传参失败，直接销毁任务防止死机
@@ -271,6 +285,7 @@ static void vTask_Control(void *pvParameters)
         // 获取最新全局快照
         Bot_State_Pull(&local_state);
         Bot_Target_Pull(&local_target);
+        Bot_MODE_Pull(local_params);
         
         if ((local_params->sys_mode != last_sys_mode) || (local_params->motion_mode != last_motion_mode))
         {
@@ -289,15 +304,18 @@ static void vTask_Control(void *pvParameters)
             case SYS_MODE_STANDBY:
                 // 待机模式：低功耗模式
                 Reset_All_Controllers();
+                Driver_Thruster_Set_Idle();
                 break;
 
             case SYS_MODE_ACTIVE_DISARMED:
                 // 加锁模式：解算 PID，但输出被强制拦截为 0，推进器不转动
                 Reset_All_Controllers();
                 Driver_Thruster_Set_Idle(); // 发送 1500us 中位信号
+                // Driver_Thruster_SetSpeed(BSP_PWM_THRUSTER_3, 20);
                 break;
 
             case SYS_MODE_MOTION_ARMED:
+                
 
                 if (local_target.target_mode != local_params->motion_mode)
                 {
@@ -321,17 +339,17 @@ static void vTask_Control(void *pvParameters)
 
                         case MOTION_STATE_STABILIZE:
                             // [自稳定深模式]：串级 PID 控制姿态 + 开环控制平移
-
+                            Driver_IMU_Quaternion_ToEuler_Deg(local_state.Quater, &local_roll, &local_pitch, &local_yaw);
                             // Roll 和 Pitch 的控制逻辑 -- 维持稳定 target不需要下发直接为0
                             wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
                                                                      0.0f,
-                                                                     local_state.roll,
+                                                                     local_roll,
                                                                      local_state.gyro_x,
                                                                      TASK_CONTROL_PERIOD_S,
                                                                      0u);
                             wrench_out.torque_y = Cascade_PID_Update(&pid_pitch,
                                                                      0.0f,
-                                                                     local_state.pitch,
+                                                                     local_pitch,
                                                                      local_state.gyro_y,
                                                                      TASK_CONTROL_PERIOD_S,
                                                                      0u);
@@ -339,7 +357,7 @@ static void vTask_Control(void *pvParameters)
                             // Yaw 的控制逻辑 -- 定向控制 跟踪target_yaw
                             wrench_out.torque_z = Cascade_PID_Update(&pid_yaw,
                                                                      local_target.cmd.stab_cmd.target_yaw,
-                                                                     local_state.yaw,
+                                                                     local_yaw,
                                                                      local_state.gyro_z,
                                                                      TASK_CONTROL_PERIOD_S,
                                                                      1u);
@@ -380,18 +398,19 @@ static void vTask_Control(void *pvParameters)
                 
                 
                 TAM_Mixer(&wrench_out, thruster_pwm, &local_params->tam_config);
+                // 输出到电调
+                for (int i = 0; i < THRUSTER_COUNT; i++) {
+                    Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), thruster_pwm[i]);
+                }
+                LOG_DEBUG("Thruster PWMs: [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f]",
+                          thruster_pwm[0], thruster_pwm[1], thruster_pwm[2],
+                          thruster_pwm[3], thruster_pwm[4], thruster_pwm[5]);
                 break;
-        }
-
-        // 输出到电调
-        for (int i = 0; i < THRUSTER_COUNT; i++) {
-            Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), thruster_pwm[i]);
         }
 
         Report_Body_State_To_OrangePi(&local_state);
 
         Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
-
         // 绝对延时，保证 100Hz 的严格周期
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
     }
@@ -402,6 +421,22 @@ void Task_Control_Init(void)
     //只更新一次
     static bot_params_t  local_params;
     Bot_Params_Pull(&local_params);
+    LOG_INFO("Control Task PID Config Loaded: Roll PID (%.2f, %.2f, %.2f), Pitch PID (%.2f, %.2f, %.2f), Yaw PID (%.2f, %.2f, %.2f), Depth PID (%.2f, %.2f, %.2f)",
+             local_params.pid_roll.outer.kp, local_params.pid_roll.outer.ki, local_params.pid_roll.outer.kd,
+             local_params.pid_pitch.outer.kp, local_params.pid_pitch.outer.ki, local_params.pid_pitch.outer.kd,
+             local_params.pid_yaw.outer.kp, local_params.pid_yaw.outer.ki, local_params.pid_yaw.outer.kd,
+             local_params.pid_depth.kp, local_params.pid_depth.ki, local_params.pid_depth.kd);
+    LOG_INFO("Control Task TAM Matrix:");
+    for (uint8_t t = 0; t < local_params.tam_config.active_thrusters; t++) {
+        LOG_INFO(" Thruster %d: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f]",
+                 t + 1,
+                 local_params.tam_config.matrix[t][0],
+                 local_params.tam_config.matrix[t][1],
+                 local_params.tam_config.matrix[t][2],
+                 local_params.tam_config.matrix[t][3],
+                 local_params.tam_config.matrix[t][4],
+                 local_params.tam_config.matrix[t][5]);
+    }
 
     xTaskCreate((TaskFunction_t)vTask_Control,
                 (const char *)"Task_Control",

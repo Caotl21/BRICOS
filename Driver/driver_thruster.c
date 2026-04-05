@@ -8,9 +8,7 @@ void Driver_Thruster_Init(void){
     for(int i=0;i<THRUSTER_COUNT;i++){
         bsp_pwm_set_pulse_us((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), THRUSTER_PWM_STOP);
     }
-	
-    bsp_delay_ms(2000); // 等待 2000ms 确保电调解锁
-
+    bsp_delay_ms(3000); // 等待 3000ms 确保电调解锁
 }
 
 // 设置单路推力
@@ -26,7 +24,7 @@ void Driver_Thruster_SetSpeed(bsp_pwm_ch_t ch, float force_percent) {
     if (force_percent >= 0.0f) {
         pulse_us = THRUSTER_PWM_STOP + (uint16_t)((THRUSTER_PWM_MAX_FWD - THRUSTER_PWM_STOP) * (force_percent / 100.0f));
     } else {
-        pulse_us = THRUSTER_PWM_STOP + (uint16_t)((THRUSTER_PWM_MAX_REV - THRUSTER_PWM_STOP) * (force_percent / 100.0f));
+        pulse_us = THRUSTER_PWM_STOP - (uint16_t)((THRUSTER_PWM_MAX_REV - THRUSTER_PWM_STOP) * (force_percent / 100.0f));
     }
 
     // 设置 PWM 输出

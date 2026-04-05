@@ -31,4 +31,6 @@ void Driver_IMU_Poll_DMA_Update(imu_id_t id, uint16_t current_dma_cnt);
 // 如果缓冲区内有完整新数据，赋值并返回 true；否则返回 false
 bool Driver_IMU_Process(imu_id_t id, imu_data_t *out_data);
 
+void Driver_IMU_Quaternion_ToEuler_Deg(const float q[4], float *roll_deg, float *pitch_deg, float *yaw_deg);
+
 #endif

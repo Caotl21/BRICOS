@@ -28,7 +28,7 @@ static void prv_extract_pid_params(PID_Controller_t *dest, const uint8_t *src)
 {
     float temp_buf[5];
     
-    // 💡 架构师防坑：使用 memcpy 拷贝到局部 float 数组
+    // 架构师防坑：使用 memcpy 拷贝到局部 float 数组
     // 彻底避免 Cortex-M4 在直接解引用非 4 字节对齐的内存时触发 UsageFault 死机
     memcpy(temp_buf, src, PAYLOAD_SIZE_PER_PID);
     
@@ -157,8 +157,8 @@ static void On_Receive_TAM_Cmd(const uint8_t *payload, uint16_t len){
     // 先暴力清零，清除掉之前可能残留的第 7、8 个推进器的旧数据
     memset(temp_params.tam_config.matrix, 0, sizeof(temp_params.tam_config.matrix));
 
-    // 💡 架构师级拷贝逻辑：由于矩阵现在是 [推进器][自由度] (8x6)
-    // 所以每一“行”代表一个推进器的 6 个自由度系数，行长度是【固定】的！
+    // 由于矩阵现在是 [推进器][自由度] (8x6)
+    // 所以每一“行”代表一个推进器的 6 个自由度系数
     const uint8_t *matrix_payload = &payload[1]; 
     uint32_t row_size_bytes = TAM_MAX_DOF * sizeof(float); // 固定为 6 * 4 = 24 字节
 

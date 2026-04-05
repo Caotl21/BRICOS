@@ -26,6 +26,7 @@
 #include "task_control.h"
 #include "task_comm.h"
 #include "task_nrt_cmd.h"
+#include "task_rt_cmd.h"
 #include "task_monitor.h"
 
 int main()
@@ -36,7 +37,7 @@ int main()
 	bsp_delay_init(); // 初始化 DWT 延时模块
 	bsp_uart_init_default(); // 初始化所有串口设备，统一配置为 115200-8N1
 	bsp_gpio_init();
-	bsp_pwm_init(1500); // 初始化 PWM 输出模块
+	bsp_pwm_init(0); // 初始化 PWM 输出模块
 
 
 	/*  Driver层初始化	*/
@@ -59,6 +60,7 @@ int main()
 	Task_Sensor_Init(); // 创建并启动所有传感器任务
 	Task_Control_Init(); // 创建并启动 100Hz 运动控制任务
 	Task_NRT_Cmd_Init();
+	Task_RT_Cmd_Init();
 	Task_Monitor_Init(); 
 
 	LOG_INFO("======================================");

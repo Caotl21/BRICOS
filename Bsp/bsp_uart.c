@@ -421,6 +421,7 @@ void bsp_uart_init_default(void)
     // 初始化 IMU2 (USART2)
     bsp_uart_init(BSP_UART_IMU2, &default_config);
     
+    default_config.baudrate  = 921600;
     // 初始化 OrangePi 实时通信总线 (USART3)
     bsp_uart_init(BSP_UART_OPI_RT, &default_config);
     
