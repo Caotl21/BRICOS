@@ -141,9 +141,7 @@ static void vTask_Monitor_Core(void *pvParameters)
 
         bool all_tasks_healthy = true;
         for (uint8_t i = 0; i < MAX_MONITOR_TASKS; i++) {
-            if (!prv_is_task_watch_enabled(params.sys_mode, i)) {
-                continue;
-            }
+            if (!prv_is_task_watch_enabled(params.sys_mode, i)) continue;
 
             uint32_t last_tick = last_ticks[i];
             uint32_t diff_ms = (current_tick >= last_tick) ? (current_tick - last_tick) : (0xFFFFFFFF - last_tick + current_tick);
