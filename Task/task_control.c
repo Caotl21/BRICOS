@@ -260,7 +260,7 @@ static void vTask_Control(void *pvParameters)
 {
     bot_params_t *local_params = (bot_params_t *)pvParameters;
     float local_roll, local_pitch, local_yaw;
-    // 严谨的架构师防爆检查
+    // 读取本地存储参数
     if (local_params == NULL) {
         vTaskDelete(NULL); // 如果传参失败，直接销毁任务防止死机
     }
@@ -311,7 +311,6 @@ static void vTask_Control(void *pvParameters)
                 // 加锁模式：解算 PID，但输出被强制拦截为 0，推进器不转动
                 Reset_All_Controllers();
                 Driver_Thruster_Set_Idle(); // 发送 1500us 中位信号
-                // Driver_Thruster_SetSpeed(BSP_PWM_THRUSTER_3, 20);
                 break;
 
             case SYS_MODE_MOTION_ARMED:
