@@ -1,12 +1,16 @@
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include "sys_data_pool.h"
 #include "sys_pid_algo.h"
+#include "sys_log.h"
+
 #include "driver_thruster.h"
 #include "driver_hydrocore.h"
 #include "driver_imu.h"
-#include "FreeRTOS.h"
-#include "task.h"
+
 #include "task_control.h"
-#include "sys_log.h"
+
 #include <string.h>
 
 #define TASK_CONTROL_PERIOD_S    (0.01f)
