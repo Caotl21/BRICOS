@@ -1,3 +1,5 @@
+#include "stm32f4xx.h"
+
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -11,25 +13,29 @@
 #include "driver_imu.h"
 #include "driver_thruster.h"
 
+#include "task_comm.h"
 #include "task_control.h"
+#include "task_sensor.h"
 
 #include <string.h>
 
-#define TASK_CONTROL_PERIOD_S    (0.01f)
-#define TASK_CONTROL_PERIOD_MS   (10u)
+#define TASK_CONTROL_PERIOD_S            (0.01f)
+#define TASK_CONTROL_PERIOD_MS           (10u)
+#define TASK_CONTROL_STANDBY_PERIOD_MS   (500u)    /* STANDBY 2Hz */
+
+#define STANDBY_ESC_KICK_INTERVAL_MS     (120000u) /* 2min */
+#define STANDBY_ESC_KICK_DURATION_MS     (500u)
+#define STANDBY_ESC_KICK_SPEED           (6.0f)
+#define STANDBY_ESC_KICK_THRUSTER_IDX    (0u)
 
 /* 控制器实例 */
 Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
 PID_Controller_t pid_depth;
 TaskHandle_t Control_Task_Handler = NULL;
 
-/* 控制状态机上下文 */
 typedef struct control_fsm_ctx_s control_fsm_ctx_t;
-
-/* 控制状态函数指针类型 */
 typedef void (*control_state_fn_t)(control_fsm_ctx_t *ctx);
 
-/* 控制状态操作结构体 */
 typedef struct {
     const char *name;
     control_state_fn_t on_enter;
@@ -37,17 +43,23 @@ typedef struct {
     control_state_fn_t on_exit;
 } control_state_ops_t;
 
-/* task_control 运行时上下文（状态机上下文） */
+/* task_control 运行时上下文 */
 struct control_fsm_ctx_s {
-    bot_params_t *params;      ///< 配置参数指针（外部传入，指向数据池）
+    bot_params_t *params;
 
-    bot_body_state_t state;    ///< 机器人当前状态（从数据池快照）
-    bot_target_t target;       ///< 机器人当前目标（从数据池快照）
+    bot_body_state_t state;
+    bot_target_t target;
 
     bot_sys_mode_e current_mode;
     bot_run_mode_e current_motion_mode;
     bot_run_mode_e last_armed_motion_mode;
     uint8_t initialized;
+
+    /* STANDBY 子状态数据 */
+    uint8_t standby_tasks_paused;
+    uint8_t standby_kick_active;
+    TickType_t standby_next_kick_tick;
+    TickType_t standby_kick_end_tick;
 
     Bot_Wrench_t wrench_out;
     float thruster_pwm[THRUSTER_COUNT];
@@ -57,12 +69,22 @@ struct control_fsm_ctx_s {
     float euler_yaw;
 };
 
+static uint8_t prv_is_time_reached(TickType_t now, TickType_t deadline)
+{
+    return ((int32_t)(now - deadline) >= 0) ? 1u : 0u;
+}
+
 static float Clamp_Symmetric(float value, float limit)
 {
-    if (limit <= 0.0f)  return value;
-    if (value > limit)  return limit;
-    if (value < -limit) return -limit;
-
+    if (limit <= 0.0f) {
+        return value;
+    }
+    if (value > limit) {
+        return limit;
+    }
+    if (value < -limit) {
+        return -limit;
+    }
     return value;
 }
 
@@ -79,15 +101,18 @@ static float Normalize_Angle_Error(float error_deg)
 
 static void Reset_PID(PID_Controller_t *pid)
 {
-    if (pid == NULL) return;
-
+    if (pid == NULL) {
+        return;
+    }
     pid->error_int = 0.0f;
     pid->error_last = 0.0f;
 }
 
 static void Reset_Cascade_PID(Cascade_PID_t *pid)
 {
-    if (pid == NULL) return;
+    if (pid == NULL) {
+        return;
+    }
 
     Reset_PID(&pid->outer);
     Reset_PID(&pid->inner);
@@ -174,7 +199,9 @@ static void Normalize_Thruster_Outputs(float *thruster_pwm, uint8_t count, float
 
     for (i = 0; i < count; i++) {
         float abs_pwm = (thruster_pwm[i] >= 0.0f) ? thruster_pwm[i] : -thruster_pwm[i];
-        if (abs_pwm > max_pwm) max_pwm = abs_pwm;
+        if (abs_pwm > max_pwm) {
+            max_pwm = abs_pwm;
+        }
     }
 
     if (max_pwm > max_output) {
@@ -195,10 +222,12 @@ static float Thruster_Map(float total_thrust)
         pwm = total_thrust * 8.0f;
     }
 
-    // 简单映射比例：暂定系数100
-    if (pwm > 100.0f)  pwm = 100.0f;
-    if (pwm < -100.0f) pwm = -100.0f;
-    
+    if (pwm > 100.0f) {
+        pwm = 100.0f;
+    }
+    if (pwm < -100.0f) {
+        pwm = -100.0f;
+    }
     return pwm;
 }
 
@@ -218,7 +247,6 @@ static void TAM_Mixer(const Bot_Wrench_t *wrench_out, float *thruster_pwm, const
     for (t = 0; t < (int)tam_config->active_thrusters; t++) {
         float total_thrust = 0.0f;
         for (dof = 0; dof < TAM_MAX_DOF; dof++) {
-            // matrix[t][dof] 代表第 t 个推进器对第 dof 个自由度的贡献度（正负表示方向，绝对值表示效率）
             total_thrust += tam_config->matrix[t][dof] * wrench_array[dof];
         }
         thruster_pwm[t] = Thruster_Map(total_thrust);
@@ -259,10 +287,14 @@ static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
     uint8_t report_buf[13u * sizeof(float)];
     uint16_t report_len;
 
-    if (body_state == NULL) return;
+    if (body_state == NULL) {
+        return;
+    }
 
     report_len = Serialize_Body_Report(report_buf, body_state);
-    if (report_len == 0u) return;
+    if (report_len == 0u) {
+        return;
+    }
 
     Driver_Protocol_SendFrame(BSP_UART_OPI_RT,
                               DATA_TYPE_STATE_BODY,
@@ -271,29 +303,122 @@ static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
                               USE_CPU);
 }
 
-// 设置所有推进器为怠速输出（0推力），用于安全状态或过渡状态的输出保障
 static void prv_set_idle_output(void)
 {
     Driver_Thruster_Set_Idle();
 }
 
+static void prv_pause_standby_tasks(control_fsm_ctx_t *ctx)
+{
+    if (ctx->standby_tasks_paused) {
+        return;
+    }
+
+    if (IMU_Task_Handler != NULL) {
+        vTaskSuspend(IMU_Task_Handler);
+    }
+    if (MS5837_Task_Handler != NULL) {
+        vTaskSuspend(MS5837_Task_Handler);
+    }
+    if (Power_Task_Handler != NULL) {
+        vTaskSuspend(Power_Task_Handler);
+    }
+    if (DHT11_Task_Handler != NULL) {
+        vTaskSuspend(DHT11_Task_Handler);
+    }
+
+    if (RT_Comm_Task_Handler != NULL) {
+        vTaskSuspend(RT_Comm_Task_Handler);
+    }
+    Task_Comm_SetRtChannelEnabled(0u);
+
+    ctx->standby_tasks_paused = 1u;
+}
+
+static void prv_resume_standby_tasks(control_fsm_ctx_t *ctx)
+{
+    if (!ctx->standby_tasks_paused) {
+        return;
+    }
+
+    if (IMU_Task_Handler != NULL) {
+        vTaskResume(IMU_Task_Handler);
+    }
+    if (MS5837_Task_Handler != NULL) {
+        vTaskResume(MS5837_Task_Handler);
+    }
+    if (Power_Task_Handler != NULL) {
+        vTaskResume(Power_Task_Handler);
+    }
+    if (DHT11_Task_Handler != NULL) {
+        vTaskResume(DHT11_Task_Handler);
+    }
+
+    Task_Comm_SetRtChannelEnabled(1u);
+    if (RT_Comm_Task_Handler != NULL) {
+        vTaskResume(RT_Comm_Task_Handler);
+    }
+
+    ctx->standby_tasks_paused = 0u;
+}
+
+static void prv_apply_standby_kick_output(void)
+{
+    /* 先恢复中位，再给一个推进器很小的短促推力，降低机体扰动 */
+    prv_set_idle_output();
+    Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + STANDBY_ESC_KICK_THRUSTER_IDX),
+                             STANDBY_ESC_KICK_SPEED);
+}
+
 /* -------------------------- 状态函数：STANDBY -------------------------- */
 static void prv_standby_enter(control_fsm_ctx_t *ctx)
 {
-    (void)ctx;
+    TickType_t now = xTaskGetTickCount();
+
     Reset_All_Controllers();
     prv_set_idle_output();
+    prv_pause_standby_tasks(ctx);
+
+    ctx->standby_kick_active = 0u;
+    ctx->standby_next_kick_tick = now + pdMS_TO_TICKS(STANDBY_ESC_KICK_INTERVAL_MS);
+    ctx->standby_kick_end_tick = 0u;
 }
 
 static void prv_standby_run(control_fsm_ctx_t *ctx)
 {
-    (void)ctx;
-    prv_set_idle_output();
+    TickType_t now = xTaskGetTickCount();
+
+    if ((!ctx->standby_kick_active) && prv_is_time_reached(now, ctx->standby_next_kick_tick)) {
+        ctx->standby_kick_active = 1u;
+        ctx->standby_kick_end_tick = now + pdMS_TO_TICKS(STANDBY_ESC_KICK_DURATION_MS);
+        LOG_INFO("STANDBY kick start");
+    }
+
+    if (ctx->standby_kick_active) {
+        if (prv_is_time_reached(now, ctx->standby_kick_end_tick)) {
+            ctx->standby_kick_active = 0u;
+            ctx->standby_next_kick_tick = now + pdMS_TO_TICKS(STANDBY_ESC_KICK_INTERVAL_MS);
+            prv_set_idle_output();
+            LOG_INFO("STANDBY kick end");
+        } else {
+            prv_apply_standby_kick_output();
+        }
+    } else {
+        prv_set_idle_output();
+    }
+
+    /* 进入睡眠，等待中断唤醒（UART/NVIC 等） */
+    __WFI();
 }
 
 static void prv_standby_exit(control_fsm_ctx_t *ctx)
 {
-    (void)ctx;
+    ctx->standby_kick_active = 0u;
+    ctx->standby_kick_end_tick = 0u;
+    ctx->standby_next_kick_tick = 0u;
+
+    prv_set_idle_output();
+    prv_resume_standby_tasks(ctx);
 }
 
 /* -------------------------- 状态函数：DISARMED ------------------------- */
@@ -382,6 +507,7 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
                 if (target_depth > ctx->params->failsafe_max_depth) {
                     target_depth = ctx->params->failsafe_max_depth;
                 }
+
                 ctx->wrench_out.force_z = PID_Update(&pid_depth,
                                                      target_depth,
                                                      ctx->state.depth_m,
@@ -463,7 +589,6 @@ static const control_state_ops_t s_state_ops[] = {
     }
 };
 
-// 检查状态有效性（存在且有运行函数）
 static uint8_t prv_state_valid(bot_sys_mode_e mode)
 {
     if ((mode < SYS_MODE_STANDBY) || (mode > SYS_MODE_FAILSAFE)) {
@@ -475,7 +600,6 @@ static uint8_t prv_state_valid(bot_sys_mode_e mode)
     return 1u;
 }
 
-// 状态转换函数：处理退出当前状态、切换状态、进入新状态的逻辑
 static void prv_fsm_transition(control_fsm_ctx_t *ctx, bot_sys_mode_e next_mode)
 {
     if (ctx->initialized && prv_state_valid(ctx->current_mode)) {
@@ -521,6 +645,8 @@ static void vTask_Control(void *pvParameters)
     Sync_PID_Config(&pid_depth, &local_params->pid_depth);
 
     while (1) {
+        TickType_t period_ticks = pdMS_TO_TICKS(TASK_CONTROL_PERIOD_MS);
+
         Bot_State_Pull(&ctx.state);
         Bot_Target_Pull(&ctx.target);
         System_ModeManager_Pull(&requested_mode, &ctx.current_motion_mode, NULL);
@@ -535,10 +661,17 @@ static void vTask_Control(void *pvParameters)
             prv_set_idle_output();
         }
 
-        Report_Body_State_To_OrangePi(&ctx.state);
+        /* STANDBY 下关闭 RT 遥测上报，降低实时通信负担 */
+        if (ctx.current_mode != SYS_MODE_STANDBY) {
+            Report_Body_State_To_OrangePi(&ctx.state);
+        }
+
         Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
 
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(TASK_CONTROL_PERIOD_MS));
+        if (ctx.current_mode == SYS_MODE_STANDBY) {
+            period_ticks = pdMS_TO_TICKS(TASK_CONTROL_STANDBY_PERIOD_MS);
+        }
+        vTaskDelayUntil(&xLastWakeTime, period_ticks);
     }
 }
 
@@ -547,14 +680,12 @@ void Task_Control_Init(void)
     static bot_params_t local_params;
 
     Bot_Params_Pull(&local_params);
-
     LOG_INFO("Control Task PID Config Loaded: Roll PID (%.2f, %.2f, %.2f), Pitch PID (%.2f, %.2f, %.2f), Yaw PID (%.2f, %.2f, %.2f), Depth PID (%.2f, %.2f, %.2f)",
              local_params.pid_roll.outer.kp, local_params.pid_roll.outer.ki, local_params.pid_roll.outer.kd,
              local_params.pid_pitch.outer.kp, local_params.pid_pitch.outer.ki, local_params.pid_pitch.outer.kd,
              local_params.pid_yaw.outer.kp, local_params.pid_yaw.outer.ki, local_params.pid_yaw.outer.kd,
              local_params.pid_depth.kp, local_params.pid_depth.ki, local_params.pid_depth.kd);
     LOG_INFO("Control Task TAM Matrix:");
-
     for (uint8_t t = 0; t < local_params.tam_config.active_thrusters; t++) {
         LOG_INFO(" Thruster %d: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f]",
                  t + 1,
@@ -573,4 +704,3 @@ void Task_Control_Init(void)
                 (UBaseType_t)CONTROL_TASK_PRIO,
                 (TaskHandle_t *)&Control_Task_Handler);
 }
-

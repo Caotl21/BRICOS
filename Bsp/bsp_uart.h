@@ -70,6 +70,13 @@ void bsp_uart_start_dma_rx_circular(bsp_uart_port_t port, uint8_t *buf_addr, uin
 void bsp_uart_start_dma_rx_normal(bsp_uart_port_t port, uint8_t *buf_addr, uint16_t buf_size);
 
 /**
+ * @brief 停止 DMA 接收并关闭该串口 RX 相关中断唤醒源
+ * @param port - 串口端口枚举
+ * @note 主要用于低功耗场景下临时关闭某路串口接收
+ */
+void bsp_uart_stop_dma_rx(bsp_uart_port_t port);
+
+/**
  * @brief 获取 DMA 接收剩余空间长度
  * @param port - 串口端口枚举 (如 BSP_UART_OPI)
  * @return 当前 DMA 接收缓冲区剩余的可用空间长度，单位字节

@@ -472,6 +472,9 @@ void bsp_uart_start_dma_rx_circular(bsp_uart_port_t port, uint8_t *buf_addr, uin
     DMA_Init(dma_rx, &DMA_InitStructure);
     
     // 开启串口的 DMA 请求，并启动 DMA 流
+    if (s_uart_hw_info[port].irqn != 0) {
+        USART_ITConfig(s_uart_hw_info[port].uart_base, USART_IT_IDLE, ENABLE);
+    }
     USART_DMACmd(s_uart_hw_info[port].uart_base, USART_DMAReq_Rx, ENABLE);
     DMA_Cmd(dma_rx, ENABLE);
 }
@@ -518,8 +521,40 @@ void bsp_uart_start_dma_rx_normal(bsp_uart_port_t port, uint8_t *buf_addr, uint1
     DMA_Init(dma_rx, &DMA_InitStructure);
     
     // 开启串口的 DMA 请求，并启动 DMA 流
+    if (s_uart_hw_info[port].irqn != 0) {
+        USART_ITConfig(s_uart_hw_info[port].uart_base, USART_IT_IDLE, ENABLE);
+    }
     USART_DMACmd(s_uart_hw_info[port].uart_base, USART_DMAReq_Rx, ENABLE);
     DMA_Cmd(dma_rx, ENABLE);
+}
+
+void bsp_uart_stop_dma_rx(bsp_uart_port_t port)
+{
+    DMA_Stream_TypeDef* dma_rx;
+    const uart_hw_info_t* hw;
+
+    if (port >= BSP_UART_MAX || s_uart_hw_info[port].dma_rx_stream == NULL) {
+        return;
+    }
+
+    hw = &s_uart_hw_info[port];
+    dma_rx = hw->dma_rx_stream;
+
+    USART_ITConfig(hw->uart_base, USART_IT_IDLE, DISABLE);
+    USART_DMACmd(hw->uart_base, USART_DMAReq_Rx, DISABLE);
+
+    DMA_Cmd(dma_rx, DISABLE);
+    while ((dma_rx->CR & DMA_SxCR_EN) != 0u) {
+        ;
+    }
+    DMA_ClearFlag(dma_rx, hw->dma_rx_clear_flags);
+
+    /* 通过读 SR/DR 清理潜在挂起标志，避免无效唤醒 */
+    {
+        volatile uint32_t temp = hw->uart_base->SR;
+        temp = hw->uart_base->DR;
+        (void)temp;
+    }
 }
 
 /* --- 获取 DMA 当前剩余接收长度 --- */
