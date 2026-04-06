@@ -2,66 +2,84 @@
 #include "task.h"
 
 #include "sys_data_pool.h"
-#include "sys_pid_algo.h"
 #include "sys_log.h"
 #include "sys_mode_manager.h"
 #include "sys_monitor.h"
+#include "sys_pid_algo.h"
 
-#include "driver_thruster.h"
 #include "driver_hydrocore.h"
 #include "driver_imu.h"
+#include "driver_thruster.h"
 
 #include "task_control.h"
 
 #include <string.h>
 
 #define TASK_CONTROL_PERIOD_S    (0.01f)
+#define TASK_CONTROL_PERIOD_MS   (10u)
 
-// 控制器实例
+/* 控制器实例 */
 Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
 PID_Controller_t pid_depth;
 TaskHandle_t Control_Task_Handler = NULL;
 
+/* 控制状态机上下文 */
+typedef struct control_fsm_ctx_s control_fsm_ctx_t;
+
+/* 控制状态函数指针类型 */
+typedef void (*control_state_fn_t)(control_fsm_ctx_t *ctx);
+
+/* 控制状态操作结构体 */
+typedef struct {
+    const char *name;
+    control_state_fn_t on_enter;
+    control_state_fn_t on_run;
+    control_state_fn_t on_exit;
+} control_state_ops_t;
+
+/* task_control 运行时上下文（状态机上下文） */
+struct control_fsm_ctx_s {
+    bot_params_t *params;      ///< 配置参数指针（外部传入，指向数据池）
+
+    bot_body_state_t state;    ///< 机器人当前状态（从数据池快照）
+    bot_target_t target;       ///< 机器人当前目标（从数据池快照）
+
+    bot_sys_mode_e current_mode;
+    bot_run_mode_e current_motion_mode;
+    bot_run_mode_e last_armed_motion_mode;
+    uint8_t initialized;
+
+    Bot_Wrench_t wrench_out;
+    float thruster_pwm[THRUSTER_COUNT];
+
+    float euler_roll;
+    float euler_pitch;
+    float euler_yaw;
+};
+
 static float Clamp_Symmetric(float value, float limit)
 {
-    if (limit <= 0.0f)
-    {
-        return value;
-    }
-
-    if (value > limit)
-    {
-        return limit;
-    }
-    if (value < -limit)
-    {
-        return -limit;
-    }
+    if (limit <= 0.0f)  return value;
+    if (value > limit)  return limit;
+    if (value < -limit) return -limit;
 
     return value;
 }
 
 static float Normalize_Angle_Error(float error_deg)
 {
-    while (error_deg > 180.0f)
-    {
+    while (error_deg > 180.0f) {
         error_deg -= 360.0f;
     }
-
-    while (error_deg < -180.0f)
-    {
+    while (error_deg < -180.0f) {
         error_deg += 360.0f;
     }
-
     return error_deg;
 }
 
 static void Reset_PID(PID_Controller_t *pid)
 {
-    if (pid == NULL)
-    {
-        return;
-    }
+    if (pid == NULL) return;
 
     pid->error_int = 0.0f;
     pid->error_last = 0.0f;
@@ -69,10 +87,7 @@ static void Reset_PID(PID_Controller_t *pid)
 
 static void Reset_Cascade_PID(Cascade_PID_t *pid)
 {
-    if (pid == NULL)
-    {
-        return;
-    }
+    if (pid == NULL) return;
 
     Reset_PID(&pid->outer);
     Reset_PID(&pid->inner);
@@ -88,8 +103,7 @@ static void Reset_All_Controllers(void)
 
 static void Sync_PID_Config(PID_Controller_t *runtime, const PID_Controller_t *config)
 {
-    if ((runtime == NULL) || (config == NULL))
-    {
+    if ((runtime == NULL) || (config == NULL)) {
         return;
     }
 
@@ -102,8 +116,7 @@ static void Sync_PID_Config(PID_Controller_t *runtime, const PID_Controller_t *c
 
 static void Sync_Cascade_Config(Cascade_PID_t *runtime, const Cascade_PID_t *config)
 {
-    if ((runtime == NULL) || (config == NULL))
-    {
+    if ((runtime == NULL) || (config == NULL)) {
         return;
     }
 
@@ -117,14 +130,12 @@ static float PID_Update(PID_Controller_t *pid, float target, float measurement, 
     float derivative;
     float output;
 
-    if ((pid == NULL) || (dt_s <= 0.0f))
-    {
+    if ((pid == NULL) || (dt_s <= 0.0f)) {
         return 0.0f;
     }
 
     error = target - measurement;
-    if (wrap_angle)
-    {
+    if (wrap_angle) {
         error = Normalize_Angle_Error(error);
     }
 
@@ -148,8 +159,7 @@ static float Cascade_PID_Update(Cascade_PID_t *pid,
 {
     float target_rate;
 
-    if (pid == NULL)
-    {
+    if (pid == NULL) {
         return 0.0f;
     }
 
@@ -160,17 +170,16 @@ static float Cascade_PID_Update(Cascade_PID_t *pid,
 static void Normalize_Thruster_Outputs(float *thruster_pwm, uint8_t count, float max_output)
 {
     float max_pwm = 0.0f;
-    for (uint8_t i = 0; i < count; i++)
-    {
+    uint8_t i;
+
+    for (i = 0; i < count; i++) {
         float abs_pwm = (thruster_pwm[i] >= 0.0f) ? thruster_pwm[i] : -thruster_pwm[i];
         if (abs_pwm > max_pwm) max_pwm = abs_pwm;
     }
 
-    if (max_pwm > max_output)
-    {
+    if (max_pwm > max_output) {
         float scale = max_output / max_pwm;
-        for (uint8_t i = 0; i < count; i++)
-        {
+        for (i = 0; i < count; i++) {
             thruster_pwm[i] *= scale;
         }
     }
@@ -179,45 +188,51 @@ static void Normalize_Thruster_Outputs(float *thruster_pwm, uint8_t count, float
 static float Thruster_Map(float total_thrust)
 {
     float pwm;
-    if(total_thrust < 0) pwm = total_thrust * 25.0f; 
-    else pwm = total_thrust * 8.0f;
 
-        // 简单比例映射：系数 100
-    if (pwm > 100.0f) pwm = 100.0f;
+    if (total_thrust < 0.0f) {
+        pwm = total_thrust * 25.0f;
+    } else {
+        pwm = total_thrust * 8.0f;
+    }
+
+    // 简单映射比例：暂定系数100
+    if (pwm > 100.0f)  pwm = 100.0f;
     if (pwm < -100.0f) pwm = -100.0f;
+    
     return pwm;
 }
 
-static void TAM_Mixer(Bot_Wrench_t *wrench_out, float *thruster_pwm, bot_tam_t *tam_config)
+static void TAM_Mixer(const Bot_Wrench_t *wrench_out, float *thruster_pwm, const bot_tam_t *tam_config)
 {
-    float wrench_array[TAM_MAX_DOF] = {
-        wrench_out->force_x, wrench_out->force_y, wrench_out->force_z,
-        wrench_out->torque_x, wrench_out->torque_y, wrench_out->torque_z
-    };
+    float wrench_array[TAM_MAX_DOF];
+    int t;
+    int dof;
 
-    for (int t = 0; t < tam_config->active_thrusters; t++) 
-    {
+    wrench_array[0] = wrench_out->force_x;
+    wrench_array[1] = wrench_out->force_y;
+    wrench_array[2] = wrench_out->force_z;
+    wrench_array[3] = wrench_out->torque_x;
+    wrench_array[4] = wrench_out->torque_y;
+    wrench_array[5] = wrench_out->torque_z;
+
+    for (t = 0; t < (int)tam_config->active_thrusters; t++) {
         float total_thrust = 0.0f;
-        
-        for (int dof = 0; dof < TAM_MAX_DOF; dof++) 
-        {
-            // matrix[t][dof] 代表第 t 个推进器在第 dof 个自由度上的分配系数
+        for (dof = 0; dof < TAM_MAX_DOF; dof++) {
+            // matrix[t][dof] 代表第 t 个推进器对第 dof 个自由度的贡献度（正负表示方向，绝对值表示效率）
             total_thrust += tam_config->matrix[t][dof] * wrench_array[dof];
         }
-        
-        thruster_pwm[t] = Thruster_Map(total_thrust); 
+        thruster_pwm[t] = Thruster_Map(total_thrust);
     }
-    
-    Normalize_Thruster_Outputs(&thruster_pwm[0], 4, 100.0f);
-    Normalize_Thruster_Outputs(&thruster_pwm[4], 2, 100.0f);
+
+    Normalize_Thruster_Outputs(&thruster_pwm[0], 4u, 100.0f);
+    Normalize_Thruster_Outputs(&thruster_pwm[4], 2u, 100.0f);
 }
 
 static uint16_t Serialize_Body_Report(uint8_t *buf, const bot_body_state_t *body_state)
 {
-    uint16_t offset = 0;
+    uint16_t offset = 0u;
 
-    if ((buf == NULL) || (body_state == NULL))
-    {
+    if ((buf == NULL) || (body_state == NULL)) {
         return 0u;
     }
 
@@ -244,16 +259,10 @@ static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
     uint8_t report_buf[13u * sizeof(float)];
     uint16_t report_len;
 
-    if (body_state == NULL)
-    {
-        return;
-    }
+    if (body_state == NULL) return;
 
     report_len = Serialize_Body_Report(report_buf, body_state);
-    if (report_len == 0u)
-    {
-        return;
-    }
+    if (report_len == 0u) return;
 
     Driver_Protocol_SendFrame(BSP_UART_OPI_RT,
                               DATA_TYPE_STATE_BODY,
@@ -262,174 +271,290 @@ static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
                               USE_CPU);
 }
 
-static void vTask_Control(void *pvParameters) 
+// 设置所有推进器为怠速输出（0推力），用于安全状态或过渡状态的输出保障
+static void prv_set_idle_output(void)
+{
+    Driver_Thruster_Set_Idle();
+}
+
+/* -------------------------- 状态函数：STANDBY -------------------------- */
+static void prv_standby_enter(control_fsm_ctx_t *ctx)
+{
+    (void)ctx;
+    Reset_All_Controllers();
+    prv_set_idle_output();
+}
+
+static void prv_standby_run(control_fsm_ctx_t *ctx)
+{
+    (void)ctx;
+    prv_set_idle_output();
+}
+
+static void prv_standby_exit(control_fsm_ctx_t *ctx)
+{
+    (void)ctx;
+}
+
+/* -------------------------- 状态函数：DISARMED ------------------------- */
+static void prv_disarmed_enter(control_fsm_ctx_t *ctx)
+{
+    (void)ctx;
+    Reset_All_Controllers();
+    prv_set_idle_output();
+}
+
+static void prv_disarmed_run(control_fsm_ctx_t *ctx)
+{
+    (void)ctx;
+    prv_set_idle_output();
+}
+
+static void prv_disarmed_exit(control_fsm_ctx_t *ctx)
+{
+    (void)ctx;
+}
+
+/* --------------------------- 状态函数：ARMED --------------------------- */
+static void prv_armed_enter(control_fsm_ctx_t *ctx)
+{
+    Reset_All_Controllers();
+    ctx->last_armed_motion_mode = ctx->current_motion_mode;
+}
+
+static void prv_armed_run(control_fsm_ctx_t *ctx)
+{
+    int i;
+
+    memset(&ctx->wrench_out, 0, sizeof(ctx->wrench_out));
+    memset(ctx->thruster_pwm, 0, sizeof(ctx->thruster_pwm));
+
+    if (ctx->current_motion_mode != ctx->last_armed_motion_mode) {
+        Reset_All_Controllers();
+        ctx->last_armed_motion_mode = ctx->current_motion_mode;
+    }
+
+    if (ctx->target.target_mode != (uint8_t)ctx->current_motion_mode) {
+        Reset_All_Controllers();
+        prv_set_idle_output();
+        LOG_ERROR("Motion mode mismatch!");
+        return;
+    }
+
+    switch (ctx->current_motion_mode) {
+        case MOTION_STATE_MANUAL:
+            ctx->wrench_out.force_x = ctx->target.cmd.manual_cmd.surge;
+            ctx->wrench_out.force_y = ctx->target.cmd.manual_cmd.sway;
+            ctx->wrench_out.force_z = ctx->target.cmd.manual_cmd.heave;
+            ctx->wrench_out.torque_z = ctx->target.cmd.manual_cmd.yaw_cmd;
+            break;
+
+        case MOTION_STATE_STABILIZE:
+            Driver_IMU_Quaternion_ToEuler_Deg(ctx->state.Quater,
+                                              &ctx->euler_roll,
+                                              &ctx->euler_pitch,
+                                              &ctx->euler_yaw);
+
+            ctx->wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
+                                                          0.0f,
+                                                          ctx->euler_roll,
+                                                          ctx->state.gyro_x,
+                                                          TASK_CONTROL_PERIOD_S,
+                                                          0u);
+            ctx->wrench_out.torque_y = Cascade_PID_Update(&pid_pitch,
+                                                          0.0f,
+                                                          ctx->euler_pitch,
+                                                          ctx->state.gyro_y,
+                                                          TASK_CONTROL_PERIOD_S,
+                                                          0u);
+            ctx->wrench_out.torque_z = Cascade_PID_Update(&pid_yaw,
+                                                          ctx->target.cmd.stab_cmd.target_yaw,
+                                                          ctx->euler_yaw,
+                                                          ctx->state.gyro_z,
+                                                          TASK_CONTROL_PERIOD_S,
+                                                          1u);
+
+            {
+                float target_depth = ctx->target.cmd.stab_cmd.target_depth;
+                if (target_depth < 0.0f) {
+                    target_depth = 0.0f;
+                }
+                if (target_depth > ctx->params->failsafe_max_depth) {
+                    target_depth = ctx->params->failsafe_max_depth;
+                }
+                ctx->wrench_out.force_z = PID_Update(&pid_depth,
+                                                     target_depth,
+                                                     ctx->state.depth_m,
+                                                     TASK_CONTROL_PERIOD_S,
+                                                     0u);
+            }
+
+            ctx->wrench_out.force_x = ctx->target.cmd.stab_cmd.surge;
+            ctx->wrench_out.force_y = ctx->target.cmd.stab_cmd.sway;
+            break;
+
+        case MOTION_STATE_AUTO:
+            /* 预留：自动模式控制逻辑 */
+            break;
+    }
+
+    TAM_Mixer(&ctx->wrench_out, ctx->thruster_pwm, &ctx->params->tam_config);
+
+    for (i = 0; i < THRUSTER_COUNT; i++) {
+        Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), ctx->thruster_pwm[i]);
+    }
+
+    LOG_DEBUG("Thruster PWMs: [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f]",
+              ctx->thruster_pwm[0], ctx->thruster_pwm[1], ctx->thruster_pwm[2],
+              ctx->thruster_pwm[3], ctx->thruster_pwm[4], ctx->thruster_pwm[5]);
+}
+
+static void prv_armed_exit(control_fsm_ctx_t *ctx)
+{
+    (void)ctx;
+    Reset_All_Controllers();
+    prv_set_idle_output();
+}
+
+/* ------------------------- 状态函数：FAILSAFE -------------------------- */
+static void prv_failsafe_enter(control_fsm_ctx_t *ctx)
+{
+    (void)ctx;
+    Reset_All_Controllers();
+    prv_set_idle_output();
+}
+
+static void prv_failsafe_run(control_fsm_ctx_t *ctx)
+{
+    (void)ctx;
+    prv_set_idle_output();
+}
+
+static void prv_failsafe_exit(control_fsm_ctx_t *ctx)
+{
+    (void)ctx;
+}
+
+/* 状态操作表 */
+static const control_state_ops_t s_state_ops[] = {
+    [SYS_MODE_STANDBY] = {
+        "STANDBY",
+        prv_standby_enter,
+        prv_standby_run,
+        prv_standby_exit
+    },
+    [SYS_MODE_ACTIVE_DISARMED] = {
+        "DISARMED",
+        prv_disarmed_enter,
+        prv_disarmed_run,
+        prv_disarmed_exit
+    },
+    [SYS_MODE_MOTION_ARMED] = {
+        "ARMED",
+        prv_armed_enter,
+        prv_armed_run,
+        prv_armed_exit
+    },
+    [SYS_MODE_FAILSAFE] = {
+        "FAILSAFE",
+        prv_failsafe_enter,
+        prv_failsafe_run,
+        prv_failsafe_exit
+    }
+};
+
+// 检查状态有效性（存在且有运行函数）
+static uint8_t prv_state_valid(bot_sys_mode_e mode)
+{
+    if ((mode < SYS_MODE_STANDBY) || (mode > SYS_MODE_FAILSAFE)) {
+        return 0u;
+    }
+    if (s_state_ops[mode].on_run == NULL) {
+        return 0u;
+    }
+    return 1u;
+}
+
+// 状态转换函数：处理退出当前状态、切换状态、进入新状态的逻辑
+static void prv_fsm_transition(control_fsm_ctx_t *ctx, bot_sys_mode_e next_mode)
+{
+    if (ctx->initialized && prv_state_valid(ctx->current_mode)) {
+        if (s_state_ops[ctx->current_mode].on_exit != NULL) {
+            s_state_ops[ctx->current_mode].on_exit(ctx);
+        }
+    }
+
+    if (!prv_state_valid(next_mode)) {
+        next_mode = SYS_MODE_FAILSAFE;
+    }
+
+    ctx->current_mode = next_mode;
+    ctx->initialized = 1u;
+
+    LOG_INFO("Control FSM -> %s", s_state_ops[ctx->current_mode].name);
+
+    if (s_state_ops[ctx->current_mode].on_enter != NULL) {
+        s_state_ops[ctx->current_mode].on_enter(ctx);
+    }
+}
+
+static void vTask_Control(void *pvParameters)
 {
     bot_params_t *local_params = (bot_params_t *)pvParameters;
-    float local_roll, local_pitch, local_yaw;
-    // 读取本地存储参数
-    if (local_params == NULL) {
-        vTaskDelete(NULL); // 如果传参失败，直接销毁任务防止死机
-    }
-    bot_sys_mode_e    current_sys_mode = (bot_sys_mode_e)0xFF;
-    bot_run_mode_e    current_motion_mode = (bot_run_mode_e)0xFF;
-    bot_body_state_t  local_state;
-    bot_target_t      local_target;
-
-
-    float thruster_pwm[THRUSTER_COUNT] = {0}; // 最终输出到电调的 PWM 波数组
-
-    (void)pvParameters;
     TickType_t xLastWakeTime = xTaskGetTickCount();
+    control_fsm_ctx_t ctx;
+    bot_sys_mode_e requested_mode = SYS_MODE_STANDBY;
 
-    while(1)
-    {
-        Bot_Wrench_t wrench_out;
+    if (local_params == NULL) {
+        vTaskDelete(NULL);
+    }
 
-        memset(&wrench_out, 0, sizeof(wrench_out));
-        memset(thruster_pwm, 0, sizeof(thruster_pwm));
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.params = local_params;
+    ctx.current_mode = (bot_sys_mode_e)0xFF;
+    ctx.current_motion_mode = MOTION_STATE_MANUAL;
+    ctx.last_armed_motion_mode = MOTION_STATE_MANUAL;
 
-        // 获取最新全局快照
-        Bot_State_Pull(&local_state);
-        Bot_Target_Pull(&local_target);
-        System_ModeManager_Pull(&current_sys_mode, &current_motion_mode, NULL);
+    Sync_Cascade_Config(&pid_roll, &local_params->pid_roll);
+    Sync_Cascade_Config(&pid_pitch, &local_params->pid_pitch);
+    Sync_Cascade_Config(&pid_yaw, &local_params->pid_yaw);
+    Sync_PID_Config(&pid_depth, &local_params->pid_depth);
 
-        Sync_Cascade_Config(&pid_roll, &local_params->pid_roll);
-        Sync_Cascade_Config(&pid_pitch, &local_params->pid_pitch);
-        Sync_Cascade_Config(&pid_yaw, &local_params->pid_yaw);
-        Sync_PID_Config(&pid_depth, &local_params->pid_depth);
+    while (1) {
+        Bot_State_Pull(&ctx.state);
+        Bot_Target_Pull(&ctx.target);
+        System_ModeManager_Pull(&requested_mode, &ctx.current_motion_mode, NULL);
 
-        switch (current_sys_mode) 
-        {
-            case SYS_MODE_STANDBY:
-                // 待机模式：低功耗模式
-                Reset_All_Controllers();
-                Driver_Thruster_Set_Idle();
-                break;
-
-            case SYS_MODE_ACTIVE_DISARMED:
-                // 加锁模式：解算 PID，但输出被强制拦截为 0，推进器不转动
-                Reset_All_Controllers();
-                Driver_Thruster_Set_Idle(); // 发送 1500us 中位信号
-                break;
-
-            case SYS_MODE_MOTION_ARMED:
-                // 运动模式：正常控制逻辑，计算 PID 输出并驱动推进器
-                if (local_target.target_mode != current_motion_mode)
-                {
-                    // 目标模式和当前运动模式不匹配，安全起见先停机
-                    Reset_All_Controllers();
-                    Driver_Thruster_Set_Idle();
-                    LOG_ERROR("Motion mode mismatch!");
-                    break;
-                }
-                else
-                {
-                    switch (current_motion_mode) 
-                    {
-                        case MOTION_STATE_MANUAL:
-                            // [纯手动模式]：直接把摇杆量扔给推力分配矩阵
-                            wrench_out.force_x = local_target.cmd.manual_cmd.surge;
-                            wrench_out.force_y = local_target.cmd.manual_cmd.sway;
-                            wrench_out.force_z = local_target.cmd.manual_cmd.heave;
-                            wrench_out.torque_z = local_target.cmd.manual_cmd.yaw_cmd;
-                            break;
-
-                        case MOTION_STATE_STABILIZE:
-                            // [自稳定深模式]：串级 PID 控制姿态 + 开环控制平移
-                            Driver_IMU_Quaternion_ToEuler_Deg(local_state.Quater, &local_roll, &local_pitch, &local_yaw);
-                            // Roll 和 Pitch 的控制逻辑 -- 维持稳定 target不需要下发直接为0
-                            wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
-                                                                     0.0f,
-                                                                     local_roll,
-                                                                     local_state.gyro_x,
-                                                                     TASK_CONTROL_PERIOD_S,
-                                                                     0u);
-                            wrench_out.torque_y = Cascade_PID_Update(&pid_pitch,
-                                                                     0.0f,
-                                                                     local_pitch,
-                                                                     local_state.gyro_y,
-                                                                     TASK_CONTROL_PERIOD_S,
-                                                                     0u);
-
-                            // Yaw 的控制逻辑 -- 定向控制 跟踪target_yaw
-                            wrench_out.torque_z = Cascade_PID_Update(&pid_yaw,
-                                                                     local_target.cmd.stab_cmd.target_yaw,
-                                                                     local_yaw,
-                                                                     local_state.gyro_z,
-                                                                     TASK_CONTROL_PERIOD_S,
-                                                                     1u);
-
-                            // Depth 的控制逻辑 -- 定深控制 单环PID控制深度
-                            {
-                                float target_depth = local_target.cmd.stab_cmd.target_depth;
-
-                                if (target_depth < 0.0f)
-                                {
-                                    target_depth = 0.0f;
-                                }
-                                if (target_depth > local_params->failsafe_max_depth)
-                                {
-                                    target_depth = local_params->failsafe_max_depth;
-                                }
-
-                                wrench_out.force_z = PID_Update(&pid_depth,
-                                                                target_depth,
-                                                                local_state.depth_m,
-                                                                TASK_CONTROL_PERIOD_S,
-                                                                0u);
-                            }
-
-                            // X/Y 方向的平移控制逻辑 -- 目前简单映射为摇杆量开环
-                            wrench_out.force_x = local_target.cmd.stab_cmd.surge;
-                            wrench_out.force_y = local_target.cmd.stab_cmd.sway;
-                            break;
-
-                        case MOTION_STATE_AUTO:
-                            // [自主导航模式]：由轨迹规划算法生成 target_roll/pitch/depth
-                            // 逻辑类似于 STABILIZE，但 target 数据不是操作手给的，而是算法生成的
-                            // Run_Trajectory_Planner(&local_target, &local_state);
-                            // ... 调用 PID ...
-                            break;
-                    }
-                }
-                
-                
-                TAM_Mixer(&wrench_out, thruster_pwm, &local_params->tam_config);
-                // 输出到电调
-                for (int i = 0; i < THRUSTER_COUNT; i++) {
-                    Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), thruster_pwm[i]);
-                }
-                LOG_DEBUG("Thruster PWMs: [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f]",
-                          thruster_pwm[0], thruster_pwm[1], thruster_pwm[2],
-                          thruster_pwm[3], thruster_pwm[4], thruster_pwm[5]);
-                break;
-
-            case SYS_MODE_FAILSAFE:
-                // FAILSAFE：强制安全输出，禁止任何推力计算
-                Reset_All_Controllers();
-                Driver_Thruster_Set_Idle();
-                break;
+        if ((!ctx.initialized) || (requested_mode != ctx.current_mode)) {
+            prv_fsm_transition(&ctx, requested_mode);
         }
 
-        Report_Body_State_To_OrangePi(&local_state);
+        if (prv_state_valid(ctx.current_mode)) {
+            s_state_ops[ctx.current_mode].on_run(&ctx);
+        } else {
+            prv_set_idle_output();
+        }
 
+        Report_Body_State_To_OrangePi(&ctx.state);
         Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
-        // 绝对延时，保证 100Hz 的严格周期
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
+
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(TASK_CONTROL_PERIOD_MS));
     }
 }
 
 void Task_Control_Init(void)
 {
-    //只更新一次
-    static bot_params_t  local_params;
+    static bot_params_t local_params;
+
     Bot_Params_Pull(&local_params);
+
     LOG_INFO("Control Task PID Config Loaded: Roll PID (%.2f, %.2f, %.2f), Pitch PID (%.2f, %.2f, %.2f), Yaw PID (%.2f, %.2f, %.2f), Depth PID (%.2f, %.2f, %.2f)",
              local_params.pid_roll.outer.kp, local_params.pid_roll.outer.ki, local_params.pid_roll.outer.kd,
              local_params.pid_pitch.outer.kp, local_params.pid_pitch.outer.ki, local_params.pid_pitch.outer.kd,
              local_params.pid_yaw.outer.kp, local_params.pid_yaw.outer.ki, local_params.pid_yaw.outer.kd,
              local_params.pid_depth.kp, local_params.pid_depth.ki, local_params.pid_depth.kd);
     LOG_INFO("Control Task TAM Matrix:");
+
     for (uint8_t t = 0; t < local_params.tam_config.active_thrusters; t++) {
         LOG_INFO(" Thruster %d: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f]",
                  t + 1,
@@ -448,3 +573,4 @@ void Task_Control_Init(void)
                 (UBaseType_t)CONTROL_TASK_PRIO,
                 (TaskHandle_t *)&Control_Task_Handler);
 }
+
