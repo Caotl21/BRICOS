@@ -1023,6 +1023,26 @@
               <FileType>5</FileType>
               <FilePath>..\System\sys_mode_manager.h</FilePath>
             </File>
+            <File>
+              <FileName>sys_shell_cfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_shell_cfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_shell_transport.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_shell_transport.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_shell_core.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_shell_core.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_shell_core.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\System\sys_shell_core.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>

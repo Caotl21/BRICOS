@@ -1,6 +1,6 @@
 # BRICOS 仓库架构速览（协作 Agent）
 
-> 更新时间：2026-04-05  
+> 更新时间：2026-04-06  
 > 说明：本文件以仓库当前代码实现为准，面向后续协作 Agent 快速上手。
 
 ## 1. 项目定位
@@ -44,7 +44,7 @@
 
 | 任务 | 优先级 | 节拍/触发 | 主要职责 |
 |---|---:|---|---|
-| `Task_Control` | 5 | `100Hz` (`10ms`) | 串级 PID + 深度控制 + TAM 分配 + 推进器 PWM 输出 + RT 状态回传 |
+| `Task_Control` | 5 | 常态 `100Hz`（`10ms`），`STANDBY` 下 `2Hz`（`500ms`） | 控制状态机（`on_enter/on_run/on_exit`）+ 串级 PID + TAM 分配 + 推进器 PWM 输出 |
 | `Task_IMU` | 4 | `50Hz` (`20ms`) | 双 IMU DMA 轮询解析、坐标转换、融合、姿态入池 |
 | `Task_RT_Comm` | 4 | 事件驱动 | UART3 RT 帧接收队列，协议分发 |
 | `Task_MS5837` | 3 | 主循环 `100Hz` | 温压状态机（深度有效更新约 `50Hz`） |
@@ -124,24 +124,66 @@ RT 控制链路如下：
 6. 按系统模式与运动模式执行开环/闭环控制
 7. TAM 分配得到 6 路推进器输出，调用 `Driver_Thruster_SetSpeed`
 
-## 8. 安全与监控机制
+## 8. 安全、模式与状态机机制（当前实现）
 
-### 8.1 模式门控
+### 8.1 Mode Manager（System 层）状态机
 
-- 系统模式：`STANDBY / ACTIVE_DISARMED / MOTION_ARMED`
-- 运动模式：`MANUAL / STABILIZE / AUTO`
+系统模式枚举：
 
-解锁到 `MOTION_ARMED` 时，至少会检查：
+- `SYS_MODE_STANDBY`
+- `SYS_MODE_ACTIVE_DISARMED`
+- `SYS_MODE_MOTION_ARMED`
+- `SYS_MODE_FAILSAFE`
 
-- 漏水标志
-- IMU 错误标志
-- 电压阈值（低压拒绝解锁）
+运动模式枚举：
 
-### 8.2 任务健康与看门狗
+- `MOTION_STATE_MANUAL`
+- `MOTION_STATE_STABILIZE`
+- `MOTION_STATE_AUTO`
 
-- 监控任务周期检查各任务最近心跳 tick 是否超时
-- 仅在“全部任务健康”时喂硬件看门狗
-- 监控任务同时通过 NRT 通道发送系统状态与执行器状态
+系统模式迁移规则（`System/sys_mode_manager.c`）：
+
+- 上电默认：`STANDBY`
+- 常态路径：`STANDBY <-> ACTIVE_DISARMED <-> MOTION_ARMED`
+- 允许快速回待机：`MOTION_ARMED -> STANDBY`
+- 外部请求不允许直接切 `FAILSAFE`（只能由故障入口触发）
+- 进入 `MOTION_ARMED` 前必须在 `ACTIVE_DISARMED`，且动态故障为 0
+- `FAILSAFE` 仅允许受控恢复到 `ACTIVE_DISARMED`，且动态故障必须已清零
+- 禁止 `FAILSAFE -> MOTION_ARMED` 直跳
+
+运动模式切换规则：
+
+- `STABILIZE/AUTO` 依赖 IMU 健康
+- 若 IMU 故障，仅允许 `MANUAL`
+
+### 8.2 Task_Control（执行层）状态机
+
+`Task_Control` 采用 `on_enter/on_run/on_exit` 框架，按系统模式执行：
+
+- `STANDBY`
+- `DISARMED`（对应 `SYS_MODE_ACTIVE_DISARMED`）
+- `ARMED`（对应 `SYS_MODE_MOTION_ARMED`）
+- `FAILSAFE`
+
+各状态行为摘要（`Task/task_control.c`）：
+
+- `STANDBY.on_enter`：重置 PID、推进器全 `1500us`，暂停传感器任务与 RT 通信任务，关闭 RT 串口接收通道（停止 `USART3` DMA RX + 回调）。
+- `STANDBY.on_run`：主循环降频到 `2Hz`（`500ms`）；基于 `500ms` 循环计数法触发脉冲；非脉冲窗口全推进器 idle；每 `120000ms` 触发一次防报警脉冲（持续 `500ms`，6 路推进器均输出 `6.0f`）；执行 `__WFI()` 进入 Sleep；关闭 RT 遥测上报（不发 `DATA_TYPE_STATE_BODY`）；保留 NRT 通道用于上位机模式切换与调试。
+- `STANDBY.on_exit`：清理脉冲子状态并恢复 idle，恢复传感器任务，重新打开 RT 串口接收通道并恢复 RT 通信任务。
+- `DISARMED.on_enter/on_run`：重置 PID，推进器强制 idle（不允许有效推力）。
+- `ARMED.on_run`：检查模式一致性（`target_mode == current_motion_mode`），执行手动/自稳控制，TAM 分配后输出 6 路推进器。
+- `FAILSAFE.on_enter/on_run`：重置 PID，推进器强制 idle。
+
+### 8.3 Monitor 联动（心跳、故障与看门狗）
+
+`Task_Monitor` 与模式管理器联动策略（`Task/task_monitor.c`）：
+
+- `STANDBY` 下仅检查 `TASK_ID_MONITOR` 心跳（允许传感器/控制侧暂停）
+- `FAILSAFE` 下仅检查 `TASK_ID_MONITOR` 心跳
+- 其他模式检查全部任务心跳
+- 发生故障位（漏水/IMU/低压/任务超时）时调用 `System_ModeManager_EnterFailsafe()`
+- 仅在“任务健康 + 无故障 + 当前不在 FAILSAFE”时喂狗
+- 监控任务持续通过 NRT 通道上报系统/执行器状态
 
 ## 9. 参数持久化与 OTA
 
@@ -189,4 +231,3 @@ RT 控制链路如下：
 5. `Driver/driver_hydrocore.c`（协议引擎）
 6. `Task/task_monitor.c` + `System/sys_monitor.c`（健康监控）
 7. `Driver/driver_param.c` + `System/sys_boot_flag.c`（持久化与 OTA 入口）
-

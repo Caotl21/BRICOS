@@ -24,9 +24,10 @@
 #define TASK_CONTROL_STANDBY_PERIOD_MS   (500u)    /* STANDBY 2Hz */
 
 #define STANDBY_ESC_KICK_INTERVAL_MS     (120000u) /* 2min */
-#define STANDBY_ESC_KICK_DURATION_MS     (500u)
+#define STANDBY_ESC_KICK_DURATION_MS     (1000u)
 #define STANDBY_ESC_KICK_SPEED           (6.0f)
-#define STANDBY_ESC_KICK_THRUSTER_IDX    (0u)
+#define STANDBY_ESC_KICK_INTERVAL_CYCLES ((STANDBY_ESC_KICK_INTERVAL_MS + TASK_CONTROL_STANDBY_PERIOD_MS - 1u) / TASK_CONTROL_STANDBY_PERIOD_MS)
+#define STANDBY_ESC_KICK_DURATION_CYCLES ((STANDBY_ESC_KICK_DURATION_MS + TASK_CONTROL_STANDBY_PERIOD_MS - 1u) / TASK_CONTROL_STANDBY_PERIOD_MS)
 
 /* 控制器实例 */
 Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
@@ -58,8 +59,8 @@ struct control_fsm_ctx_s {
     /* STANDBY 子状态数据 */
     uint8_t standby_tasks_paused;
     uint8_t standby_kick_active;
-    TickType_t standby_next_kick_tick;
-    TickType_t standby_kick_end_tick;
+    uint16_t standby_cycle_counter;
+    uint16_t standby_kick_cycles_left;
 
     Bot_Wrench_t wrench_out;
     float thruster_pwm[THRUSTER_COUNT];
@@ -68,11 +69,6 @@ struct control_fsm_ctx_s {
     float euler_pitch;
     float euler_yaw;
 };
-
-static uint8_t prv_is_time_reached(TickType_t now, TickType_t deadline)
-{
-    return ((int32_t)(now - deadline) >= 0) ? 1u : 0u;
-}
 
 static float Clamp_Symmetric(float value, float limit)
 {
@@ -364,44 +360,58 @@ static void prv_resume_standby_tasks(control_fsm_ctx_t *ctx)
 
 static void prv_apply_standby_kick_output(void)
 {
-    /* 先恢复中位，再给一个推进器很小的短促推力，降低机体扰动 */
+    int i;
+
+    /* STANDBY 仅用于岸上调试：避免 ESC 长时间静止啸叫 */
     prv_set_idle_output();
-    Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + STANDBY_ESC_KICK_THRUSTER_IDX),
-                             STANDBY_ESC_KICK_SPEED);
+    for (i = 0; i < THRUSTER_COUNT; i++) {
+        Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), STANDBY_ESC_KICK_SPEED);
+    }
 }
 
 /* -------------------------- 状态函数：STANDBY -------------------------- */
 static void prv_standby_enter(control_fsm_ctx_t *ctx)
 {
-    TickType_t now = xTaskGetTickCount();
-
     Reset_All_Controllers();
     prv_set_idle_output();
     prv_pause_standby_tasks(ctx);
 
     ctx->standby_kick_active = 0u;
-    ctx->standby_next_kick_tick = now + pdMS_TO_TICKS(STANDBY_ESC_KICK_INTERVAL_MS);
-    ctx->standby_kick_end_tick = 0u;
+    ctx->standby_cycle_counter = 0u;
+    ctx->standby_kick_cycles_left = 0u;
 }
 
 static void prv_standby_run(control_fsm_ctx_t *ctx)
 {
-    TickType_t now = xTaskGetTickCount();
-
-    if ((!ctx->standby_kick_active) && prv_is_time_reached(now, ctx->standby_next_kick_tick)) {
-        ctx->standby_kick_active = 1u;
-        ctx->standby_kick_end_tick = now + pdMS_TO_TICKS(STANDBY_ESC_KICK_DURATION_MS);
-        LOG_INFO("STANDBY kick start");
+    // 非脉冲状态下计数器递增，达到阈值时进入脉冲状态
+    if (!ctx->standby_kick_active) {
+        // 到达脉冲触发周期，进入脉冲状态  
+        if ((uint16_t)(ctx->standby_cycle_counter + 1u) >= (uint16_t)STANDBY_ESC_KICK_INTERVAL_CYCLES) {
+            uint16_t duration_cycles = (uint16_t)STANDBY_ESC_KICK_DURATION_CYCLES;
+            if (duration_cycles == 0u) {
+                duration_cycles = 1u;
+            }
+            ctx->standby_kick_active = 1u;                      ///< 进入脉冲状态
+            ctx->standby_kick_cycles_left = duration_cycles;    ///< 设置脉冲持续周期
+            ctx->standby_cycle_counter = 0u;                    ///< 重置循环计数器
+            LOG_INFO("STANDBY kick start");
+        } else {
+            ctx->standby_cycle_counter++;
+        }
     }
-
+    
+    // 根据当前是否处于脉冲状态，设置输出
     if (ctx->standby_kick_active) {
-        if (prv_is_time_reached(now, ctx->standby_kick_end_tick)) {
+        prv_apply_standby_kick_output();
+        if (ctx->standby_kick_cycles_left > 0u) {
+            ctx->standby_kick_cycles_left--;
+        } 
+
+        // 脉冲持续周期为standby_kick_cycles_left，递减至0后退出脉冲状态
+        if (ctx->standby_kick_cycles_left == 0u) {
             ctx->standby_kick_active = 0u;
-            ctx->standby_next_kick_tick = now + pdMS_TO_TICKS(STANDBY_ESC_KICK_INTERVAL_MS);
             prv_set_idle_output();
             LOG_INFO("STANDBY kick end");
-        } else {
-            prv_apply_standby_kick_output();
         }
     } else {
         prv_set_idle_output();
@@ -414,8 +424,8 @@ static void prv_standby_run(control_fsm_ctx_t *ctx)
 static void prv_standby_exit(control_fsm_ctx_t *ctx)
 {
     ctx->standby_kick_active = 0u;
-    ctx->standby_kick_end_tick = 0u;
-    ctx->standby_next_kick_tick = 0u;
+    ctx->standby_kick_cycles_left = 0u;
+    ctx->standby_cycle_counter = 0u;
 
     prv_set_idle_output();
     prv_resume_standby_tasks(ctx);
