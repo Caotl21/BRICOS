@@ -616,6 +616,16 @@
               <FilePath>..\User\main.c</FilePath>
             </File>
             <File>
+              <FileName>app_shell.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\app_shell.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_shell.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\User\app_shell.h</FilePath>
+            </File>
+            <File>
               <FileName>stm32f4xx_it.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\stm32f4xx_it.c</FilePath>
@@ -857,6 +867,16 @@
               <FileName>task_sensor.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Task\task_sensor.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_shell_transport_nrt.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\task_shell_transport_nrt.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_shell_transport_nrt.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Task\task_shell_transport_nrt.h</FilePath>
             </File>
           </Files>
         </Group>

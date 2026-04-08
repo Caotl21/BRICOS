@@ -27,3 +27,5 @@ Project/Listings/*.map
 Project/*.uvguix.*
 
 Boot/
+
+*/__pycache__/

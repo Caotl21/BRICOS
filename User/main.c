@@ -14,6 +14,7 @@
 #include "driver_power.h"
 #include "driver_thruster.h"
 
+#include "app_shell.h"
 #include "sys_boot_flag.h"
 #include "sys_data_pool.h"
 #include "sys_log.h"
@@ -55,6 +56,8 @@ int main(void)
     Task_NRT_Cmd_Init();
     Task_RT_Cmd_Init();
     Task_Monitor_Init();
+
+    App_Shell_Init();
 
     LOG_INFO("======================================");
     LOG_INFO("   BRICOS System Booting...       ");

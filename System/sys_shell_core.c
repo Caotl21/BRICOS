@@ -1,5 +1,3 @@
-#include "sys_shell_core.h"
-
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -7,6 +5,7 @@
 
 #include "sys_port.h"
 #include "sys_shell_cfg.h"
+#include "sys_shell_core.h"
 
 /*
  * Shell Core 实现说明：
