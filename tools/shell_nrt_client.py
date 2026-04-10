@@ -89,7 +89,7 @@ class HydroParser:
 
 
 class ShellClient:
-    COMMANDS = ["help", "echo", "mode", "motion", "fault"]
+    COMMANDS = ["help", "echo", "sysmode", "momode", "fault"]
 
     def __init__(self, port: str, baud: int):
         self.ser = serial.Serial(port=port, baudrate=baud, timeout=0.05)

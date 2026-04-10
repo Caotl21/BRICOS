@@ -456,6 +456,7 @@ static void prv_standby_exit(control_fsm_ctx_t *ctx)
 /* -------------------------- 状态函数：DISARMED ------------------------- */
 static void prv_disarmed_enter(control_fsm_ctx_t *ctx)
 {
+    LOG_INFO("DISARMED entry: resetting controllers and outputs");
     (void)ctx;
     Reset_All_Controllers();
     prv_set_idle_output();

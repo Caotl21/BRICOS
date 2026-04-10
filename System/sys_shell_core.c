@@ -781,10 +781,17 @@ static shell_ret_t prv_cmd_echo(shell_cmd_ctx_t *ctx, int argc, char **argv)
     return SHELL_RET_OK;
 }
 
-/* mode：查询/切换系统模式 */
-static shell_ret_t prv_cmd_mode(shell_cmd_ctx_t *ctx, int argc, char **argv)
+/* sysmode：查询/切换系统模式 */
+static shell_ret_t prv_cmd_sysmode(shell_cmd_ctx_t *ctx, int argc, char **argv)
 {
     if (argc == 1) {
+        System_ShellCore_Printf(ctx,
+                                "usage: sysmode [request | set <target>]\r\n"
+                                "               <target>: standby | disarmed | armed | failsafe");
+        return SHELL_RET_OK;
+    }
+
+    if ((argc == 2) && prv_streq_ignore_case(argv[1], "request")) {
         System_ShellCore_Printf(ctx, "sys=%s motion=%s faults=0x%08lX",
                                 prv_sys_mode_str(ctx->sys_mode_snapshot),
                                 prv_motion_mode_str(ctx->motion_mode_snapshot),
@@ -796,6 +803,10 @@ static shell_ret_t prv_cmd_mode(shell_cmd_ctx_t *ctx, int argc, char **argv)
         bot_sys_mode_e target_mode;
         sys_mode_mgr_status_t st;
         if (!prv_parse_sys_mode(argv[2], &target_mode)) {
+            System_ShellCore_Printf(ctx, "invalid target: %s\r\n", argv[2]);
+            System_ShellCore_Printf(ctx,
+                                    "usage: sysmode [request | set <target>]\r\n"
+                                    "               <target>: standby | disarmed | armed | failsafe");
             return SHELL_RET_BAD_ARGS;
         }
 
@@ -811,13 +822,23 @@ static shell_ret_t prv_cmd_mode(shell_cmd_ctx_t *ctx, int argc, char **argv)
         return prv_mode_mgr_status_to_shell_ret(st);
     }
 
+    System_ShellCore_Printf(ctx,
+                            "usage: sysmode [request | set <target>]\r\n"
+                            "               <target>: standby | disarmed | armed | failsafe");
     return SHELL_RET_BAD_ARGS;
 }
 
-/* motion：查询/切换运动模式 */
-static shell_ret_t prv_cmd_motion(shell_cmd_ctx_t *ctx, int argc, char **argv)
+/* momode：查询/切换运动模式 */
+static shell_ret_t prv_cmd_momode(shell_cmd_ctx_t *ctx, int argc, char **argv)
 {
     if (argc == 1) {
+        System_ShellCore_Printf(ctx,
+                                "usage: momode [request | set <target>]\r\n"
+                                "              <target>: manual | stabilize | auto");
+        return SHELL_RET_OK;
+    }
+
+    if ((argc == 2) && prv_streq_ignore_case(argv[1], "request")) {
         System_ShellCore_Printf(ctx, "motion=%s", prv_motion_mode_str(ctx->motion_mode_snapshot));
         return SHELL_RET_OK;
     }
@@ -826,6 +847,10 @@ static shell_ret_t prv_cmd_motion(shell_cmd_ctx_t *ctx, int argc, char **argv)
         bot_run_mode_e target_mode;
         sys_mode_mgr_status_t st;
         if (!prv_parse_motion_mode(argv[2], &target_mode)) {
+            System_ShellCore_Printf(ctx, "invalid target: %s\r\n", argv[2]);
+            System_ShellCore_Printf(ctx,
+                                    "usage: momode [request | set <target>]\r\n"
+                                    "              <target>: manual | stabilize | auto");
             return SHELL_RET_BAD_ARGS;
         }
 
@@ -836,6 +861,9 @@ static shell_ret_t prv_cmd_motion(shell_cmd_ctx_t *ctx, int argc, char **argv)
         return prv_mode_mgr_status_to_shell_ret(st);
     }
 
+    System_ShellCore_Printf(ctx,
+                            "usage: momode [request | set <target>]\r\n"
+                            "              <target>: manual | stabilize | auto");
     return SHELL_RET_BAD_ARGS;
 }
 
@@ -867,16 +895,16 @@ int System_ShellCore_RegisterBuiltins(void)
             SHELL_MODE_ANY
         },
         {
-            "mode",
-            "mode [set standby|disarmed|armed|failsafe]",
-            prv_cmd_mode,
+            "sysmode",
+            "sysmode request | sysmode set standby|disarmed|armed|failsafe",
+            prv_cmd_sysmode,
             SHELL_PERM_SAFE_CTRL,
             SHELL_MODE_ANY
         },
         {
-            "motion",
-            "motion [set manual|stabilize|auto]",
-            prv_cmd_motion,
+            "momode",
+            "momode request | momode set manual|stabilize|auto",
+            prv_cmd_momode,
             SHELL_PERM_SAFE_CTRL,
             SHELL_MODE_ANY
         },
