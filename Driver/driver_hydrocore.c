@@ -8,14 +8,18 @@
 #include "task.h"
 
 static protocol_cmd_handler_t s_handlers[256] = {NULL};
-static SemaphoreHandle_t s_protocol_mutex = NULL;
-static uint8_t s_tx_frame[262];
+static SemaphoreHandle_t s_protocol_mutex[BSP_UART_MAX] = {NULL};
+static uint8_t s_tx_frame[BSP_UART_MAX][262];
 
-static void prv_protocol_mutex_init(void)
+static void prv_protocol_mutex_init(bsp_uart_port_t port)
 {
+    if (port >= BSP_UART_MAX) {
+        return;
+    }
+
     taskENTER_CRITICAL();
-    if (s_protocol_mutex == NULL) {
-        s_protocol_mutex = xSemaphoreCreateMutex();
+    if (s_protocol_mutex[port] == NULL) {
+        s_protocol_mutex[port] = xSemaphoreCreateMutex();
     }
     taskEXIT_CRITICAL();
 }
@@ -68,46 +72,55 @@ void Driver_Protocol_Dispatch(const uint8_t *raw_frame, uint16_t total_len)
 
 void Driver_Protocol_SendFrame(bsp_uart_port_t port, uint8_t cmd_id, const uint8_t *payload, uint8_t payload_len, protocol_send_mode_t send_mode)
 {
+    SemaphoreHandle_t tx_mutex;
+    uint8_t *tx_frame;
     uint16_t total_len;
 
-    prv_protocol_mutex_init();
-    if (s_protocol_mutex != NULL) {
-        if (xSemaphoreTake(s_protocol_mutex, portMAX_DELAY) != pdTRUE) {
+    if (port >= BSP_UART_MAX) {
+        return;
+    }
+
+    prv_protocol_mutex_init(port);
+    tx_mutex = s_protocol_mutex[port];
+    tx_frame = s_tx_frame[port];
+
+    if (tx_mutex != NULL) {
+        if (xSemaphoreTake(tx_mutex, portMAX_DELAY) != pdTRUE) {
             return;
         }
     }
 
     total_len = (uint16_t)payload_len + 7u;
-    if (total_len > sizeof(s_tx_frame)) {
-        if (s_protocol_mutex != NULL) {
-            xSemaphoreGive(s_protocol_mutex);
+    if (total_len > sizeof(s_tx_frame[0])) {
+        if (tx_mutex != NULL) {
+            xSemaphoreGive(tx_mutex);
         }
         return;
     }
 
-    s_tx_frame[0] = PACKET_START_BYTE1;
-    s_tx_frame[1] = PACKET_START_BYTE2;
-    s_tx_frame[2] = cmd_id;
-    s_tx_frame[3] = payload_len;
+    tx_frame[0] = PACKET_START_BYTE1;
+    tx_frame[1] = PACKET_START_BYTE2;
+    tx_frame[2] = cmd_id;
+    tx_frame[3] = payload_len;
 
     if ((payload_len > 0u) && (payload != NULL)) {
-        memcpy(&s_tx_frame[4], payload, payload_len);
+        memcpy(&tx_frame[4], payload, payload_len);
     }
 
-    s_tx_frame[4u + payload_len] = calculate_checksum(&s_tx_frame[2], (uint16_t)payload_len + 2u);
-    s_tx_frame[5u + payload_len] = PACKET_END_BYTE1;
-    s_tx_frame[6u + payload_len] = PACKET_END_BYTE2;
+    tx_frame[4u + payload_len] = calculate_checksum(&tx_frame[2], (uint16_t)payload_len + 2u);
+    tx_frame[5u + payload_len] = PACKET_END_BYTE1;
+    tx_frame[6u + payload_len] = PACKET_END_BYTE2;
 
     if (send_mode == USE_DMA) {
-        if (!bsp_uart_send_dma(port, s_tx_frame, (uint16_t)total_len)) {
-            bsp_uart_send_buffer(port, s_tx_frame, total_len);
+        if (!bsp_uart_send_dma(port, tx_frame, (uint16_t)total_len)) {
+            bsp_uart_send_buffer(port, tx_frame, total_len);
         }
     } else {
-        bsp_uart_send_buffer(port, s_tx_frame, total_len);
+        bsp_uart_send_buffer(port, tx_frame, total_len);
     }
 
-    if (s_protocol_mutex != NULL) {
-        xSemaphoreGive(s_protocol_mutex);
+    if (tx_mutex != NULL) {
+        xSemaphoreGive(tx_mutex);
     }
 }
 
