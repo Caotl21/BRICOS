@@ -29,6 +29,10 @@
 #define STANDBY_ESC_KICK_INTERVAL_CYCLES ((STANDBY_ESC_KICK_INTERVAL_MS + TASK_CONTROL_STANDBY_PERIOD_MS - 1u) / TASK_CONTROL_STANDBY_PERIOD_MS)
 #define STANDBY_ESC_KICK_DURATION_CYCLES ((STANDBY_ESC_KICK_DURATION_MS + TASK_CONTROL_STANDBY_PERIOD_MS - 1u) / TASK_CONTROL_STANDBY_PERIOD_MS)
 
+/* ARMED 进入动作：每个推进器依次轻转 0.2s */
+#define ARMED_ENTRY_SPIN_DURATION_MS     (200u)
+#define ARMED_ENTRY_SPIN_SPEED           (8.0f)
+
 /* 控制器实例 */
 Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
 PID_Controller_t pid_depth;
@@ -304,6 +308,24 @@ static void prv_set_idle_output(void)
     Driver_Thruster_Set_Idle();
 }
 
+static void prv_armed_entry_spin_once(void)
+{
+    TickType_t spin_ticks = pdMS_TO_TICKS(ARMED_ENTRY_SPIN_DURATION_MS);
+    int i;
+
+    if (spin_ticks == 0u) {
+        spin_ticks = 1u;
+    }
+
+    for (i = 0; i < THRUSTER_COUNT; i++) {
+        prv_set_idle_output();
+        Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), ARMED_ENTRY_SPIN_SPEED);
+        vTaskDelay(spin_ticks);
+    }
+
+    prv_set_idle_output();
+}
+
 static void prv_pause_standby_tasks(control_fsm_ctx_t *ctx)
 {
     if (ctx->standby_tasks_paused) {
@@ -455,6 +477,10 @@ static void prv_armed_enter(control_fsm_ctx_t *ctx)
 {
     Reset_All_Controllers();
     ctx->last_armed_motion_mode = ctx->current_motion_mode;
+
+    LOG_INFO("ARMED entry spin start");
+    prv_armed_entry_spin_once();
+    LOG_INFO("ARMED entry spin done");
 }
 
 static void prv_armed_run(control_fsm_ctx_t *ctx)
@@ -547,9 +573,9 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
 
 static void prv_armed_exit(control_fsm_ctx_t *ctx)
 {
-    (void)ctx;
     Reset_All_Controllers();
     prv_set_idle_output();
+    (void)ctx;
 }
 
 /* ------------------------- 状态函数：FAILSAFE -------------------------- */
