@@ -7,6 +7,9 @@ LR_IROM1 0x08020000 0x00020000  {    ; 128KB APP2
   ER_IROM1 0x08020000 0x00020000  {  ; load address = execution address
     *.o (RESET, +First)
     *(InRoot$$Sections)
+    *(ShellCmd$$Table$$A)
+    *(ShellCmd$$Table$$M)
+    *(ShellCmd$$Table$$Z)
     .ANY (+RO)
   }
   RW_IRAM1 0x20000000 0x00030000  {  ; 192KB SRAM

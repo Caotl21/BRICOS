@@ -7,6 +7,9 @@ LR_IROM1 0x08008000 0x00018000  {    ; 96KB APP1
   ER_IROM1 0x08008000 0x00018000  {  ; load address = execution address
     *.o (RESET, +First)
     *(InRoot$$Sections)
+    *(ShellCmd$$Table$$A)
+    *(ShellCmd$$Table$$M)
+    *(ShellCmd$$Table$$Z)
     .ANY (+RO)
   }
 

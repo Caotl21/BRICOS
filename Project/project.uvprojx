@@ -621,6 +621,16 @@
               <FilePath>..\User\app_shell.c</FilePath>
             </File>
             <File>
+              <FileName>core_cmd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\core_cmd.c</FilePath>
+            </File>
+            <File>
+              <FileName>query_cmd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\query_cmd.c</FilePath>
+            </File>
+            <File>
               <FileName>app_shell.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\User\app_shell.h</FilePath>
@@ -1062,6 +1072,11 @@
               <FileName>sys_shell_core.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\System\sys_shell_core.c</FilePath>
+            </File>
+            <File>
+              <FileName>sys_shell_export.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_shell_export.h</FilePath>
             </File>
           </Files>
         </Group>
