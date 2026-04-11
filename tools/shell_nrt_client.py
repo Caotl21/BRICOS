@@ -105,6 +105,15 @@ class ShellClient:
     QUERY_COMMANDS = ["euler", "depthtemp", "power", "cabin", "chip"]
     SYSMODE_TARGETS = ["standby", "disarmed", "armed", "failsafe"]
     MOMODE_TARGETS = ["manual", "stabilize", "auto"]
+    SHELL_RET_MAP = {
+        0: ("OK", "成功"),
+        1: ("UNKNOWN_CMD", "未知命令"),
+        2: ("BAD_ARGS", "参数错误"),
+        3: ("DENIED", "权限不足或被安全策略拒绝"),
+        4: ("MODE_BLOCKED", "当前系统模式不允许执行"),
+        5: ("BUSY", "资源忙"),
+        6: ("INTERNAL_ERROR", "内部错误"),
+    }
 
     ANSI_RESET = "\033[0m"
     ANSI_GREEN = "\033[92m"
@@ -307,12 +316,37 @@ class ShellClient:
             color = self.ANSI_GRADIENT[idx % len(self.ANSI_GRADIENT)]
             print(f"\033[38;5;{color}m{line}{self.ANSI_RESET}")
 
+    def _format_shell_response_text(self, raw_text: str) -> str:
+        text = raw_text or ""
+        if not text.startswith("ret="):
+            return text
+
+        tail = text[4:]
+        pos = 0
+        while pos < len(tail) and tail[pos].isdigit():
+            pos += 1
+
+        if pos == 0:
+            return text
+
+        ret = int(tail[:pos])
+        payload = tail[pos:].lstrip()
+
+        if ret == 0:
+            return payload
+
+        ret_name, ret_desc = self.SHELL_RET_MAP.get(ret, (f"RET_{ret}", "未知错误"))
+        if payload:
+            return f"[ERR {ret}:{ret_name}] {payload}"
+        return f"[ERR {ret}:{ret_name}] {ret_desc}"
+
     def _handle_frame(self, cmd: int, payload: bytes):
         if cmd == CMD_SHELL_RESP:
             # Shell response may be split across multiple 0x21 frames.
             self._shell_resp_buf.extend(payload)
             if self._shell_resp_buf.endswith(b"\r\n") or self._shell_resp_buf.endswith(b"\n"):
-                txt = self._shell_resp_buf.decode("utf-8", errors="replace").rstrip("\r\n")
+                raw_txt = self._shell_resp_buf.decode("utf-8", errors="replace").rstrip("\r\n")
+                txt = self._format_shell_response_text(raw_txt)
                 self.waiting_response = False
                 self._print_async(txt)
                 self._shell_resp_buf.clear()
