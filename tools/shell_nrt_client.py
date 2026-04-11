@@ -119,9 +119,13 @@ class ShellClient:
     ANSI_GREEN = "\033[92m"
     ANSI_WHITE = "\033[97m"
     ANSI_GRADIENT = [196, 202, 226, 82, 45]
+    RECONNECT_RETRY_SEC = 0.3
 
     def __init__(self, port: str, baud: int, verbose_frames: bool = False):
-        self.ser = serial.Serial(port=port, baudrate=baud, timeout=0.05)
+        self.port = port
+        self.baud = baud
+        self.ser = None
+        self.connected = False
         self.parser = HydroParser()
         self.running = True
         self.line = ""
@@ -161,8 +165,15 @@ class ShellClient:
         self._shell_resp_buf.clear()
         payload = line.encode("utf-8", errors="ignore")
         frame = self._build_frame(CMD_SHELL_REQ, payload)
-        self.ser.write(frame)
-        self.ser.flush()
+        try:
+            if (not self.connected) or (self.ser is None):
+                return False
+            self.ser.write(frame)
+            self.ser.flush()
+            return True
+        except (serial.SerialException, OSError):
+            self._handle_disconnect()
+            return False
 
     def _print_async(self, text: str):
         with self.lock:
@@ -316,6 +327,35 @@ class ShellClient:
             color = self.ANSI_GRADIENT[idx % len(self.ANSI_GRADIENT)]
             print(f"\033[38;5;{color}m{line}{self.ANSI_RESET}")
 
+    def _connect_serial(self, initial: bool):
+        while self.running and (not self.connected):
+            try:
+                self.ser = serial.Serial(port=self.port, baudrate=self.baud, timeout=0.05)
+                self.connected = True
+                self.parser = HydroParser()
+                self._shell_resp_buf.clear()
+                self.waiting_response = False
+
+                if not initial:
+                    with self.lock:
+                        sys.stdout.write("\r\n\r\n")
+                        self._print_logo()
+                        self._redraw_input_unlocked()
+                return
+            except (serial.SerialException, OSError):
+                time.sleep(self.RECONNECT_RETRY_SEC)
+
+    def _handle_disconnect(self):
+        self.connected = False
+        self.waiting_response = False
+        self._shell_resp_buf.clear()
+        if self.ser is not None:
+            try:
+                self.ser.close()
+            except Exception:
+                pass
+        self.ser = None
+
     def _format_shell_response_text(self, raw_text: str) -> str:
         text = raw_text or ""
         if not text.startswith("ret="):
@@ -365,12 +405,18 @@ class ShellClient:
 
     def _rx_loop(self):
         while self.running:
+            if not self.connected:
+                self._connect_serial(initial=False)
+                continue
+
             try:
+                if self.ser is None:
+                    self._handle_disconnect()
+                    continue
                 data = self.ser.read(256)
-            except serial.SerialException as exc:
-                self._print_async(f"[ERROR] serial read failed: {exc}")
-                self.running = False
-                break
+            except (serial.SerialException, OSError):
+                self._handle_disconnect()
+                continue
 
             if not data:
                 continue
@@ -379,6 +425,7 @@ class ShellClient:
                 self._handle_frame(cmd, payload)
 
     def run(self):
+        self._connect_serial(initial=True)
         self.rx_thread.start()
         self._print_logo()
         print("BRICOS Shell (NRT Frame Transport)")
@@ -421,8 +468,10 @@ class ShellClient:
                             if (not self.history) or (self.history[-1] != line):
                                 self.history.append(line)
                             self.history_index = len(self.history)
-                            self.waiting_response = True
-                            self.send_shell_line(line)
+                            if self.send_shell_line(line):
+                                self.waiting_response = True
+                            else:
+                                self.waiting_response = False
                         else:
                             self.history_index = len(self.history)
                         self._redraw_input_unlocked()
@@ -466,7 +515,8 @@ class ShellClient:
 
         self.running = False
         self.rx_thread.join(timeout=0.2)
-        self.ser.close()
+        if self.ser is not None:
+            self.ser.close()
         print("\nbye")
 
 
