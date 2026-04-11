@@ -89,15 +89,28 @@ class HydroParser:
 
 
 class ShellClient:
-    COMMANDS = ["help", "echo", "sysmode", "momode", "fault", "euler", "depthtemp", "power", "cabin", "chip"]
+    COMMANDS = [
+        "help",
+        "echo",
+        "sysmode",
+        "momode",
+        "fault",
+        "euler",
+        "depthtemp",
+        "power",
+        "cabin",
+        "chip",
+    ]
 
-    def __init__(self, port: str, baud: int):
+    def __init__(self, port: str, baud: int, verbose_frames: bool = False):
         self.ser = serial.Serial(port=port, baudrate=baud, timeout=0.05)
         self.parser = HydroParser()
         self.running = True
         self.line = ""
         self.lock = threading.Lock()
         self.rx_thread = threading.Thread(target=self._rx_loop, daemon=True)
+        self.verbose_frames = verbose_frames
+        self._shell_resp_buf = bytearray()
 
     @staticmethod
     def _checksum(data: bytes) -> int:
@@ -121,6 +134,8 @@ class ShellClient:
         return bytes(frame)
 
     def send_shell_line(self, line: str):
+        # Clear pending fragments before sending next command.
+        self._shell_resp_buf.clear()
         payload = line.encode("utf-8", errors="ignore")
         frame = self._build_frame(CMD_SHELL_REQ, payload)
         self.ser.write(frame)
@@ -137,8 +152,12 @@ class ShellClient:
 
     def _handle_frame(self, cmd: int, payload: bytes):
         if cmd == CMD_SHELL_RESP:
-            txt = payload.decode("utf-8", errors="replace").rstrip("\r\n")
-            self._print_async(txt)
+            # Shell response may be split across multiple 0x21 frames.
+            self._shell_resp_buf.extend(payload)
+            if self._shell_resp_buf.endswith(b"\r\n") or self._shell_resp_buf.endswith(b"\n"):
+                txt = self._shell_resp_buf.decode("utf-8", errors="replace").rstrip("\r\n")
+                self._print_async(txt)
+                self._shell_resp_buf.clear()
             return
 
         if cmd == CMD_ACK and len(payload) >= 4 and payload[0] == CMD_ACK:
@@ -146,12 +165,11 @@ class ShellClient:
             ack_code = payload[2]
             seq = payload[3]
             desc = ACK_MAP.get(ack_code, f"0x{ack_code:02X}")
-            self._print_async(
-                f"[ACK] cmd=0x{ack_cmd:02X} code={desc} seq={seq}"
-            )
+            self._print_async(f"[ACK] cmd=0x{ack_cmd:02X} code={desc} seq={seq}")
             return
 
-        self._print_async(f"[FRAME] cmd=0x{cmd:02X} len={len(payload)}")
+        if self.verbose_frames:
+            self._print_async(f"[FRAME] cmd=0x{cmd:02X} len={len(payload)}")
 
     def _rx_loop(self):
         while self.running:
@@ -161,8 +179,10 @@ class ShellClient:
                 self._print_async(f"[ERROR] serial read failed: {exc}")
                 self.running = False
                 break
+
             if not data:
                 continue
+
             for cmd, payload in self.parser.feed(data):
                 self._handle_frame(cmd, payload)
 
@@ -183,6 +203,7 @@ class ShellClient:
             sys.stdout.write("\r\n")
             self._redraw_input_unlocked()
             return
+
         sys.stdout.write("\a")
         sys.stdout.flush()
 
@@ -254,12 +275,13 @@ def parse_args():
     p = argparse.ArgumentParser(description="NRT shell client")
     p.add_argument("--port", default="/dev/ttyUSB0", help="serial port")
     p.add_argument("--baud", type=int, default=921600, help="baud rate")
+    p.add_argument("--verbose-frames", action="store_true", help="print non-shell frames")
     return p.parse_args()
 
 
 def main():
     args = parse_args()
-    client = ShellClient(args.port, args.baud)
+    client = ShellClient(args.port, args.baud, verbose_frames=args.verbose_frames)
     client.run()
 
 
