@@ -92,6 +92,7 @@ class HydroParser:
 class ShellClient:
     COMMANDS = [
         "help",
+        "reboot",
         "echo",
         "sysmode",
         "momode",
