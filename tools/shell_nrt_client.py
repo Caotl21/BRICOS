@@ -383,8 +383,8 @@ class ShellClient:
         self._print_logo()
         print("BRICOS Shell (NRT Frame Transport)")
         print("Ctrl-C to quit")
-        print("Note: firmware-side Tab completion only works in UART stream mode.")
         print("This client provides local command + argument completion for Tab.")
+        print("Welcome to our bot world! Type 'help' to get started.\n")
 
         fd = sys.stdin.fileno()
         with RawMode(fd):
