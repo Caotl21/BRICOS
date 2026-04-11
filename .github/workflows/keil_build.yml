@@ -30,13 +30,11 @@ jobs:
           if (-not $latest) { throw "No Build/<timestamp> folder found." }
 
           $bin = Join-Path $latest.FullName "app.bin"
-          $log = Join-Path $latest.FullName "build.log"
+          
           if (-not (Test-Path $bin)) { throw "app.bin not found in $($latest.FullName)" }
-          if (-not (Test-Path $log)) { throw "build.log not found in $($latest.FullName)" }
-
+          
           "bin_path=$bin" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          "log_path=$log" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
+          
       - name: Upload Artifact
         if: success()
         uses: actions/upload-artifact@v4
@@ -44,7 +42,6 @@ jobs:
           name: Bricsbot_Firmware
           path: |
             ${{ steps.pick.outputs.bin_path }}
-            ${{ steps.pick.outputs.log_path }}
 
       - name: Generate Tag Name
         if: success()
@@ -70,6 +67,5 @@ jobs:
           prerelease: false
           files: |
             ${{ steps.pick.outputs.bin_path }}
-            ${{ steps.pick.outputs.log_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
