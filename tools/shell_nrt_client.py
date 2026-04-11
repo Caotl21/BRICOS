@@ -5,6 +5,7 @@ import select
 import sys
 import termios
 import threading
+import time
 import tty
 
 import serial
@@ -101,6 +102,13 @@ class ShellClient:
         "cabin",
         "chip",
     ]
+    QUERY_COMMANDS = ["euler", "depthtemp", "power", "cabin", "chip"]
+    SYSMODE_TARGETS = ["standby", "disarmed", "armed", "failsafe"]
+    MOMODE_TARGETS = ["manual", "stabilize", "auto"]
+
+    ANSI_RESET = "\033[0m"
+    ANSI_GREEN = "\033[92m"
+    ANSI_GRADIENT = [196, 202, 226, 82, 45]
 
     def __init__(self, port: str, baud: int, verbose_frames: bool = False):
         self.ser = serial.Serial(port=port, baudrate=baud, timeout=0.05)
@@ -109,6 +117,8 @@ class ShellClient:
         self.line = ""
         self.prompt = "bricos$ "
         self.waiting_response = False
+        self.history = []
+        self.history_index = 0
         self.lock = threading.Lock()
         self.rx_thread = threading.Thread(target=self._rx_loop, daemon=True)
         self.verbose_frames = verbose_frames
@@ -145,7 +155,7 @@ class ShellClient:
 
     def _print_async(self, text: str):
         with self.lock:
-            sys.stdout.write("\r\n" + text + "\r\n")
+            sys.stdout.write("\r\033[2K" + text + "\r\n")
             self._redraw_input_unlocked()
 
     def _redraw_input_unlocked(self):
@@ -153,8 +163,140 @@ class ShellClient:
             sys.stdout.write("\r\033[2K")
             sys.stdout.flush()
             return
-        sys.stdout.write("\r\033[2K" + self.prompt + self.line)
+        sys.stdout.write(
+            "\r\033[2K" + self.ANSI_GREEN + self.prompt + self.ANSI_RESET + self.line
+        )
         sys.stdout.flush()
+
+    @staticmethod
+    def _print_hint_list(hits):
+        sys.stdout.write("\r\n" + "  ".join(hits) + "\r\n")
+
+    def _arg_candidates(self, cmd: str, args_before, arg_index: int, prefix: str):
+        pool = []
+        cmd = cmd.lower()
+        pfx = prefix.lower()
+
+        if cmd in self.QUERY_COMMANDS:
+            if arg_index == 1:
+                pool = ["request"]
+        elif cmd == "sysmode":
+            if arg_index == 1:
+                pool = ["request", "set"]
+            elif (arg_index == 2) and (len(args_before) >= 1) and (args_before[0].lower() == "set"):
+                pool = self.SYSMODE_TARGETS
+        elif cmd == "momode":
+            if arg_index == 1:
+                pool = ["request", "set"]
+            elif (arg_index == 2) and (len(args_before) >= 1) and (args_before[0].lower() == "set"):
+                pool = self.MOMODE_TARGETS
+
+        return [x for x in pool if x.startswith(pfx)]
+
+    def _resolve_completion(self):
+        line = self.line
+        ends_with_space = line.endswith(" ")
+        tokens = line.split()
+
+        if not tokens:
+            return "command", "", self.COMMANDS
+
+        first = tokens[0].lower()
+        if (len(tokens) == 1) and (not ends_with_space):
+            hits = [c for c in self.COMMANDS if c.startswith(first)]
+            if (len(hits) == 1) and (hits[0] == first):
+                arg_hits = self._arg_candidates(first, [], 1, "")
+                if arg_hits:
+                    return "arg", "", arg_hits
+            return "command", first, hits
+
+        if first not in self.COMMANDS:
+            return "none", "", []
+
+        arg_index = len(tokens) if ends_with_space else (len(tokens) - 1)
+        prefix = "" if ends_with_space else tokens[-1]
+        args_before = tokens[1:arg_index]
+        hits = self._arg_candidates(first, args_before, arg_index, prefix)
+        return "arg", prefix, hits
+
+    def _complete_line(self):
+        kind, prefix, hits = self._resolve_completion()
+
+        if not hits:
+            sys.stdout.write("\a")
+            sys.stdout.flush()
+            return
+
+        if len(hits) > 1:
+            self._print_hint_list(hits)
+            self._redraw_input_unlocked()
+            return
+
+        hit = hits[0]
+        if kind == "command":
+            self.line = hit + " "
+            self._redraw_input_unlocked()
+            return
+
+        if self.line.endswith(" "):
+            self.line = self.line + hit + " "
+        else:
+            base = self.line[: len(self.line) - len(prefix)] if prefix else self.line
+            self.line = base + hit + " "
+        self._redraw_input_unlocked()
+
+    def _history_up(self):
+        if not self.history:
+            sys.stdout.write("\a")
+            sys.stdout.flush()
+            return
+        if self.history_index > 0:
+            self.history_index -= 1
+        self.line = self.history[self.history_index]
+        self._redraw_input_unlocked()
+
+    def _history_down(self):
+        if not self.history:
+            sys.stdout.write("\a")
+            sys.stdout.flush()
+            return
+        if self.history_index < (len(self.history) - 1):
+            self.history_index += 1
+            self.line = self.history[self.history_index]
+        else:
+            self.history_index = len(self.history)
+            self.line = ""
+        self._redraw_input_unlocked()
+
+    @staticmethod
+    def _read_escape_seq(fd: int) -> bytes:
+        seq = bytearray()
+        deadline = time.monotonic() + 0.02
+        while time.monotonic() < deadline:
+            rlist, _, _ = select.select([fd], [], [], 0.002)
+            if not rlist:
+                break
+            nxt = os.read(fd, 1)
+            if not nxt:
+                break
+            seq.extend(nxt)
+
+            if len(seq) >= 2 and seq[0] in (ord("["), ord("O")) and seq[1] in (ord("A"), ord("B"), ord("C"), ord("D")):
+                break
+        return bytes(seq)
+
+    def _print_logo(self):
+        logo_lines = [
+            " ____  ____  ___ ____ ___  ____",
+            "| __ )|  _ \\|_ _/ ___/ _ \\/ ___|",
+            "|  _ \\| |_) || | |  | | | \\___ \\",
+            "| |_) |  _ < | | |__| |_| |___) |",
+            "|____/|_| \\_\\___\\____\\___/|____/ ",
+        ]
+
+        for idx, line in enumerate(logo_lines):
+            color = self.ANSI_GRADIENT[idx % len(self.ANSI_GRADIENT)]
+            print(f"\033[38;5;{color}m{line}{self.ANSI_RESET}")
 
     def _handle_frame(self, cmd: int, payload: bytes):
         if cmd == CMD_SHELL_RESP:
@@ -193,40 +335,13 @@ class ShellClient:
             for cmd, payload in self.parser.feed(data):
                 self._handle_frame(cmd, payload)
 
-    def _complete_first_token(self):
-        if " " in self.line:
-            sys.stdout.write("\a")
-            sys.stdout.flush()
-            return
-
-        prefix = self.line
-        hits = [c for c in self.COMMANDS if c.startswith(prefix)]
-        if len(hits) == 1:
-            self.line = hits[0]
-            self._redraw_input_unlocked()
-            return
-        if len(hits) > 1:
-            sys.stdout.write("\r\n" + "  ".join(hits))
-            sys.stdout.write("\r\n")
-            self._redraw_input_unlocked()
-            return
-
-        sys.stdout.write("\a")
-        sys.stdout.flush()
-
     def run(self):
         self.rx_thread.start()
-        print(
-            " ____  ____  ___ ____ ___  ____\n"
-            "| __ )|  _ \\|_ _/ ___/ _ \\/ ___|\n"
-            "|  _ \\| |_) || | |  | | | \\___ \\\n"
-            "| |_) |  _ < | | |__| |_| |___) |\n"
-            "|____/|_| \\_\\___\\____\\___/|____/\n"
-        )
+        self._print_logo()
         print("BRICOS Shell (NRT Frame Transport)")
         print("Ctrl-C to quit")
         print("Note: firmware-side Tab completion only works in UART stream mode.")
-        print("This client provides local first-token completion for Tab.")
+        print("This client provides local command + argument completion for Tab.")
 
         fd = sys.stdin.fileno()
         with RawMode(fd):
@@ -247,20 +362,33 @@ class ShellClient:
                     break
 
                 with self.lock:
+                    if self.waiting_response:
+                        if c == 27:
+                            _ = self._read_escape_seq(fd)
+                        sys.stdout.write("\a")
+                        sys.stdout.flush()
+                        continue
+
                     if c in (13, 10):
                         line = self.line.strip()
                         sys.stdout.write("\r\n")
                         sys.stdout.flush()
                         self.line = ""
                         if line:
+                            if (not self.history) or (self.history[-1] != line):
+                                self.history.append(line)
+                            self.history_index = len(self.history)
                             self.waiting_response = True
                             self.send_shell_line(line)
+                        else:
+                            self.history_index = len(self.history)
                         self._redraw_input_unlocked()
                         continue
 
                     if c in (8, 127):
                         if self.line:
                             self.line = self.line[:-1]
+                            self.history_index = len(self.history)
                             self._redraw_input_unlocked()
                         else:
                             sys.stdout.write("\a")
@@ -268,11 +396,24 @@ class ShellClient:
                         continue
 
                     if c == 9:
-                        self._complete_first_token()
+                        self._complete_line()
+                        continue
+
+                    if c == 27:
+                        seq = self._read_escape_seq(fd)
+                        if seq in (b"[A", b"OA"):
+                            self._history_up()
+                            continue
+                        if seq in (b"[B", b"OB"):
+                            self._history_down()
+                            continue
+                        sys.stdout.write("\a")
+                        sys.stdout.flush()
                         continue
 
                     if 32 <= c <= 126:
                         self.line += chr(c)
+                        self.history_index = len(self.history)
                         sys.stdout.write(chr(c))
                         sys.stdout.flush()
                         continue
