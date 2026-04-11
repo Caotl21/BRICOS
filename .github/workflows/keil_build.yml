@@ -2,9 +2,9 @@ name: Auto_Build
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "CICD_test" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "CICD_test" ]
 
 jobs:
   build_job:
@@ -20,6 +20,20 @@ jobs:
       - name: Run Keil Build
         run: python tools/build_firmware.py
 
+      - name: Pick latest build output
+        id: pick
+        shell: pwsh
+        run: |
+          $latest = Get-ChildItem Build -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          if (-not $latest) { throw "No Build/<timestamp> folder found." }
+
+          $bin = Join-Path $latest.FullName "app.bin"
+          $log = Join-Path $latest.FullName "build.log"
+          if (-not (Test-Path $bin)) { throw "app.bin not found in $($latest.FullName)" }
+
+          "bin_path=$bin" >> $env:GITHUB_OUTPUT
+          if (Test-Path $log) { "log_path=$log" >> $env:GITHUB_OUTPUT}
+
       # 如果编译成功，把生成的固件文件上传到 GitHub 网页方便下载
       - name: Upload Artifact
         if: success()
@@ -27,7 +41,7 @@ jobs:
         with:
           name: Bricsbot_Firmware
           path: |
-             **/*.bin
+             ${{ steps.pick.outputs.bin_path }}
 
       # 生成一个基于日期和运行次数的 Tag 名 (例如 v2024.04.11-1)
       - name: Generate Tag Name
@@ -51,7 +65,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            **/*.hex
-            **/*.bin
+            ${{ steps.pick.outputs.bin_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
