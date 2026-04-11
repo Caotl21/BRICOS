@@ -2,58 +2,62 @@ name: Auto_Build
 
 on:
   push:
-    branches: [ "CICD_test" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "CICD_test" ]
+    branches: ["CICD_test"]
+
+permissions:
+  contents: write
 
 jobs:
   build_job:
-    # 关键点：指定在你自己的电脑上运行
     runs-on: self-hosted
 
     steps:
-      # 把 GitHub 上的代码拉取到你电脑的临时目录
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 运行编译脚本
       - name: Run Keil Build
+        shell: powershell
         run: python tools/build_firmware.py
 
-      - name: Pick latest build output
+      - name: Pick Latest Build Artifact
         id: pick
-        shell: pwsh
+        shell: powershell
         run: |
-          $latest = Get-ChildItem Build -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          if (-not (Test-Path Build)) { throw "Build folder not found." }
+          $latest = Get-ChildItem -Path Build -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if (-not $latest) { throw "No Build/<timestamp> folder found." }
 
           $bin = Join-Path $latest.FullName "app.bin"
           $log = Join-Path $latest.FullName "build.log"
           if (-not (Test-Path $bin)) { throw "app.bin not found in $($latest.FullName)" }
+          if (-not (Test-Path $log)) { throw "build.log not found in $($latest.FullName)" }
 
-          "bin_path=$bin" >> $env:GITHUB_OUTPUT
-          if (Test-Path $log) { "log_path=$log" >> $env:GITHUB_OUTPUT}
+          "bin_path=$bin" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "log_path=$log" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      # 如果编译成功，把生成的固件文件上传到 GitHub 网页方便下载
       - name: Upload Artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Bricsbot_Firmware
           path: |
-             ${{ steps.pick.outputs.bin_path }}
+            ${{ steps.pick.outputs.bin_path }}
+            ${{ steps.pick.outputs.log_path }}
 
-      # 生成一个基于日期和运行次数的 Tag 名 (例如 v2024.04.11-1)
       - name: Generate Tag Name
-        if: success() && github.event_name == 'push'
+        if: success()
         id: tag
+        shell: powershell
         run: |
-          echo "tag_name=v$(date +'%Y.%m.%d')-${{ github.run_number }}" >> $GITHUB_OUTPUT
-        shell: bash
+          $tag = "v{0}-{1}" -f (Get-Date -Format "yyyy.MM.dd"), "${{ github.run_number }}"
+          $build_time = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+          "tag_name=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "build_time=$build_time" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-      # 自动创建 Release 并上传文件
       - name: Create Release
-        if: success() && github.event_name == 'push'
+        if: success()
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag_name }}
@@ -61,10 +65,11 @@ jobs:
           body: |
             Bricsbot 自动编译发布
             - 提交信息: ${{ github.event.head_commit.message }}
-            - 编译时间: $(date +'%Y-%m-%d %H:%M:%S')
+            - 编译时间: ${{ steps.tag.outputs.build_time }}
           draft: false
           prerelease: false
           files: |
             ${{ steps.pick.outputs.bin_path }}
+            ${{ steps.pick.outputs.log_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
