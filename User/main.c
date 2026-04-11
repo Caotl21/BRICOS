@@ -43,7 +43,7 @@ int main(void)
     Driver_Power_Init();
     Driver_Thruster_Init();
 
-    System_SysTick_Init(168);
+    System_SysTick_Init(SYSCLK);
     Sys_BootFlag_MarkBootSuccess();
     System_Log_Init();
 

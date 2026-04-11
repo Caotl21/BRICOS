@@ -1,0 +1,57 @@
+name: Auto_Build
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build_job:
+    # 关键点：指定在你自己的电脑上运行
+    runs-on: self-hosted
+
+    steps:
+      # 把 GitHub 上的代码拉取到你电脑的临时目录
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 运行编译脚本
+      - name: Run Keil Build
+        run: python tools/build_firmware.py
+
+      # 如果编译成功，把生成的固件文件上传到 GitHub 网页方便下载
+      - name: Upload Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bricsbot_Firmware
+          path: |
+             **/*.bin
+
+      # 生成一个基于日期和运行次数的 Tag 名 (例如 v2024.04.11-1)
+      - name: Generate Tag Name
+        if: success() && github.event_name == 'push'
+        id: tag
+        run: |
+          echo "tag_name=v$(date +'%Y.%m.%d')-${{ github.run_number }}" >> $GITHUB_OUTPUT
+        shell: bash
+
+      # 自动创建 Release 并上传文件
+      - name: Create Release
+        if: success() && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: Release ${{ steps.tag.outputs.tag_name }}
+          body: |
+            Bricsbot 自动编译发布
+            - 提交信息: ${{ github.event.head_commit.message }}
+            - 编译时间: $(date +'%Y-%m-%d %H:%M:%S')
+          draft: false
+          prerelease: false
+          files: |
+            **/*.hex
+            **/*.bin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

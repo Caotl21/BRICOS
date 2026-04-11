@@ -13,6 +13,7 @@ PROJECT_PATH = os.path.join(ROOT_DIR, "Project", "project.uvprojx")
 TARGET_NAME = "Target 1"
 LOG_DIR = os.path.join(ROOT_DIR, "Build")
 OBJECT_DIR = os.path.join(ROOT_DIR, "Project", "Objects")
+HIDE_KEIL_WINDOW = True
 
 
 def modify_keil_macros(xml_path, new_defines):
@@ -44,7 +45,7 @@ def get_output_name(xml_path):
 
 
 def build_keil_project():
-    """Run Keil build and return (success, log_file, timestamp, output_name)."""
+    """Run Keil build and return (success, build_dir, log_file, output_name)."""
     if not os.path.exists(KEIL_EXE):
         print(f"ERROR: UV4.exe not found: {KEIL_EXE}")
         return False, None, None, None
@@ -56,63 +57,64 @@ def build_keil_project():
     os.makedirs(LOG_DIR, exist_ok=True)
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = os.path.join(LOG_DIR, f"build_log_{timestamp}.txt")
+    build_dir = os.path.join(LOG_DIR, timestamp)
+    os.makedirs(build_dir, exist_ok=True)
+    log_file = os.path.join(build_dir, "build.log")
     output_name = get_output_name(PROJECT_PATH)
 
-    cmd = [KEIL_EXE, "-r", PROJECT_PATH, "-t", TARGET_NAME, "-o", log_file]
+    cmd = [KEIL_EXE, "-j0", "-r", PROJECT_PATH, "-t", TARGET_NAME, "-o", log_file]
     print(f"Building target '{TARGET_NAME}' ...")
 
     try:
-        result = subprocess.run(cmd, check=False)
+        run_kwargs = {"check": False}
+        if os.name == "nt" and HIDE_KEIL_WINDOW:
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
+            run_kwargs["startupinfo"] = startupinfo
+            run_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        result = subprocess.run(cmd, **run_kwargs)
     except Exception as exc:
         print(f"ERROR: failed to execute Keil: {exc}")
-        return False, log_file, timestamp, output_name
+        return False, build_dir, log_file, output_name
 
     # Keil return code: 0=no warning, 1=warnings, >=2=errors
     if result.returncode <= 1:
         print(f"Build completed with return code {result.returncode}.")
-        return True, log_file, timestamp, output_name
+        return True, build_dir, log_file, output_name
 
     print(f"ERROR: build failed with return code {result.returncode}.")
     if os.path.exists(log_file):
         print(f"See build log: {log_file}")
-    return False, log_file, timestamp, output_name
+    return False, build_dir, log_file, output_name
 
 
-def export_timestamped_firmware(timestamp, output_name):
-    """Copy firmware outputs to timestamped names and return created files."""
-    created_files = []
-    candidates = [
-        os.path.join(OBJECT_DIR, f"{output_name}.hex"),
-        os.path.join(OBJECT_DIR, f"{output_name}.bin"),
-    ]
+def export_build_bin(build_dir, output_name):
+    """Copy build bin artifact into Build/<timestamp>/ and return output path."""
+    src_bin = os.path.join(OBJECT_DIR, f"{output_name}.bin")
+    if not os.path.exists(src_bin):
+        return None
 
-    for src in candidates:
-        if not os.path.exists(src):
-            continue
-        stem, ext = os.path.splitext(src)
-        dst = f"{stem}_{timestamp}{ext}"
-        shutil.copy2(src, dst)
-        created_files.append(dst)
-
-    return created_files
+    dst_bin = os.path.join(build_dir, f"{output_name}.bin")
+    shutil.copy2(src_bin, dst_bin)
+    return dst_bin
 
 
 if __name__ == "__main__":
     # Optional: update macro defines before build
     # modify_keil_macros(PROJECT_PATH, "STM32F10X_HD,USE_STDPERIPH_DRIVER,VERSION_V1")
 
-    ok, log_file, timestamp, output_name = build_keil_project()
+    ok, build_dir, log_file, output_name = build_keil_project()
     if not ok:
         sys.exit(1)
 
-    timestamped_files = export_timestamped_firmware(timestamp, output_name)
-    if timestamped_files:
-        print("Timestamped firmware files:")
-        for file_path in timestamped_files:
-            print(f" - {file_path}")
+    copied_bin = export_build_bin(build_dir, output_name)
+    if copied_bin:
+        print("Build output:")
+        print(f" - BIN: {copied_bin}")
     else:
-        print("WARNING: build succeeded but no .hex/.bin firmware was found to timestamp.")
+        print("ERROR: build succeeded but no .bin firmware was found.")
+        sys.exit(2)
 
     if log_file:
         print(f"Build log: {log_file}")
