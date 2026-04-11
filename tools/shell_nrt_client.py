@@ -107,6 +107,8 @@ class ShellClient:
         self.parser = HydroParser()
         self.running = True
         self.line = ""
+        self.prompt = "bricos$ "
+        self.waiting_response = False
         self.lock = threading.Lock()
         self.rx_thread = threading.Thread(target=self._rx_loop, daemon=True)
         self.verbose_frames = verbose_frames
@@ -147,7 +149,11 @@ class ShellClient:
             self._redraw_input_unlocked()
 
     def _redraw_input_unlocked(self):
-        sys.stdout.write("\r\033[2K> " + self.line)
+        if self.waiting_response:
+            sys.stdout.write("\r\033[2K")
+            sys.stdout.flush()
+            return
+        sys.stdout.write("\r\033[2K" + self.prompt + self.line)
         sys.stdout.flush()
 
     def _handle_frame(self, cmd: int, payload: bytes):
@@ -156,6 +162,7 @@ class ShellClient:
             self._shell_resp_buf.extend(payload)
             if self._shell_resp_buf.endswith(b"\r\n") or self._shell_resp_buf.endswith(b"\n"):
                 txt = self._shell_resp_buf.decode("utf-8", errors="replace").rstrip("\r\n")
+                self.waiting_response = False
                 self._print_async(txt)
                 self._shell_resp_buf.clear()
             return
@@ -209,7 +216,14 @@ class ShellClient:
 
     def run(self):
         self.rx_thread.start()
-        print("Interactive shell over NRT frame mode")
+        print(
+            " ____  ____  ___ ____ ___  ____\n"
+            "| __ )|  _ \\|_ _/ ___/ _ \\/ ___|\n"
+            "|  _ \\| |_) || | |  | | | \\___ \\\n"
+            "| |_) |  _ < | | |__| |_| |___) |\n"
+            "|____/|_| \\_\\___\\____\\___/|____/\n"
+        )
+        print("BRICOS Shell (NRT Frame Transport)")
         print("Ctrl-C to quit")
         print("Note: firmware-side Tab completion only works in UART stream mode.")
         print("This client provides local first-token completion for Tab.")
@@ -238,9 +252,10 @@ class ShellClient:
                         sys.stdout.write("\r\n")
                         sys.stdout.flush()
                         self.line = ""
-                        self._redraw_input_unlocked()
                         if line:
+                            self.waiting_response = True
                             self.send_shell_line(line)
+                        self._redraw_input_unlocked()
                         continue
 
                     if c in (8, 127):
@@ -273,7 +288,7 @@ class ShellClient:
 
 def parse_args():
     p = argparse.ArgumentParser(description="NRT shell client")
-    p.add_argument("--port", default="/dev/ttyUSB0", help="serial port")
+    p.add_argument("--port", default="/dev/ttyS7", help="serial port")
     p.add_argument("--baud", type=int, default=921600, help="baud rate")
     p.add_argument("--verbose-frames", action="store_true", help="print non-shell frames")
     return p.parse_args()
