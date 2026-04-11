@@ -1,6 +1,9 @@
 #include <ctype.h>
 #include <string.h>
 
+#include "bsp_delay.h"
+#include "bsp_cpu.h"
+
 #include "sys_mode_manager.h"
 #include "sys_shell_export.h"
 
@@ -224,8 +227,19 @@ static shell_ret_t prv_cmd_fault(shell_cmd_ctx_t *ctx, int argc, char **argv)
     return SHELL_RET_OK;
 }
 
+static shell_ret_t prv_cmd_reboot(shell_cmd_ctx_t *ctx, int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    System_ShellCore_Printf(ctx, "Rebooting...");
+    bsp_delay_ms(100);
+    bsp_cpu_reset();
+    return SHELL_RET_OK; // 实际上不会执行到这里
+}
+
 EXPORT_SHELL_CMD("help", "show command list", prv_cmd_help, SHELL_PERM_READONLY, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("echo", "echo text", prv_cmd_echo, SHELL_PERM_READONLY, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("sysmode", "sysmode request | sysmode set standby|disarmed|armed|failsafe", prv_cmd_sysmode, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("momode", "momode request | momode set manual|stabilize|auto", prv_cmd_momode, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
+EXPORT_SHELL_CMD("reboot", "reboot the system", prv_cmd_reboot, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("fault", "show fault flags", prv_cmd_fault, SHELL_PERM_READONLY, SHELL_MODE_ANY);
