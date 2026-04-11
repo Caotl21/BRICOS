@@ -108,6 +108,7 @@ class ShellClient:
 
     ANSI_RESET = "\033[0m"
     ANSI_GREEN = "\033[92m"
+    ANSI_WHITE = "\033[97m"
     ANSI_GRADIENT = [196, 202, 226, 82, 45]
 
     def __init__(self, port: str, baud: int, verbose_frames: bool = False):
@@ -115,7 +116,8 @@ class ShellClient:
         self.parser = HydroParser()
         self.running = True
         self.line = ""
-        self.prompt = "bricos$ "
+        self.prompt_name = "bricsbot1"
+        self.prompt_symbol = "$"
         self.waiting_response = False
         self.history = []
         self.history_index = 0
@@ -164,7 +166,14 @@ class ShellClient:
             sys.stdout.flush()
             return
         sys.stdout.write(
-            "\r\033[2K" + self.ANSI_GREEN + self.prompt + self.ANSI_RESET + self.line
+            "\r\033[2K"
+            + self.ANSI_GREEN
+            + self.prompt_name
+            + self.ANSI_WHITE
+            + self.prompt_symbol
+            + " "
+            + self.ANSI_RESET
+            + self.line
         )
         sys.stdout.flush()
 
