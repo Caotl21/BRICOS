@@ -1,85 +1,118 @@
+import datetime
 import os
+import shutil
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 
-# --- 配置信息 ---
-
-# 获取当前脚本所在目录 (D:\...\tools)
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
-# 找到项目根目录 (tools 的上一级)
-root_dir = os.path.dirname(script_dir)
-
-# Keil 安装路径下的 UV4.exe 路径
-KEIL_EXE = r"D:\Keil_v5\UV4\UV4.exe" 
-
-# 工程文件路径
-PROJECT_PATH = os.path.join(root_dir, "Project", "project.uvprojx")
-
+# Config
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(SCRIPT_DIR)
+KEIL_EXE = r"D:\Keil_v5\UV4\UV4.exe"
+PROJECT_PATH = os.path.join(ROOT_DIR, "Project", "project.uvprojx")
 TARGET_NAME = "Target 1"
+LOG_DIR = os.path.join(ROOT_DIR, "Build")
+OBJECT_DIR = os.path.join(ROOT_DIR, "Project", "Objects")
 
-# 编译日志输出路径
-LOG_FILE = os.path.join(root_dir, "build_log.txt")
 
 def modify_keil_macros(xml_path, new_defines):
-    """
-    修改 .uvprojx 中的 C/C++ 宏定义
-    :param xml_path: 工程文件路径
-    :param new_defines: 字符串格式的宏定义，例如 "STM32F10X_MD,USE_STDPERIPH_DRIVER"
-    """
-    # 解析 XML
+    """Update all <Define> nodes in a .uvprojx file."""
     tree = ET.parse(xml_path)
     root = tree.getroot()
 
-    # 寻找 <Define> 节点
-    # 注意：Keil 的 XML 结构很深，通常路径是：
-    # Targets -> Target -> TargetOption -> TargetArmAds -> Cads -> VariousControls -> Define
     found = False
     for define_node in root.findall(".//Define"):
         define_node.text = new_defines
         found = True
-    
+
     if found:
         tree.write(xml_path, encoding="utf-8", xml_declaration=True)
-        print(f"成功更新宏定义为: {new_defines}")
+        print(f"Updated macro defines: {new_defines}")
     else:
-        print("未找到 Define 节点，请检查工程文件结构。")
+        print("No <Define> node found in project file.")
+
+
+def get_output_name(xml_path):
+    """Read <OutputName> from project file, fallback to 'app'."""
+    try:
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        output_name = root.findtext(".//OutputName")
+        return output_name.strip() if output_name else "app"
+    except Exception:
+        return "app"
+
 
 def build_keil_project():
-    """
-    通过命令行调用 Keil 进行编译
-    """
+    """Run Keil build and return (success, log_file, timestamp, output_name)."""
     if not os.path.exists(KEIL_EXE):
-        print("错误: 找不到 UV4.exe，请检查配置路径。")
-        return
+        print(f"ERROR: UV4.exe not found: {KEIL_EXE}")
+        return False, None, None, None
 
-    # 构造命令
-    # -r: 全局重新编译 (Rebuild)
-    # -j0: 多核编译（加速）
-    # -o: 将输出重定向到日志文件
-    cmd = [KEIL_EXE, "-r", PROJECT_PATH, "-t", TARGET_NAME, "-o", LOG_FILE]
+    if not os.path.exists(PROJECT_PATH):
+        print(f"ERROR: project file not found: {PROJECT_PATH}")
+        return False, None, None, None
 
-    print(f"正在编译工程: {TARGET_NAME} ...")
-    
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = os.path.join(LOG_DIR, f"build_log_{timestamp}.txt")
+    output_name = get_output_name(PROJECT_PATH)
+
+    cmd = [KEIL_EXE, "-r", PROJECT_PATH, "-t", TARGET_NAME, "-o", log_file]
+    print(f"Building target '{TARGET_NAME}' ...")
+
     try:
-        # 运行并等待结束
-        result = subprocess.run(cmd, shell=True)
-        
-        # Keil 的退出码含义:
-        # 0: 无错误无警告, 1: 有警告, 2: 有错误, 3: 致命错误
-        if result.returncode <= 1:
-            print("🎉 编译成功!")
-        else:
-            print(f"❌ 编译失败，退出码: {result.returncode}")
-            if os.path.exists(LOG_FILE):
-                print(f"请检查日志文件: {LOG_FILE}")
+        result = subprocess.run(cmd, check=False)
+    except Exception as exc:
+        print(f"ERROR: failed to execute Keil: {exc}")
+        return False, log_file, timestamp, output_name
 
-    except Exception as e:
-        print(f"执行出错: {e}")
+    # Keil return code: 0=no warning, 1=warnings, >=2=errors
+    if result.returncode <= 1:
+        print(f"Build completed with return code {result.returncode}.")
+        return True, log_file, timestamp, output_name
+
+    print(f"ERROR: build failed with return code {result.returncode}.")
+    if os.path.exists(log_file):
+        print(f"See build log: {log_file}")
+    return False, log_file, timestamp, output_name
+
+
+def export_timestamped_firmware(timestamp, output_name):
+    """Copy firmware outputs to timestamped names and return created files."""
+    created_files = []
+    candidates = [
+        os.path.join(OBJECT_DIR, f"{output_name}.hex"),
+        os.path.join(OBJECT_DIR, f"{output_name}.bin"),
+    ]
+
+    for src in candidates:
+        if not os.path.exists(src):
+            continue
+        stem, ext = os.path.splitext(src)
+        dst = f"{stem}_{timestamp}{ext}"
+        shutil.copy2(src, dst)
+        created_files.append(dst)
+
+    return created_files
+
 
 if __name__ == "__main__":
-    # 第一步：修改宏定义（可选，例如自动化测试不同功能）
+    # Optional: update macro defines before build
     # modify_keil_macros(PROJECT_PATH, "STM32F10X_HD,USE_STDPERIPH_DRIVER,VERSION_V1")
 
-    # 第二步：执行编译
-    build_keil_project()
+    ok, log_file, timestamp, output_name = build_keil_project()
+    if not ok:
+        sys.exit(1)
+
+    timestamped_files = export_timestamped_firmware(timestamp, output_name)
+    if timestamped_files:
+        print("Timestamped firmware files:")
+        for file_path in timestamped_files:
+            print(f" - {file_path}")
+    else:
+        print("WARNING: build succeeded but no .hex/.bin firmware was found to timestamp.")
+
+    if log_file:
+        print(f"Build log: {log_file}")
