@@ -28,6 +28,8 @@
 #define STANDBY_ESC_KICK_SPEED           (6.0f)
 #define STANDBY_ESC_KICK_INTERVAL_CYCLES ((STANDBY_ESC_KICK_INTERVAL_MS + TASK_CONTROL_STANDBY_PERIOD_MS - 1u) / TASK_CONTROL_STANDBY_PERIOD_MS)
 #define STANDBY_ESC_KICK_DURATION_CYCLES ((STANDBY_ESC_KICK_DURATION_MS + TASK_CONTROL_STANDBY_PERIOD_MS - 1u) / TASK_CONTROL_STANDBY_PERIOD_MS)
+/* 暂时关闭STANDBY任务挂起/恢复，优先保证模式切换稳定性 */
+#define STANDBY_TASK_PAUSE_ENABLE        (0u)
 
 /* ARMED 进入动作：每个推进器依次轻转 0.2s */
 #define ARMED_ENTRY_SPIN_DURATION_MS     (200u)
@@ -328,6 +330,11 @@ static void prv_armed_entry_spin_once(void)
 
 static void prv_pause_standby_tasks(control_fsm_ctx_t *ctx)
 {
+    if (STANDBY_TASK_PAUSE_ENABLE == 0u) {
+        ctx->standby_tasks_paused = 0u;
+        return;
+    }
+
     if (ctx->standby_tasks_paused) {
         return;
     }
@@ -355,6 +362,11 @@ static void prv_pause_standby_tasks(control_fsm_ctx_t *ctx)
 
 static void prv_resume_standby_tasks(control_fsm_ctx_t *ctx)
 {
+    if (STANDBY_TASK_PAUSE_ENABLE == 0u) {
+        ctx->standby_tasks_paused = 0u;
+        return;
+    }
+
     if (!ctx->standby_tasks_paused) {
         return;
     }
@@ -362,24 +374,29 @@ static void prv_resume_standby_tasks(control_fsm_ctx_t *ctx)
     if (IMU_Task_Handler != NULL) {
         vTaskResume(IMU_Task_Handler);
         Bot_Task_LastTick_Reset(TASK_ID_IMU);
+        LOG_INFO("IMU task resumed");
     }
     if (MS5837_Task_Handler != NULL) {
         vTaskResume(MS5837_Task_Handler);
         Bot_Task_LastTick_Reset(TASK_ID_MS5837);
+        LOG_INFO("MS5837 task resumed");
     }
     if (Power_Task_Handler != NULL) {
         vTaskResume(Power_Task_Handler);
         Bot_Task_LastTick_Reset(TASK_ID_POWER);
+        LOG_INFO("Power task resumed");
     }
     if (DHT11_Task_Handler != NULL) {
         vTaskResume(DHT11_Task_Handler);
         Bot_Task_LastTick_Reset(TASK_ID_DHT11);
+        LOG_INFO("DHT11 task resumed");
     }
 
     Task_Comm_SetRtChannelEnabled(1u);
     if (RT_Comm_Task_Handler != NULL) {
         vTaskResume(RT_Comm_Task_Handler);
         Bot_Task_LastTick_Reset(TASK_ID_CONTROL);
+        LOG_INFO("RT_Comm task resumed");
     }
 
     ctx->standby_tasks_paused = 0u;
