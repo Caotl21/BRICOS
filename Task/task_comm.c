@@ -7,6 +7,7 @@
 #include "driver_hydrocore.h"
 
 #include "task_comm.h"
+#include "task_shell_transport_nrt.h"
 
 // 定义双缓冲 (Ping-Pong Buffers)
 #define RX_BUF_SIZE 180
@@ -114,6 +115,10 @@ void vTask_RT_Comm_Opi(void *pvParameters) {
 // 非实时通信任务
 void vTask_NRT_Comm_Opi(void *pvParameters) {
     opi_rx_msg_t rx_msg;
+    (void)pvParameters;
+
+    /* Send one-shot shell startup status after scheduler and NRT task are up. */
+    Task_ShellTransportNRT_OnNrtCommStarted();
 
     while (1) {
         if (xQueueReceive(s_nrt_rx_ptr_queue, &rx_msg, portMAX_DELAY) == pdPASS) {

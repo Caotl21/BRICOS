@@ -124,7 +124,8 @@ class ShellClient:
     ANSI_GRADIENT = [196, 202, 226, 82, 45]
     RECONNECT_RETRY_SEC = 0.3
     SHELL_BOOT_PROBE_INTERVAL_SEC = 0.3
-    BOOT_STATUS_DUP_GUARD_SEC = 0.6
+    BOOT_STATUS_DUP_GUARD_SEC = 1.0
+    BOOT_STATUS_STARTUP_SETTLE_SEC = 3.0
     REBOOT_BOOT_PROBE_DELAY_SEC = 0.25
     SHELL_BOOT_DETECT_PAYLOAD = b"detect"
     SHELL_BOOT_STATUS_TEXT = "startup_success"
@@ -155,6 +156,7 @@ class ShellClient:
         self._shell_ready = False
         self._next_boot_probe_ts = 0.0
         self._last_boot_status_ts = 0.0
+        self._shell_ready_since_ts = 0.0
 
     @staticmethod
     def _checksum(data: bytes) -> int:
@@ -200,6 +202,7 @@ class ShellClient:
         self._shell_ready = False
         self.waiting_response = False
         self._shell_resp_buf.clear()
+        self._shell_ready_since_ts = 0.0
         self._next_boot_probe_ts = time.monotonic() + max(0.0, delay_sec)
 
     def _print_shell_intro_unlocked(self):
@@ -219,6 +222,7 @@ class ShellClient:
             self.waiting_response = False
             self._shell_resp_buf.clear()
             self.line = ""
+            self._shell_ready_since_ts = time.monotonic()
             sys.stdout.write("\r\n")
             self._print_shell_intro_unlocked()
             self._redraw_input_unlocked()
@@ -458,6 +462,9 @@ class ShellClient:
                 self._last_boot_status_ts = now
 
                 if self._shell_ready:
+                    ready_since = self._shell_ready_since_ts
+                    if (ready_since > 0.0) and ((now - ready_since) < self.BOOT_STATUS_STARTUP_SETTLE_SEC):
+                        return
                     if (now - last_ts) < self.BOOT_STATUS_DUP_GUARD_SEC:
                         return
                     self._mark_shell_ready(force_refresh=True)

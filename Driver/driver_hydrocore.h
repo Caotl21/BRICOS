@@ -33,7 +33,7 @@ typedef enum {
 #define DATA_TYPE_SET_SERVO       0x14
 #define DATA_TYPE_SET_TAM         0x15
 
-// ACK状态码定义
+// SERVICE ACK状态码定义
 #define ACK_SUCCESS               0x01
 #define INVALID_PARAM             0x02
 #define UNKNOWN_CMD               0x03  

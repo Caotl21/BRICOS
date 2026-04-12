@@ -13,6 +13,7 @@
 
 /* Shell Core 在 start() 时注入的接收回调 */
 static shell_rx_cb_t s_shell_rx_cb = 0;
+static uint8_t s_startup_status_pending = 0u;
 
 static void prv_send_shell_boot_status(void)
 {
@@ -71,12 +72,11 @@ static int prv_nrt_start(shell_rx_cb_t rx_cb)
 
     SYS_ENTER_CRITICAL();
     s_shell_rx_cb = rx_cb;
+    s_startup_status_pending = 1u;
     SYS_EXIT_CRITICAL();
 
     Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_REQ, prv_on_shell_req);
     Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_BOOT_DETECT, prv_on_shell_boot_detect);
-    /* Active one-shot startup ack, probing fallback is still supported. */
-    prv_send_shell_boot_status();
     return 0;
 }
 
@@ -113,6 +113,7 @@ static int prv_nrt_stop(void)
 {
     SYS_ENTER_CRITICAL();
     s_shell_rx_cb = 0;
+    s_startup_status_pending = 0u;
     SYS_EXIT_CRITICAL();
 
     /* 注销 shell 命令处理，避免 stop 后仍被分发 */
@@ -131,4 +132,20 @@ static const shell_transport_vtable_t s_shell_nrt_vtable = {
 const shell_transport_vtable_t *Task_ShellTransportNRT_GetVTable(void)
 {
     return &s_shell_nrt_vtable;
+}
+
+void Task_ShellTransportNRT_OnNrtCommStarted(void)
+{
+    uint8_t should_send = 0u;
+
+    SYS_ENTER_CRITICAL();
+    if (s_startup_status_pending != 0u) {
+        s_startup_status_pending = 0u;
+        should_send = 1u;
+    }
+    SYS_EXIT_CRITICAL();
+
+    if (should_send != 0u) {
+        prv_send_shell_boot_status();
+    }
 }

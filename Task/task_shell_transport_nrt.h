@@ -18,4 +18,7 @@
 /* 获取 NRT 传输适配器 vtable */
 const shell_transport_vtable_t *Task_ShellTransportNRT_GetVTable(void);
 
+/* Notify shell transport that NRT comm task has started (RTOS context). */
+void Task_ShellTransportNRT_OnNrtCommStarted(void);
+
 #endif /* __TASK_SHELL_TRANSPORT_NRT_H */
