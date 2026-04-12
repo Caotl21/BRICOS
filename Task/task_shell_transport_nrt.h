@@ -12,6 +12,8 @@
  */
 #define DATA_TYPE_SHELL_REQ   (0x20u)
 #define DATA_TYPE_SHELL_RESP  (0x21u)
+#define DATA_TYPE_SHELL_BOOT_DETECT  (0x22u)
+#define DATA_TYPE_SHELL_BOOT_STATUS  (0x23u)
 
 /* 获取 NRT 传输适配器 vtable */
 const shell_transport_vtable_t *Task_ShellTransportNRT_GetVTable(void);

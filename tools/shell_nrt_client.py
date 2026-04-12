@@ -17,6 +17,8 @@ END2 = 0xDD
 
 CMD_SHELL_REQ = 0x20
 CMD_SHELL_RESP = 0x21
+CMD_SHELL_BOOT_DETECT = 0x22
+CMD_SHELL_BOOT_STATUS = 0x23
 CMD_ACK = 0xFF
 
 ACK_MAP = {
@@ -121,7 +123,10 @@ class ShellClient:
     ANSI_WHITE = "\033[97m"
     ANSI_GRADIENT = [196, 202, 226, 82, 45]
     RECONNECT_RETRY_SEC = 0.3
-    REBOOT_RECONNECT_DELAY_SEC = 0.25
+    SHELL_BOOT_PROBE_INTERVAL_SEC = 0.3
+    REBOOT_BOOT_PROBE_DELAY_SEC = 0.25
+    SHELL_BOOT_DETECT_PAYLOAD = b"detect"
+    SHELL_BOOT_STATUS_TEXT = "startup_success"
 
     def __init__(self, port: str, baud: int, verbose_frames: bool = False):
         self.port = port
@@ -140,8 +145,8 @@ class ShellClient:
         self.rx_thread = threading.Thread(target=self._rx_loop, daemon=True)
         self.verbose_frames = verbose_frames
         self._shell_resp_buf = bytearray()
-        self._reboot_reconnect_pending = False
-        self._reboot_reconnect_lock = threading.Lock()
+        self._shell_ready = False
+        self._next_boot_probe_ts = 0.0
 
     @staticmethod
     def _checksum(data: bytes) -> int:
@@ -183,23 +188,48 @@ class ShellClient:
     def _is_reboot_command(line: str) -> bool:
         return line.strip().lower() == "reboot"
 
-    def _schedule_reconnect_after_reboot(self):
-        with self._reboot_reconnect_lock:
-            if self._reboot_reconnect_pending:
+    def _set_boot_wait_state(self, delay_sec: float):
+        self._shell_ready = False
+        self.waiting_response = False
+        self._shell_resp_buf.clear()
+        self._next_boot_probe_ts = time.monotonic() + max(0.0, delay_sec)
+
+    def _print_shell_intro_unlocked(self):
+        self._print_logo()
+        print("BRICOS Shell (NRT Frame Transport)")
+        print("Ctrl-C to quit")
+        print("This client provides local command + argument completion for Tab.")
+        print("Welcome to our bot world! Type 'help' to get started.\n")
+
+    def _mark_shell_ready(self):
+        with self.lock:
+            if self._shell_ready:
                 return
-            self._reboot_reconnect_pending = True
+            self._shell_ready = True
+            self.waiting_response = False
+            self._shell_resp_buf.clear()
+            sys.stdout.write("\r\n")
+            self._print_shell_intro_unlocked()
+            self._redraw_input_unlocked()
 
-        threading.Thread(target=self._reconnect_after_reboot_worker, daemon=True).start()
-
-    def _reconnect_after_reboot_worker(self):
+    def _send_boot_detect(self):
+        frame = self._build_frame(CMD_SHELL_BOOT_DETECT, self.SHELL_BOOT_DETECT_PAYLOAD)
         try:
-            time.sleep(self.REBOOT_RECONNECT_DELAY_SEC)
-            if not self.running:
+            if (not self.connected) or (self.ser is None):
                 return
+            self.ser.write(frame)
+            self.ser.flush()
+        except (serial.SerialException, OSError):
             self._handle_disconnect()
-        finally:
-            with self._reboot_reconnect_lock:
-                self._reboot_reconnect_pending = False
+
+    def _poll_boot_detect(self):
+        if self._shell_ready or (not self.connected):
+            return
+        now = time.monotonic()
+        if now < self._next_boot_probe_ts:
+            return
+        self._next_boot_probe_ts = now + self.SHELL_BOOT_PROBE_INTERVAL_SEC
+        self._send_boot_detect()
 
     def _print_async(self, text: str):
         with self.lock:
@@ -207,6 +237,10 @@ class ShellClient:
             self._redraw_input_unlocked()
 
     def _redraw_input_unlocked(self):
+        if not self._shell_ready:
+            sys.stdout.write("\r\033[2K")
+            sys.stdout.flush()
+            return
         if self.waiting_response:
             sys.stdout.write("\r\033[2K")
             sys.stdout.flush()
@@ -359,22 +393,19 @@ class ShellClient:
                 self.ser = serial.Serial(port=self.port, baudrate=self.baud, timeout=0.05)
                 self.connected = True
                 self.parser = HydroParser()
-                self._shell_resp_buf.clear()
-                self.waiting_response = False
-
+                self._set_boot_wait_state(delay_sec=0.0)
                 if not initial:
-                    with self.lock:
-                        sys.stdout.write("\r\n\r\n")
-                        self._print_logo()
-                        self._redraw_input_unlocked()
+                    self._print_async("[INFO] serial reconnected, waiting for startup ack...")
                 return
             except (serial.SerialException, OSError):
                 time.sleep(self.RECONNECT_RETRY_SEC)
 
     def _handle_disconnect(self):
         self.connected = False
+        self._shell_ready = False
         self.waiting_response = False
         self._shell_resp_buf.clear()
+        self._next_boot_probe_ts = 0.0
         if self.ser is not None:
             try:
                 self.ser.close()
@@ -407,6 +438,14 @@ class ShellClient:
         return f"[ERR {ret}:{ret_name}] {ret_desc}"
 
     def _handle_frame(self, cmd: int, payload: bytes):
+        if cmd == CMD_SHELL_BOOT_STATUS:
+            status_text = payload.decode("utf-8", errors="replace").strip().lower()
+            if status_text == self.SHELL_BOOT_STATUS_TEXT:
+                self._mark_shell_ready()
+            elif self.verbose_frames:
+                self._print_async(f"[BOOT] unexpected status: {status_text}")
+            return
+
         if cmd == CMD_SHELL_RESP:
             # Shell response may be split across multiple 0x21 frames.
             self._shell_resp_buf.extend(payload)
@@ -435,6 +474,8 @@ class ShellClient:
                 self._connect_serial(initial=False)
                 continue
 
+            self._poll_boot_detect()
+
             try:
                 if self.ser is None:
                     self._handle_disconnect()
@@ -453,11 +494,7 @@ class ShellClient:
     def run(self):
         self._connect_serial(initial=True)
         self.rx_thread.start()
-        self._print_logo()
-        print("BRICOS Shell (NRT Frame Transport)")
-        print("Ctrl-C to quit")
-        print("This client provides local command + argument completion for Tab.")
-        print("Welcome to our bot world! Type 'help' to get started.\n")
+        print("Waiting for device startup ack...")
 
         fd = sys.stdin.fileno()
         with RawMode(fd):
@@ -478,6 +515,13 @@ class ShellClient:
                     break
 
                 with self.lock:
+                    if not self._shell_ready:
+                        if c == 27:
+                            _ = self._read_escape_seq(fd)
+                        sys.stdout.write("\a")
+                        sys.stdout.flush()
+                        continue
+
                     if self.waiting_response:
                         if c == 27:
                             _ = self._read_escape_seq(fd)
@@ -496,8 +540,9 @@ class ShellClient:
                             self.history_index = len(self.history)
                             if self.send_shell_line(line):
                                 if self._is_reboot_command(line):
-                                    self.waiting_response = False
-                                    self._schedule_reconnect_after_reboot()
+                                    self._set_boot_wait_state(self.REBOOT_BOOT_PROBE_DELAY_SEC)
+                                    sys.stdout.write("[INFO] reboot sent, waiting for startup ack...\r\n")
+                                    sys.stdout.flush()
                                 else:
                                     self.waiting_response = True
                             else:

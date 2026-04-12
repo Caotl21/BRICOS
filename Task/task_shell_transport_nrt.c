@@ -9,6 +9,7 @@
  * 这里保守设置为 240，给后续扩展字段预留空间。
  */
 #define SHELL_NRT_TX_CHUNK_MAX  (240u)
+#define SHELL_BOOT_STATUS_TEXT  "startup_success"
 
 /* Shell Core 在 start() 时注入的接收回调 */
 static shell_rx_cb_t s_shell_rx_cb = 0;
@@ -39,6 +40,19 @@ static void prv_on_shell_req(const uint8_t *payload, uint16_t len)
     cb(&peer, payload, len);
 }
 
+static void prv_on_shell_boot_detect(const uint8_t *payload, uint16_t len)
+{
+    static const uint8_t s_boot_status[] = SHELL_BOOT_STATUS_TEXT;
+    (void)payload;
+    (void)len;
+
+    Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                              (uint8_t)DATA_TYPE_SHELL_BOOT_STATUS,
+                              s_boot_status,
+                              (uint8_t)(sizeof(s_boot_status) - 1u),
+                              USE_DMA);
+}
+
 static int prv_nrt_init(void)
 {
     return 0;
@@ -55,6 +69,7 @@ static int prv_nrt_start(shell_rx_cb_t rx_cb)
     SYS_EXIT_CRITICAL();
 
     Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_REQ, prv_on_shell_req);
+    Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_BOOT_DETECT, prv_on_shell_boot_detect);
     return 0;
 }
 
@@ -95,6 +110,7 @@ static int prv_nrt_stop(void)
 
     /* 注销 shell 命令处理，避免 stop 后仍被分发 */
     Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_REQ, 0);
+    Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_BOOT_DETECT, 0);
     return 0;
 }
 
