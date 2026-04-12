@@ -124,6 +124,7 @@ class ShellClient:
     ANSI_GRADIENT = [196, 202, 226, 82, 45]
     RECONNECT_RETRY_SEC = 0.3
     SHELL_BOOT_PROBE_INTERVAL_SEC = 0.3
+    BOOT_STATUS_DUP_GUARD_SEC = 0.6
     REBOOT_BOOT_PROBE_DELAY_SEC = 0.25
     SHELL_BOOT_DETECT_PAYLOAD = b"detect"
     SHELL_BOOT_STATUS_TEXT = "startup_success"
@@ -153,6 +154,7 @@ class ShellClient:
         self._shell_resp_buf = bytearray()
         self._shell_ready = False
         self._next_boot_probe_ts = 0.0
+        self._last_boot_status_ts = 0.0
 
     @staticmethod
     def _checksum(data: bytes) -> int:
@@ -209,13 +211,14 @@ class ShellClient:
         self._write_line()
         sys.stdout.flush()
 
-    def _mark_shell_ready(self):
+    def _mark_shell_ready(self, force_refresh: bool = False):
         with self.lock:
-            if self._shell_ready:
+            if self._shell_ready and (not force_refresh):
                 return
             self._shell_ready = True
             self.waiting_response = False
             self._shell_resp_buf.clear()
+            self.line = ""
             sys.stdout.write("\r\n")
             self._print_shell_intro_unlocked()
             self._redraw_input_unlocked()
@@ -414,6 +417,7 @@ class ShellClient:
         self.waiting_response = False
         self._shell_resp_buf.clear()
         self._next_boot_probe_ts = 0.0
+        self._last_boot_status_ts = 0.0
         if self.ser is not None:
             try:
                 self.ser.close()
@@ -449,7 +453,16 @@ class ShellClient:
         if cmd == CMD_SHELL_BOOT_STATUS:
             status_text = payload.decode("utf-8", errors="replace").strip().lower()
             if status_text == self.SHELL_BOOT_STATUS_TEXT:
-                self._mark_shell_ready()
+                now = time.monotonic()
+                last_ts = self._last_boot_status_ts
+                self._last_boot_status_ts = now
+
+                if self._shell_ready:
+                    if (now - last_ts) < self.BOOT_STATUS_DUP_GUARD_SEC:
+                        return
+                    self._mark_shell_ready(force_refresh=True)
+                else:
+                    self._mark_shell_ready()
             elif self.verbose_frames:
                 self._print_async(f"[BOOT] unexpected status: {status_text}")
             return

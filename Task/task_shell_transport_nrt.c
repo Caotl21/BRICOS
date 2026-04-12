@@ -14,6 +14,17 @@
 /* Shell Core 在 start() 时注入的接收回调 */
 static shell_rx_cb_t s_shell_rx_cb = 0;
 
+static void prv_send_shell_boot_status(void)
+{
+    static const uint8_t s_boot_status[] = SHELL_BOOT_STATUS_TEXT;
+
+    Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                              (uint8_t)DATA_TYPE_SHELL_BOOT_STATUS,
+                              s_boot_status,
+                              (uint8_t)(sizeof(s_boot_status) - 1u),
+                              USE_DMA);
+}
+
 /*
  * NRT 命令回调：把收到的 payload 转交给 Shell Core。
  * 当前按 NRT_FRAME 模式处理（一帧一命令）。
@@ -42,15 +53,9 @@ static void prv_on_shell_req(const uint8_t *payload, uint16_t len)
 
 static void prv_on_shell_boot_detect(const uint8_t *payload, uint16_t len)
 {
-    static const uint8_t s_boot_status[] = SHELL_BOOT_STATUS_TEXT;
     (void)payload;
     (void)len;
-
-    Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
-                              (uint8_t)DATA_TYPE_SHELL_BOOT_STATUS,
-                              s_boot_status,
-                              (uint8_t)(sizeof(s_boot_status) - 1u),
-                              USE_DMA);
+    prv_send_shell_boot_status();
 }
 
 static int prv_nrt_init(void)
@@ -70,6 +75,8 @@ static int prv_nrt_start(shell_rx_cb_t rx_cb)
 
     Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_REQ, prv_on_shell_req);
     Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_BOOT_DETECT, prv_on_shell_boot_detect);
+    /* Active one-shot startup ack, probing fallback is still supported. */
+    prv_send_shell_boot_status();
     return 0;
 }
 
