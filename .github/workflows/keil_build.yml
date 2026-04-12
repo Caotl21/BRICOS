@@ -22,7 +22,7 @@ jobs:
 
       - name: Run Keil Build
         shell: powershell
-        run: python tools/build_firmware.py
+        run: python tools/make/build_firmware.py
 
       - name: Pick Latest Build Artifact
         id: pick

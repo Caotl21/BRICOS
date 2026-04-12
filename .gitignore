@@ -28,6 +28,6 @@ Project/*.uvguix.*
 
 Boot/
 
-*/__pycache__/
+**/__pycache__/
 
 Build/

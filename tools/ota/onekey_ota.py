@@ -7,7 +7,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 
@@ -90,24 +89,25 @@ def run_cmd(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
 
 
-def build_mux_options(control_path: str | None, persist_sec: int) -> list[str]:
-    if not control_path:
-        return []
-    return [
-        "-o",
-        "ControlMaster=auto",
-        "-o",
-        f"ControlPath={control_path}",
-        "-o",
-        f"ControlPersist={persist_sec}s",
-    ]
-
-
 def resolve_tool(name: str, override: str | None = None) -> str:
     if override:
-        p = Path(override).expanduser().resolve()
+        raw = os.path.expanduser(override)
+        p = Path(raw)
         if p.is_file():
             return str(p)
+
+        # 32-bit Python on Windows can redirect System32 -> SysWOW64.
+        # If user passes System32 explicitly, try Sysnative fallback.
+        if os.name == "nt":
+            low = raw.lower()
+            mark = "\\system32\\"
+            idx = low.find(mark)
+            if idx >= 0:
+                alt = raw[:idx] + "\\Sysnative\\" + raw[idx + len(mark):]
+                alt_p = Path(alt)
+                if alt_p.is_file():
+                    return str(alt_p)
+
         raise RuntimeError(f"{name} override path not found: {p}")
 
     hit = shutil.which(name) or shutil.which(f"{name}.exe")
@@ -200,15 +200,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ssh-bin", help="Optional absolute path to ssh executable")
     parser.add_argument("--scp-bin", help="Optional absolute path to scp executable")
     parser.add_argument(
-        "--single-password",
-        action="store_true",
-        help="Prompt password once by reusing one SSH control connection for this run.",
+        "--ssh-key",
+        default="~/.ssh/id_ed25519_bricsbot_ota",
+        help=(
+            "Private key path for SSH/SCP. "
+            "Default: ~/.ssh/id_ed25519_bricsbot_ota"
+        ),
     )
     parser.add_argument(
-        "--control-persist-sec",
-        type=int,
-        default=300,
-        help="Seconds to keep SSH control connection alive (used with --single-password).",
+        "--use-ssh-key",
+        dest="use_ssh_key",
+        action="store_true",
+        default=True,
+        help="Use private key authentication (default: enabled).",
+    )
+    parser.add_argument(
+        "--no-ssh-key",
+        dest="use_ssh_key",
+        action="store_false",
+        help="Disable private key authentication and use password login.",
     )
     return parser.parse_args()
 
@@ -227,6 +237,9 @@ def main() -> int:
 
     ssh_bin = resolve_tool("ssh", args.ssh_bin)
     scp_bin = resolve_tool("scp", args.scp_bin)
+    key_path = Path(os.path.expanduser(args.ssh_key))
+    if args.use_ssh_key and (not key_path.is_file()):
+        raise RuntimeError(f"SSH private key not found: {key_path}")
 
     target = f"{args.user}@{ip}"
     remote_bin_name = local_bin.name
@@ -241,48 +254,33 @@ def main() -> int:
     print(f"ssh: {ssh_bin}")
     print(f"scp: {scp_bin}")
 
-    ssh_opts: list[str] = []
-    master_started = False
-    if args.single_password:
-        mux_dir = Path(tempfile.gettempdir()) / "onekey_ota_mux"
-        mux_dir.mkdir(parents=True, exist_ok=True)
-        safe_id = f"{args.user}_{ip.replace('.', '_')}"
-        control_path = (mux_dir / f"mux_{safe_id}").as_posix()
-        ssh_opts = build_mux_options(control_path, args.control_persist_sec)
-        print("Single-password mode enabled.")
-        try:
-            run_cmd([ssh_bin, *ssh_opts, "-MNf", target])
-            master_started = True
-        except subprocess.CalledProcessError:
-            if os.name == "nt":
-                print(
-                    "[WARN] SSH connection multiplexing is not supported by this Windows OpenSSH build."
-                )
-            else:
-                print("[WARN] Failed to start SSH control master; falling back.")
-            print("[WARN] Fallback to normal mode (you may be prompted for password multiple times).")
-            ssh_opts = []
-            master_started = False
+    auth_opts: list[str] = []
+    if args.use_ssh_key:
+        print(f"ssh key: {key_path}")
+        auth_opts = [
+            "-i",
+            str(key_path),
+            "-o",
+            "IdentitiesOnly=yes",
+        ]
+    else:
+        print("ssh key: disabled")
 
-    try:
-        run_cmd([ssh_bin, *ssh_opts, target, f"mkdir -p {remote_dir}"])
-        run_cmd([scp_bin, *ssh_opts, str(local_ota_send), remote_ota_send])
-        run_cmd([scp_bin, *ssh_opts, str(local_bin), remote_bin])
+    run_cmd([ssh_bin, *auth_opts, target, f"mkdir -p {remote_dir}"])
+    run_cmd([scp_bin, *auth_opts, str(local_ota_send), remote_ota_send])
+    run_cmd([scp_bin, *auth_opts, str(local_bin), remote_bin])
 
-        remote_cmd = (
-            f"cd {remote_dir} && "
-            f"{args.remote_python} ota_send.py "
-            f"--mode hw-reset "
-            f"--cmd-port {shlex.quote(args.cmd_port)} "
-            f"--data-port {shlex.quote(args.data_port)} "
-            f"--file {shlex.quote(remote_bin_name)} "
-            f"--reset-gpiochip {shlex.quote(args.reset_gpiochip)} "
-            f"--reset-line {args.reset_line}"
-        )
-        run_cmd([ssh_bin, *ssh_opts, target, remote_cmd])
-    finally:
-        if master_started:
-            subprocess.run([ssh_bin, *ssh_opts, "-O", "exit", target], check=False)
+    remote_cmd = (
+        f"cd {remote_dir} && "
+        f"{args.remote_python} ota_send.py "
+        f"--mode hw-reset "
+        f"--cmd-port {shlex.quote(args.cmd_port)} "
+        f"--data-port {shlex.quote(args.data_port)} "
+        f"--file {shlex.quote(remote_bin_name)} "
+        f"--reset-gpiochip {shlex.quote(args.reset_gpiochip)} "
+        f"--reset-line {args.reset_line}"
+    )
+    run_cmd([ssh_bin, *auth_opts, target, remote_cmd])
 
     print("OTA completed.")
     return 0
