@@ -128,6 +128,12 @@ class ShellClient:
     SHELL_BOOT_DETECT_PAYLOAD = b"detect"
     SHELL_BOOT_STATUS_TEXT = "startup_success"
 
+    @staticmethod
+    def _write_line(text: str = ""):
+        # In raw tty mode, '\n' does not reliably return to column 0.
+        # Always emit CRLF explicitly for aligned multi-line output.
+        sys.stdout.write(text + "\r\n")
+
     def __init__(self, port: str, baud: int, verbose_frames: bool = False):
         self.port = port
         self.baud = baud
@@ -196,10 +202,12 @@ class ShellClient:
 
     def _print_shell_intro_unlocked(self):
         self._print_logo()
-        print("BRICOS Shell (NRT Frame Transport)")
-        print("Ctrl-C to quit")
-        print("This client provides local command + argument completion for Tab.")
-        print("Welcome to our bot world! Type 'help' to get started.\n")
+        self._write_line("BRICOS Shell (NRT Frame Transport)")
+        self._write_line("Ctrl-C to quit")
+        self._write_line("This client provides local command + argument completion for Tab.")
+        self._write_line("Welcome to our bot world! Type 'help' to get started.")
+        self._write_line()
+        sys.stdout.flush()
 
     def _mark_shell_ready(self):
         with self.lock:
@@ -385,7 +393,7 @@ class ShellClient:
 
         for idx, line in enumerate(logo_lines):
             color = self.ANSI_GRADIENT[idx % len(self.ANSI_GRADIENT)]
-            print(f"\033[38;5;{color}m{line}{self.ANSI_RESET}")
+            self._write_line(f"\033[38;5;{color}m{line}{self.ANSI_RESET}")
 
     def _connect_serial(self, initial: bool):
         while self.running and (not self.connected):
