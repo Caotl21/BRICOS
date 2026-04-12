@@ -2,7 +2,7 @@ name: Auto_Build
 
 on:
   pull_request:
-    branches: ["master"]
+    branches: ["CICD_test"]
     types: [closed]
   workflow_dispatch:
 
