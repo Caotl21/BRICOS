@@ -167,7 +167,7 @@ static void vTask_Monitor_Core(void *pvParameters)
             (void)System_ModeManager_EnterFailsafe(failsafe_faults);
         }
 
-        if (all_tasks_healthy && (failsafe_faults == SYS_FAULT_NONE) && (current_sys_mode != SYS_MODE_FAILSAFE)) {
+        if (all_tasks_healthy) {
             LOG_INFO("All tasks healthy!! CPU=%lu%%, TEMP=%lu", cpu, temp);
             bsp_wdg_feed();
         }

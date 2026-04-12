@@ -361,20 +361,25 @@ static void prv_resume_standby_tasks(control_fsm_ctx_t *ctx)
 
     if (IMU_Task_Handler != NULL) {
         vTaskResume(IMU_Task_Handler);
+        Bot_Task_LastTick_Reset(TASK_ID_IMU);
     }
     if (MS5837_Task_Handler != NULL) {
         vTaskResume(MS5837_Task_Handler);
+        Bot_Task_LastTick_Reset(TASK_ID_MS5837);
     }
     if (Power_Task_Handler != NULL) {
         vTaskResume(Power_Task_Handler);
+        Bot_Task_LastTick_Reset(TASK_ID_POWER);
     }
     if (DHT11_Task_Handler != NULL) {
         vTaskResume(DHT11_Task_Handler);
+        Bot_Task_LastTick_Reset(TASK_ID_DHT11);
     }
 
     Task_Comm_SetRtChannelEnabled(1u);
     if (RT_Comm_Task_Handler != NULL) {
         vTaskResume(RT_Comm_Task_Handler);
+        Bot_Task_LastTick_Reset(TASK_ID_CONTROL);
     }
 
     ctx->standby_tasks_paused = 0u;

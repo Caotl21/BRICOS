@@ -135,3 +135,16 @@ void Bot_Task_LastTick_Pull(uint32_t *out_ticks, uint8_t len)
     SYS_EXIT_CRITICAL();
 }
 
+void Bot_Task_LastTick_Reset(monitor_task_id_t task_id)
+{
+    uint32_t now = xTaskGetTickCount();
+    if (task_id >= MAX_MONITOR_TASKS) {
+        LOG_ERROR("Invalid task ID %u in Bot_Task_LastTick_Reset", task_id);
+        return;
+    }
+
+    SYS_ENTER_CRITICAL();
+    s_task_last_tick[task_id] = now;
+    SYS_EXIT_CRITICAL();
+}
+

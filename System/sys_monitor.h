@@ -26,5 +26,6 @@ uint32_t System_Runtime_GetChipTemperature(void);
 /* --------------------------- 任务心跳监控接口 ------------------------------- */
 void Bot_Task_CheckIn_Monitor(monitor_task_id_t task_id);
 void Bot_Task_LastTick_Pull(uint32_t *out_ticks, uint8_t len);
+void Bot_Task_LastTick_Reset(monitor_task_id_t task_id);
 
 #endif /* __SYS_MONITOR_H */

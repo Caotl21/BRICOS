@@ -20,6 +20,7 @@ CMD_SHELL_RESP = 0x21
 CMD_SHELL_BOOT_DETECT = 0x22
 CMD_SHELL_BOOT_STATUS = 0x23
 CMD_ACK = 0xFF
+CMD_LOG = 0x05
 
 ACK_MAP = {
     0x01: "ACK_SUCCESS",
@@ -492,6 +493,12 @@ class ShellClient:
             desc = ACK_MAP.get(ack_code, f"0x{ack_code:02X}")
             self._print_async(f"[ACK] cmd=0x{ack_cmd:02X} code={desc} seq={seq}")
             return
+        
+        if cmd == CMD_LOG:
+            txt = payload.decode("utf-8", errors="replace").rstrip("\r\n")
+            self._print_async(f"[LOG] {txt}")
+            return
+
 
         if self.verbose_frames:
             self._print_async(f"[FRAME] cmd=0x{cmd:02X} len={len(payload)}")
