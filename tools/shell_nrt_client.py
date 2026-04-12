@@ -121,6 +121,7 @@ class ShellClient:
     ANSI_WHITE = "\033[97m"
     ANSI_GRADIENT = [196, 202, 226, 82, 45]
     RECONNECT_RETRY_SEC = 0.3
+    REBOOT_RECONNECT_DELAY_SEC = 0.25
 
     def __init__(self, port: str, baud: int, verbose_frames: bool = False):
         self.port = port
@@ -139,6 +140,8 @@ class ShellClient:
         self.rx_thread = threading.Thread(target=self._rx_loop, daemon=True)
         self.verbose_frames = verbose_frames
         self._shell_resp_buf = bytearray()
+        self._reboot_reconnect_pending = False
+        self._reboot_reconnect_lock = threading.Lock()
 
     @staticmethod
     def _checksum(data: bytes) -> int:
@@ -175,6 +178,28 @@ class ShellClient:
         except (serial.SerialException, OSError):
             self._handle_disconnect()
             return False
+
+    @staticmethod
+    def _is_reboot_command(line: str) -> bool:
+        return line.strip().lower() == "reboot"
+
+    def _schedule_reconnect_after_reboot(self):
+        with self._reboot_reconnect_lock:
+            if self._reboot_reconnect_pending:
+                return
+            self._reboot_reconnect_pending = True
+
+        threading.Thread(target=self._reconnect_after_reboot_worker, daemon=True).start()
+
+    def _reconnect_after_reboot_worker(self):
+        try:
+            time.sleep(self.REBOOT_RECONNECT_DELAY_SEC)
+            if not self.running:
+                return
+            self._handle_disconnect()
+        finally:
+            with self._reboot_reconnect_lock:
+                self._reboot_reconnect_pending = False
 
     def _print_async(self, text: str):
         with self.lock:
@@ -470,7 +495,11 @@ class ShellClient:
                                 self.history.append(line)
                             self.history_index = len(self.history)
                             if self.send_shell_line(line):
-                                self.waiting_response = True
+                                if self._is_reboot_command(line):
+                                    self.waiting_response = False
+                                    self._schedule_reconnect_after_reboot()
+                                else:
+                                    self.waiting_response = True
                             else:
                                 self.waiting_response = False
                         else:
