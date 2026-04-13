@@ -32,11 +32,12 @@ jobs:
           $latest = Get-ChildItem -Path Build -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if (-not $latest) { throw "No Build/<timestamp> folder found." }
 
-          $bin = Join-Path $latest.FullName "app.bin"
+          $bin = Get-ChildItem -Path $latest.FullName -File -Filter "*.bin" |
+                 Sort-Object LastWriteTime -Descending |
+                 Select-Object -First 1
+          if (-not $bin) { throw "No .bin file found in $($latest.FullName)" }
 
-          if (-not (Test-Path $bin)) { throw "app.bin not found in $($latest.FullName)" }
-
-          "bin_path=$bin" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "bin_path=$($bin.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload Artifact
         if: success()
