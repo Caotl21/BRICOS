@@ -1,12 +1,25 @@
-#include "sys_monitor.h"
-#include "sys_log.h"
-#include "bsp_timer.h"
-#include "bsp_adc.h"
-#include "FreeRTOS.h"
-#include "task.h"
 #include <string.h>
 
+#include "FreeRTOS.h"
+#include "task.h"
+
+#include "bsp_timer.h"
+#include "bsp_adc.h"
+
+#include "sys_monitor.h"
+#include "sys_log.h"
+#include "sys_port.h"
+
+
 static bsp_timer_cfg_t sys_monitor_timer_cfg = { .timer = BSP_TIM_SYSCOUNT, .tick_us = 0U };
+
+static uint32_t s_task_last_tick[MAX_MONITOR_TASKS];
+
+bool System_Watchdog_Init(void)
+{
+    memset(s_task_last_tick, 0, sizeof(uint32_t) * MAX_MONITOR_TASKS);
+    return true;
+}
 
 bool System_Runtime_Monitor_Init(void)
 {
@@ -99,5 +112,39 @@ uint32_t System_Runtime_GetChipTemperature(void)
     }
 
     return (uint32_t)(temp_c * 100.0f + 0.5f); // 0.01C
+}
+
+void Bot_Task_CheckIn_Monitor(monitor_task_id_t task_id)
+{
+    if (task_id >= MAX_MONITOR_TASKS) {
+        LOG_ERROR("Invalid task ID %u in Bot_Task_CheckIn_Monitor", task_id);
+        return;
+    }
+
+    SYS_ENTER_CRITICAL();
+    s_task_last_tick[task_id] = xTaskGetTickCount();
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_Task_LastTick_Pull(uint32_t *out_ticks, uint8_t len)
+{
+    if ((out_ticks == NULL) || (len < MAX_MONITOR_TASKS)) return;
+
+    SYS_ENTER_CRITICAL();
+    memcpy(out_ticks, s_task_last_tick, sizeof(uint32_t) * MAX_MONITOR_TASKS);
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_Task_LastTick_Reset(monitor_task_id_t task_id)
+{
+    uint32_t now = xTaskGetTickCount();
+    if (task_id >= MAX_MONITOR_TASKS) {
+        LOG_ERROR("Invalid task ID %u in Bot_Task_LastTick_Reset", task_id);
+        return;
+    }
+
+    SYS_ENTER_CRITICAL();
+    s_task_last_tick[task_id] = now;
+    SYS_EXIT_CRITICAL();
 }
 

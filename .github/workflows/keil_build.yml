@@ -1,0 +1,74 @@
+name: Auto_Build
+
+on:
+  pull_request:
+    branches: ["master"]
+    types: [closed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build_job:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+
+      - name: Run Keil Build
+        shell: powershell
+        run: python tools/make/build_firmware.py
+
+      - name: Pick Latest Build Artifact
+        id: pick
+        shell: powershell
+        run: |
+          if (-not (Test-Path Build)) { throw "Build folder not found." }
+          $latest = Get-ChildItem -Path Build -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $latest) { throw "No Build/<timestamp> folder found." }
+
+          $bin = Join-Path $latest.FullName "app.bin"
+
+          if (-not (Test-Path $bin)) { throw "app.bin not found in $($latest.FullName)" }
+
+          "bin_path=$bin" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bricsbot_Firmware
+          path: |
+            ${{ steps.pick.outputs.bin_path }}
+
+      - name: Generate Tag Name
+        if: success()
+        id: tag
+        shell: powershell
+        run: |
+          $tag = "v{0}-{1}" -f (Get-Date -Format "yyyy.MM.dd"), "${{ github.run_number }}"
+          $build_time = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+          "tag_name=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "build_time=$build_time" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Create Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: Release ${{ steps.tag.outputs.tag_name }}
+          body: |
+            BRICOS 自动编译发布
+            - 提交说明: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+            - 编译时间: ${{ steps.tag.outputs.build_time }}
+          draft: false
+          prerelease: false
+          files: |
+            ${{ steps.pick.outputs.bin_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

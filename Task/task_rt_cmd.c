@@ -2,6 +2,7 @@
 
 #include "driver_hydrocore.h"
 #include "sys_data_pool.h"
+#include "sys_mode_manager.h"
 
 typedef struct
 {

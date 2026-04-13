@@ -1,16 +1,21 @@
-#include "task_sensor.h"
+#include <string.h>
 #include "FreeRTOS.h"
 #include "task.h"
+
+#include "bsp_uart.h"
+#include "bsp_delay.h"
+
 #include "driver_ms5837.h"
 #include "driver_power.h"
 #include "driver_dht11.h"
-#include "sys_data_pool.h" // 引入全局数据池 API
-
 #include "driver_imu.h"
-#include "bsp_uart.h"
-#include <string.h>
 
-#include "sys_log.h" // 引入日志系统
+#include "sys_data_pool.h" 
+#include "sys_log.h" 
+#include "sys_monitor.h"
+
+#include "task_sensor.h"
+
 
 #define CABIN_HUMI_LEAK_THRESHOLD  85  // 舱内湿度大于 85% 判定为漏水预警
 

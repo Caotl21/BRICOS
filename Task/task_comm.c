@@ -3,13 +3,17 @@
 #include "queue.h"
 
 #include "bsp_uart.h"
+
 #include "driver_hydrocore.h"
+
 #include "task_comm.h"
+#include "task_shell_transport_nrt.h"
 
 // 定义双缓冲 (Ping-Pong Buffers)
 #define RX_BUF_SIZE 180
 static uint8_t s_ping_buf[RX_BUF_SIZE];
 static uint8_t s_pong_buf[RX_BUF_SIZE];
+static uint8_t s_rt_channel_enabled = 1u;
 static uint8_t *s_active_rt_dma_buf = s_ping_buf; // DMA 当前正在写的数组
 static uint8_t s_active_nrt_dma_buf[RX_BUF_SIZE]; // 非实时通信专用 DMA 缓冲区
 
@@ -34,6 +38,9 @@ TaskHandle_t NRT_Comm_Task_Handler   = NULL;
 // BSP底层中断回调函数
 static void Opi_RT_Comm_Rx_Callback(uint8_t *completed_buf, uint16_t len) {
     BaseType_t xWoken = pdFALSE;
+    if (!s_rt_channel_enabled) {
+        return;
+    }
 
     opi_rx_msg_t msg = { 
         .buf = completed_buf, 
@@ -52,6 +59,30 @@ static void Opi_RT_Comm_Rx_Callback(uint8_t *completed_buf, uint16_t len) {
 
     bsp_uart_start_dma_rx_normal(BSP_UART_OPI_RT, s_active_rt_dma_buf, RX_BUF_SIZE);
     portYIELD_FROM_ISR(xWoken);
+}
+
+void Task_Comm_SetRtChannelEnabled(uint8_t enabled)
+{
+    taskENTER_CRITICAL();
+
+    if (enabled) {
+        if (!s_rt_channel_enabled) {
+            s_rt_channel_enabled = 1u;
+            bsp_uart_register_rx_cb(BSP_UART_OPI_RT, Opi_RT_Comm_Rx_Callback);
+            bsp_uart_start_dma_rx_normal(BSP_UART_OPI_RT, s_active_rt_dma_buf, RX_BUF_SIZE);
+        }
+    } else {
+        if (s_rt_channel_enabled) {
+            s_rt_channel_enabled = 0u;
+            bsp_uart_register_rx_cb(BSP_UART_OPI_RT, NULL);
+            bsp_uart_stop_dma_rx(BSP_UART_OPI_RT);
+            if (s_rt_rx_ptr_queue != NULL) {
+                xQueueReset(s_rt_rx_ptr_queue);
+            }
+        }
+    }
+
+    taskEXIT_CRITICAL();
 }
 
 static void Opi_NRT_Comm_Rx_Callback(uint8_t *data, uint16_t len) {
@@ -84,6 +115,10 @@ void vTask_RT_Comm_Opi(void *pvParameters) {
 // 非实时通信任务
 void vTask_NRT_Comm_Opi(void *pvParameters) {
     opi_rx_msg_t rx_msg;
+    (void)pvParameters;
+
+    /* Send one-shot shell startup status after scheduler and NRT task are up. */
+    Task_ShellTransportNRT_OnNrtCommStarted();
 
     while (1) {
         if (xQueueReceive(s_nrt_rx_ptr_queue, &rx_msg, portMAX_DELAY) == pdPASS) {

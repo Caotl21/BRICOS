@@ -32,4 +32,11 @@ extern TaskHandle_t NRT_Comm_Task_Handler;
  */
 void Task_Comm_Init(void);
 
+/**
+ * @brief 启用/禁用实时通信通道（USART3）
+ * @param enabled 1=启用，0=禁用
+ * @note 禁用后会停止 RT 串口 DMA 接收并注销回调，用于低功耗待机
+ */
+void Task_Comm_SetRtChannelEnabled(uint8_t enabled);
+
 #endif /* __TASK_COMM_H */

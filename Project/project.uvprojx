@@ -616,6 +616,26 @@
               <FilePath>..\User\main.c</FilePath>
             </File>
             <File>
+              <FileName>app_shell.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\app_shell.c</FilePath>
+            </File>
+            <File>
+              <FileName>core_cmd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\core_cmd.c</FilePath>
+            </File>
+            <File>
+              <FileName>query_cmd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\query_cmd.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_shell.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\User\app_shell.h</FilePath>
+            </File>
+            <File>
               <FileName>stm32f4xx_it.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\stm32f4xx_it.c</FilePath>
@@ -849,11 +869,6 @@
               <FilePath>..\Task\task_control.c</FilePath>
             </File>
             <File>
-              <FileName>task_imu_parse.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Task\task_imu_parse.c</FilePath>
-            </File>
-            <File>
               <FileName>task_monitor.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Task\task_monitor.c</FilePath>
@@ -862,6 +877,16 @@
               <FileName>task_sensor.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Task\task_sensor.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_shell_transport_nrt.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\task_shell_transport_nrt.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_shell_transport_nrt.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Task\task_shell_transport_nrt.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -1017,6 +1042,41 @@
               <FileName>sys_monitor.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\System\sys_monitor.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_mode_manager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\System\sys_mode_manager.c</FilePath>
+            </File>
+            <File>
+              <FileName>sys_mode_manager.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_mode_manager.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_shell_cfg.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_shell_cfg.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_shell_transport.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_shell_transport.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_shell_core.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_shell_core.h</FilePath>
+            </File>
+            <File>
+              <FileName>sys_shell_core.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\System\sys_shell_core.c</FilePath>
+            </File>
+            <File>
+              <FileName>sys_shell_export.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\System\sys_shell_export.h</FilePath>
             </File>
           </Files>
         </Group>
