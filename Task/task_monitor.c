@@ -126,7 +126,7 @@ static void vTask_Monitor_Core(void *pvParameters)
     uint8_t sys_report_buf[2u + (7u * sizeof(float)) + 3u];
     uint8_t actuator_report_buf[3u];
 
-    bsp_wdg_init(5000);
+    //bsp_wdg_init(5000);
 
     while (1) {
         uint32_t current_tick = xTaskGetTickCount();
