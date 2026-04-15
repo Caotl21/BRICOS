@@ -29,10 +29,11 @@
 #define STANDBY_ESC_KICK_INTERVAL_CYCLES ((STANDBY_ESC_KICK_INTERVAL_MS + TASK_CONTROL_STANDBY_PERIOD_MS - 1u) / TASK_CONTROL_STANDBY_PERIOD_MS)
 #define STANDBY_ESC_KICK_DURATION_CYCLES ((STANDBY_ESC_KICK_DURATION_MS + TASK_CONTROL_STANDBY_PERIOD_MS - 1u) / TASK_CONTROL_STANDBY_PERIOD_MS)
 /* 暂时关闭STANDBY任务挂起/恢复，优先保证模式切换稳定性 */
-#define STANDBY_TASK_PAUSE_ENABLE        (0u)
+#define STANDBY_TASK_PAUSE_ENABLE        (1u)
 
 /* ARMED 进入动作：每个推进器依次轻转 0.2s */
 #define ARMED_ENTRY_SPIN_DURATION_MS     (200u)
+#define ARMED_ENTRY_SPIN_SLICE_MS  (50u)
 #define ARMED_ENTRY_SPIN_SPEED           (8.0f)
 
 /* 控制器实例 */
@@ -286,7 +287,7 @@ static uint16_t Serialize_Body_Report(uint8_t *buf, const bot_body_state_t *body
 
 static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
 {
-    uint8_t report_buf[13u * sizeof(float)];
+    uint8_t report_buf[14u * sizeof(float)];
     uint16_t report_len;
 
     if (body_state == NULL) {
@@ -312,17 +313,29 @@ static void prv_set_idle_output(void)
 
 static void prv_armed_entry_spin_once(void)
 {
-    TickType_t spin_ticks = pdMS_TO_TICKS(ARMED_ENTRY_SPIN_DURATION_MS);
+    TickType_t total_ticks = pdMS_TO_TICKS(ARMED_ENTRY_SPIN_DURATION_MS);
+    TickType_t slice_ticks = pdMS_TO_TICKS(ARMED_ENTRY_SPIN_SLICE_MS);
     int i;
 
-    if (spin_ticks == 0u) {
-        spin_ticks = 1u;
+    if (total_ticks == 0u) {
+        total_ticks = 1u;
     }
-
+    if (slice_ticks == 0u) {
+        slice_ticks = 1u;
+    }
+    // 由于需要定时器打卡，因此不能直接vTaskDelay(ARMED_ENTRY_SPIN_DURATION_MS)，而是需要切分成多个小片段
     for (i = 0; i < THRUSTER_COUNT; i++) {
+        TickType_t remain = total_ticks;
+
         prv_set_idle_output();
         Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), ARMED_ENTRY_SPIN_SPEED);
-        vTaskDelay(spin_ticks);
+
+        while (remain > 0u) {
+            TickType_t step = (remain > slice_ticks) ? slice_ticks : remain;
+            Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
+            vTaskDelay(step);
+            remain -= step;
+        }
     }
 
     prv_set_idle_output();

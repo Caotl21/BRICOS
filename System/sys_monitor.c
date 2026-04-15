@@ -10,6 +10,8 @@
 #include "sys_log.h"
 #include "sys_port.h"
 
+#include "stm32f4xx.h"
+
 
 static bsp_timer_cfg_t sys_monitor_timer_cfg = { .timer = BSP_TIM_SYSCOUNT, .tick_us = 0U };
 
@@ -146,5 +148,33 @@ void Bot_Task_LastTick_Reset(monitor_task_id_t task_id)
     SYS_ENTER_CRITICAL();
     s_task_last_tick[task_id] = now;
     SYS_EXIT_CRITICAL();
+}
+
+
+/*
+ * FreeRTOS stack overflow hook.
+ * When configCHECK_FOR_STACK_OVERFLOW is enabled (set to 1 or 2), FreeRTOS
+ * calls this function if a stack overflow is detected for a task.
+ * Keep this routine minimal and avoid calling the RTOS API that may
+ * rely on the corrupted stack. Here we disable interrupts and trigger
+ * a system reset so the fault can be captured after reboot.
+ */
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+    (void)xTask;
+    (void)pcTaskName;
+
+    taskDISABLE_INTERRUPTS();
+
+    /* Optionally, attempt to record fault info to a reserved RAM area here. */
+
+    /* Trigger a system reset to halt and recover the system. */
+    NVIC_SystemReset();
+
+    /* Should not reach here, but loop if reset did not occur. */
+    for (;;)
+    {
+        __NOP();
+    }
 }
 
