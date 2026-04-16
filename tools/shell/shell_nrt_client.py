@@ -99,6 +99,7 @@ class ShellClient:
         "echo",
         "sysmode",
         "momode",
+        "servo",
         "fault",
         "euler",
         "depthtemp",
@@ -295,6 +296,9 @@ class ShellClient:
                 pool = ["request", "set"]
             elif (arg_index == 2) and (len(args_before) >= 1) and (args_before[0].lower() == "set"):
                 pool = self.MOMODE_TARGETS
+        elif cmd == "servo":
+            if arg_index == 1:
+                pool = ["set"]
 
         return [x for x in pool if x.startswith(pfx)]
 

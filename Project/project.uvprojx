@@ -618,22 +618,27 @@
             <File>
               <FileName>app_shell.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\app_shell.c</FilePath>
+              <FilePath>..\User\shell\app_shell.c</FilePath>
+            </File>
+            <File>
+              <FileName>freertos_hooks.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\freertos_hooks.c</FilePath>
             </File>
             <File>
               <FileName>core_cmd.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\core_cmd.c</FilePath>
+              <FilePath>..\User\shell\core_cmd.c</FilePath>
             </File>
             <File>
               <FileName>query_cmd.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\query_cmd.c</FilePath>
+              <FilePath>..\User\shell\query_cmd.c</FilePath>
             </File>
             <File>
               <FileName>app_shell.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\User\app_shell.h</FilePath>
+              <FilePath>..\User\shell\app_shell.h</FilePath>
             </File>
             <File>
               <FileName>stm32f4xx_it.c</FileName>
@@ -644,6 +649,11 @@
               <FileName>stm32f4xx_it.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\User\stm32f4xx_it.h</FilePath>
+            </File>
+            <File>
+              <FileName>actuator_cmd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\shell\actuator_cmd.c</FilePath>
             </File>
           </Files>
         </Group>

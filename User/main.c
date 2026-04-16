@@ -12,7 +12,7 @@
 #include "driver_power.h"
 #include "driver_thruster.h"
 
-#include "app_shell.h"
+#include "shell/app_shell.h"
 #include "sys_boot_flag.h"
 #include "sys_data_pool.h"
 #include "sys_log.h"

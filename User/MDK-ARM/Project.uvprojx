@@ -406,6 +406,11 @@
               <FileType>1</FileType>
               <FilePath>../main.c</FilePath>
             </File>
+            <File>
+              <FileName>freertos_hooks.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../freertos_hooks.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
