@@ -43,4 +43,6 @@ static shell_ret_t prv_cmd_servo(shell_cmd_ctx_t *ctx, int argc, char **argv)
     return SHELL_RET_BAD_ARGS;
 }
 
+
+
 EXPORT_SHELL_CMD("servo", "control servo angle", prv_cmd_servo, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);

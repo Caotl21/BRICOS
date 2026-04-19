@@ -14,13 +14,19 @@
 
 TaskHandle_t Monitor_Task_Handler = NULL;
 
+#define MONITOR_LOW_VOLTAGE_WARN_V  (22.0f)
+/* 模式切换后保留一个短暂保护窗，避免切换瞬间误报任务超时。 */
+#define MODE_SWITCH_GRACE_MS        (800u)
+/* 保护窗最大时长兜底，防止 control 心跳长期不同步导致一直屏蔽点名。 */
+#define MODE_SWITCH_GUARD_MAX_MS    (3000u)
+
 static const uint32_t TASK_TIMEOUT_THERSHOLDS[MAX_MONITOR_TASKS] = {
-    [TASK_ID_CONTROL] = pdMS_TO_TICKS(100), // 控制任务心跳阈值 100ms
-    [TASK_ID_IMU] = pdMS_TO_TICKS(200),     // IMU任务心跳阈值 200ms
-    [TASK_ID_MS5837] = pdMS_TO_TICKS(1000), // MS5837任务心跳阈值 1000ms
-    [TASK_ID_POWER] = pdMS_TO_TICKS(10000),  // 电源监测任务心跳阈值 10000ms
-    [TASK_ID_DHT11] = pdMS_TO_TICKS(2000),  // DHT11任务心跳阈值 2000ms
-    [TASK_ID_MONITOR] = pdMS_TO_TICKS(2000)   // 监控任务自身心跳阈值 2000ms
+    [TASK_ID_CONTROL] = pdMS_TO_TICKS(100),
+    [TASK_ID_IMU] = pdMS_TO_TICKS(200),
+    [TASK_ID_MS5837] = pdMS_TO_TICKS(1000),
+    [TASK_ID_POWER] = pdMS_TO_TICKS(10000),
+    [TASK_ID_DHT11] = pdMS_TO_TICKS(2000),
+    [TASK_ID_MONITOR] = pdMS_TO_TICKS(2000)
 };
 
 static uint8_t prv_is_task_watch_enabled(bot_sys_mode_e mode, uint8_t task_id)
@@ -38,6 +44,12 @@ static uint8_t prv_is_task_watch_enabled(bot_sys_mode_e mode, uint8_t task_id)
     }
 
     return 1u;
+}
+
+static uint8_t prv_tick_elapsed_ge(uint32_t now_tick, uint32_t start_tick, uint32_t duration_tick)
+{
+    /* 使用无符号减法比较 tick，能安全处理 tick 回绕。 */
+    return ((uint32_t)(now_tick - start_tick) >= duration_tick) ? 1u : 0u;
 }
 
 static uint32_t prv_collect_safety_faults(const bot_sys_state_t *sys_state, const bot_params_t *params)
@@ -112,21 +124,28 @@ static void vTask_Monitor_Core(void *pvParameters)
 {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xPeriod = pdMS_TO_TICKS(MONITOR_PERIOD_MS);
-    uint8_t log_divider = 0;
+    uint8_t low_voltage_alarm_reported = 0u;
 
     (void)pvParameters;
 
     static bot_sys_state_t sys_state;
     static bot_params_t params;
     static bot_actuator_state_t actuator_state;
-    bot_sys_mode_e current_sys_mode;
+    bot_sys_mode_e last_sys_mode = SYS_MODE_STANDBY;
+    bot_sys_mode_e current_sys_mode = SYS_MODE_STANDBY;
     bot_run_mode_e current_motion_mode;
 
     uint32_t last_ticks[MAX_MONITOR_TASKS];
     uint8_t sys_report_buf[2u + (7u * sizeof(float)) + 3u];
     uint8_t actuator_report_buf[3u];
+    /* 记录 STANDBY->DISARMED 过渡被 monitor 首次观测到的 tick。 */
+    uint32_t mode_switch_tick = 0u;
+    /* 保护窗激活标志：仅在 STANDBY->DISARMED 时置 1。 */
+    uint8_t mode_switch_guard_active = 0u;
+    /* 首轮循环只初始化基线模式，避免把上电初值误判成“模式切换边沿”。 */
+    uint8_t mode_guard_initialized = 0u;
 
-    //bsp_wdg_init(5000);
+    bsp_wdg_init(5000);
 
     while (1) {
         uint32_t current_tick = xTaskGetTickCount();
@@ -145,15 +164,74 @@ static void vTask_Monitor_Core(void *pvParameters)
         Bot_Task_LastTick_Pull(last_ticks, MAX_MONITOR_TASKS);
         System_ModeManager_Pull(&current_sys_mode, &current_motion_mode, NULL);
 
+        if (mode_guard_initialized == 0u) {
+            last_sys_mode = current_sys_mode;
+            mode_guard_initialized = 1u;
+        } else if (current_sys_mode != last_sys_mode) {
+            /* 仅在 STANDBY -> ACTIVE_DISARMED 进入保护窗，其它模式切换不启用保护窗。 */
+            if ((last_sys_mode == SYS_MODE_STANDBY) &&
+                (current_sys_mode == SYS_MODE_ACTIVE_DISARMED)) {
+                mode_switch_tick = current_tick;
+                mode_switch_guard_active = 1u;
+                LOG_WARNING("Mode switch guard active: %u->%u",
+                            (uint32_t)last_sys_mode,
+                            (uint32_t)current_sys_mode);
+            } else {
+                mode_switch_guard_active = 0u;
+            }
+            last_sys_mode = current_sys_mode;
+        }
+
+        if (sys_state.bat_voltage_v < MONITOR_LOW_VOLTAGE_WARN_V) {
+            if (low_voltage_alarm_reported == 0u) {
+                LOG_ERROR("Voltage alarm: bat_voltage=%.2fV < %.2fV",
+                          sys_state.bat_voltage_v,
+                          (double)MONITOR_LOW_VOLTAGE_WARN_V);
+                low_voltage_alarm_reported = 1u;
+            }
+        } else {
+            low_voltage_alarm_reported = 0u;
+        }
+
         bool all_tasks_healthy = true;
+        uint8_t monitor_only_guard = 0u;
+        if (mode_switch_guard_active) {
+            /* 保护窗释放条件：最小保护时间已过，且 control 在切换后至少打卡一次。 */
+            uint8_t grace_elapsed = prv_tick_elapsed_ge(current_tick,
+                                                        mode_switch_tick,
+                                                        pdMS_TO_TICKS(MODE_SWITCH_GRACE_MS));
+            uint8_t guard_timeout = prv_tick_elapsed_ge(current_tick,
+                                                        mode_switch_tick,
+                                                        pdMS_TO_TICKS(MODE_SWITCH_GUARD_MAX_MS));
+            uint8_t control_synced = prv_tick_elapsed_ge(last_ticks[TASK_ID_CONTROL],
+                                                         mode_switch_tick,
+                                                         1u);
+
+            if (guard_timeout) {
+                mode_switch_guard_active = 0u;
+                LOG_WARNING("Mode switch guard timeout: mode=%u", (uint32_t)current_sys_mode);
+            } else if (grace_elapsed && control_synced) {
+                mode_switch_guard_active = 0u;
+                LOG_INFO("Mode switch guard released: mode=%u", (uint32_t)current_sys_mode);
+            } else {
+                /* 保护窗期间仅依据 monitor 自身健康度喂狗，避免切换窗口误判。 */
+                monitor_only_guard = 1u;
+            }
+        }
+
         for (uint8_t i = 0; i < MAX_MONITOR_TASKS; i++) {
-            if (!prv_is_task_watch_enabled(current_sys_mode, i)) continue;
+            if (monitor_only_guard && (i != TASK_ID_MONITOR)) {
+                continue;
+            }
+            if (!prv_is_task_watch_enabled(current_sys_mode, i)) {
+                continue;
+            }
 
             uint32_t last_tick = last_ticks[i];
-            uint32_t diff_ms = (current_tick >= last_tick) ? (current_tick - last_tick) : (0xFFFFFFFF - last_tick + current_tick);
-            if (diff_ms > TASK_TIMEOUT_THERSHOLDS[i]){
+            uint32_t diff_tick = current_tick - last_tick;
+            if (diff_tick > TASK_TIMEOUT_THERSHOLDS[i]){
                 all_tasks_healthy = false;
-                LOG_ERROR("Task %u timeout! Last tick: %lu, diff: %lu ms", i, last_tick, diff_ms);
+                LOG_ERROR("Task %u timeout! Last tick: %lu, diff: %lu ms", i, last_tick, diff_tick);
                 break;
             }
         }

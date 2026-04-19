@@ -13,7 +13,7 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
     (void)pcTaskName;
 
     taskDISABLE_INTERRUPTS();
-    bsp_cpu_reset();
+    //bsp_cpu_reset();
 
     for (;;)
     {

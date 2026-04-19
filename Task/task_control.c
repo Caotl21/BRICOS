@@ -418,6 +418,7 @@ static void prv_resume_standby_tasks(control_fsm_ctx_t *ctx)
 static void prv_apply_standby_kick_output(void)
 {
     int i;
+    
 
     /* STANDBY 仅用于岸上调试：避免 ESC 长时间静止啸叫 */
     prv_set_idle_output();
@@ -602,9 +603,9 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
         Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), ctx->thruster_pwm[i]);
     }
 
-    LOG_DEBUG("Thruster PWMs: [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f]",
-              ctx->thruster_pwm[0], ctx->thruster_pwm[1], ctx->thruster_pwm[2],
-              ctx->thruster_pwm[3], ctx->thruster_pwm[4], ctx->thruster_pwm[5]);
+    //LOG_DEBUG("Thruster PWMs: [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f]",
+    //          ctx->thruster_pwm[0], ctx->thruster_pwm[1], ctx->thruster_pwm[2],
+    //          ctx->thruster_pwm[3], ctx->thruster_pwm[4], ctx->thruster_pwm[5]);
 }
 
 static void prv_armed_exit(control_fsm_ctx_t *ctx)
