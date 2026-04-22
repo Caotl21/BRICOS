@@ -626,6 +626,11 @@
               <FilePath>..\User\freertos_hooks.c</FilePath>
             </File>
             <File>
+              <FileName>fault_snapshot.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\fault_snapshot.c</FilePath>
+            </File>
+            <File>
               <FileName>core_cmd.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\shell\core_cmd.c</FilePath>
