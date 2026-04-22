@@ -10,6 +10,7 @@
 #include "driver_dht11.h"
 #include "driver_imu.h"
 
+#include "sys_mode_manager.h"
 #include "sys_data_pool.h" 
 #include "sys_log.h" 
 #include "sys_monitor.h"
@@ -18,6 +19,8 @@
 
 
 #define CABIN_HUMI_LEAK_THRESHOLD  85  // 舱内湿度大于 85% 判定为漏水预警
+#define IMU_FUSE_RP_DIFF_THRESHOLD_DEG   (8.0f)   // roll/pitch 差值阈值（单位：度）
+#define IMU_FUSE_CONTINUOUS_FAIL_LIMIT    (3u)     // 连续超限次数门限
 
 imu_data_t g_imu_body_frame[IMU_MAX_NUM];
 
@@ -99,16 +102,79 @@ static void IMU_Align_To_BodyFrame(imu_data_t *imu)
     imu->quat[3] =  temp;         // Z_new = W_old
 }
 
+static float prv_abs_float(float value)
+{
+    return (value >= 0.0f) ? value : -value;
+}
+
+static float prv_normalize_angle_error(float error_deg)
+{
+    /* 把角度误差归一化到 [-180, 180]，避免 179 和 -179 这种环绕误判。 */
+    while (error_deg > 180.0f) {
+        error_deg -= 360.0f;
+    }
+    while (error_deg < -180.0f) {
+        error_deg += 360.0f;
+    }
+    return error_deg;
+}
+
 static void IMU_Fuse(const imu_data_t frames[], bot_body_state_t *out)
 {
+    static uint8_t s_imu_mismatch_cnt = 0u;
+    const imu_data_t *main_imu;
+    const imu_data_t *aux_imu;
+    float main_roll = 0.0f;
+    float main_pitch = 0.0f;
+    float main_yaw = 0.0f;
+    float aux_roll = 0.0f;
+    float aux_pitch = 0.0f;
+    float aux_yaw = 0.0f;
+    float roll_diff = 0.0f;
+    float pitch_diff = 0.0f;
+
     if ((frames == NULL) || (out == NULL)) return;
-    out->acc_x = frames[IMU_IM948].acc[0]; // 以 IM948 为主
-    out->acc_y = frames[IMU_IM948].acc[1];
-    out->acc_z = frames[IMU_IM948].acc[2];
-    out->gyro_x = frames[IMU_IM948].gyro[0];
-    out->gyro_y = frames[IMU_IM948].gyro[1];
-    out->gyro_z = frames[IMU_IM948].gyro[2];
-    memcpy(out->Quater, frames[IMU_JY901S].quat, sizeof(float) * 4);
+
+    /*
+     * 这里的主输出逻辑保持不变：
+     * - IM948 作为主 IMU，提供加速度和角速度；
+     * - JY901S 继续提供四元数给控制链路使用。
+     * 同时在这里直接比较两路 IMU 的姿态一致性。
+     */
+    main_imu = &frames[IMU_IM948];
+    aux_imu = &frames[IMU_JY901S];
+
+    /* 先把两路四元数都转成欧拉角，再比较 roll 和 pitch。 */
+    Driver_IMU_Quaternion_ToEuler_Deg(main_imu->quat, &main_roll, &main_pitch, &main_yaw);
+    Driver_IMU_Quaternion_ToEuler_Deg(aux_imu->quat, &aux_roll, &aux_pitch, &aux_yaw);
+
+    /* 对角度差做环绕处理，避免 179 度和 -179 度被误认为差了 358 度。 */
+    roll_diff = prv_abs_float(prv_normalize_angle_error(main_roll - aux_roll));
+    pitch_diff = prv_abs_float(prv_normalize_angle_error(main_pitch - aux_pitch));
+
+    /* 只看 roll/pitch，一旦连续多次超阈值，就认为 IMU 一致性异常。 */
+    if ((roll_diff <= IMU_FUSE_RP_DIFF_THRESHOLD_DEG) &&
+        (pitch_diff <= IMU_FUSE_RP_DIFF_THRESHOLD_DEG)) {
+        s_imu_mismatch_cnt = 0u;
+    } else {
+        if (s_imu_mismatch_cnt < 255u) {
+            s_imu_mismatch_cnt++;
+        }
+
+        if (s_imu_mismatch_cnt >= IMU_FUSE_CONTINUOUS_FAIL_LIMIT) {
+            /* 连续异常达到门限后，直接请求系统进入 FAILSAFE。 */
+            (void)System_ModeManager_EnterFailsafe(SYS_FAULT_IMU);
+        }
+    }
+
+    /* 比较通过时，继续输出当前主 IMU 的状态。 */
+    out->acc_x = main_imu->acc[0];
+    out->acc_y = main_imu->acc[1];
+    out->acc_z = main_imu->acc[2];
+    out->gyro_x = main_imu->gyro[0];
+    out->gyro_y = main_imu->gyro[1];
+    out->gyro_z = main_imu->gyro[2];
+    memcpy(out->Quater, main_imu->quat, sizeof(float) * 4);
 }
 
 /* =========================================================

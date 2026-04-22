@@ -2,6 +2,7 @@
 #include "task.h"
 
 #include "bsp_cpu.h"
+#include "fault_snapshot.h"
 
 /*
  * FreeRTOS application hook.
@@ -10,7 +11,8 @@
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
     (void)xTask;
-    (void)pcTaskName;
+
+    (void)System_FaultSnapshot_SaveStackOverflowTask(pcTaskName);
 
     taskDISABLE_INTERRUPTS();
     //bsp_cpu_reset();

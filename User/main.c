@@ -19,6 +19,8 @@
 #include "sys_mode_manager.h"
 #include "sys_systick.h"
 
+#include "fault_snapshot.h"
+
 #include "task_comm.h"
 #include "task_control.h"
 #include "task_monitor.h"
@@ -46,6 +48,14 @@ int main(void)
     System_Log_Init();
     Bot_Data_Pool_Init();
     System_ModeManager_Init();
+
+    {
+        char overflow_task_name[32];
+
+        if (System_FaultSnapshot_LoadLastStackOverflowTask(overflow_task_name, sizeof(overflow_task_name))) {
+            LOG_ERROR("Last stack overflow task: %s", overflow_task_name);
+        }
+    }
 
     Task_Comm_Init();
     Task_Sensor_Init();
