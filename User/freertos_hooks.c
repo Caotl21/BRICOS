@@ -2,7 +2,7 @@
 #include "task.h"
 
 #include "bsp_cpu.h"
-#include "fault_snapshot.h"
+#include "sys_fault_snapshot.h"
 
 /*
  * FreeRTOS application hook.

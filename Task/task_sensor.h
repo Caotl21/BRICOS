@@ -28,7 +28,7 @@
 
 /* 3. Power 电源监控任务 (低频 ADC 采样) */
 #define POWER_TASK_PRIO     2
-#define POWER_STK_SIZE      128  
+#define POWER_STK_SIZE      256  
 
 /* 4. DHT11 舱内温湿度与漏水辅助监控任务 (单总线时序) */
 #define DHT11_TASK_PRIO     2

@@ -7,6 +7,9 @@
 #include "driver_hydrocore.h"
 #include "driver_param.h"
 
+#include "task_control.h"
+#include "task_sensor.h"
+
 #include "sys_data_pool.h"
 #include "sys_log.h"
 #include "sys_monitor.h"
@@ -108,6 +111,30 @@ static uint16_t Serialize_Actuator_Report(uint8_t *buf, const bot_actuator_state
     return 3u;
 }
 
+static void prv_log_stack_watermarks(void)
+{
+    UBaseType_t monitor_words;
+    UBaseType_t control_words;
+    UBaseType_t imu_words;
+    UBaseType_t ms5837_words;
+    UBaseType_t power_words;
+    UBaseType_t dht11_words;
+
+
+    LOG_INFO("StackHWM MONITOR: used=%lu%%",
+             (unsigned long)(100u - ((uxTaskGetStackHighWaterMark(Monitor_Task_Handler) * 100u) / MONITOR_STK_SIZE)));
+    LOG_INFO("StackHWM CONTROL: used=%lu%%",
+             (unsigned long)(100u - ((uxTaskGetStackHighWaterMark(Control_Task_Handler) * 100u) / CONTROL_STK_SIZE)));
+    LOG_INFO("StackHWM IMU: used=%lu%%",
+             (unsigned long)(100u - ((uxTaskGetStackHighWaterMark(IMU_Task_Handler) * 100u) / IMU_STK_SIZE)));
+    LOG_INFO("StackHWM MS5837: used=%lu%%",
+             (unsigned long)(100u - ((uxTaskGetStackHighWaterMark(MS5837_Task_Handler) * 100u) / MS5837_STK_SIZE)));
+    LOG_INFO("StackHWM POWER: used=%lu%%",
+             (unsigned long)(100u - ((uxTaskGetStackHighWaterMark(Power_Task_Handler) * 100u) / POWER_STK_SIZE)));
+    LOG_INFO("StackHWM DHT11: used=%lu%%",
+             (unsigned long)(100u - ((uxTaskGetStackHighWaterMark(DHT11_Task_Handler) * 100u) / DHT11_STK_SIZE)));
+}
+
 static void vTask_Monitor_Core(void *pvParameters)
 {
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -170,6 +197,11 @@ static void vTask_Monitor_Core(void *pvParameters)
         if (all_tasks_healthy) {
             LOG_INFO("All tasks healthy!! CPU=%lu%%, TEMP=%lu", cpu, temp);
             bsp_wdg_feed();
+        }
+
+        if (++log_divider >= 10u) {
+            prv_log_stack_watermarks();
+            log_divider = 0u;
         }
 
         sys_report_len = Serialize_Sys_Report(sys_report_buf,

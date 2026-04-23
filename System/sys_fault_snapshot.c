@@ -1,4 +1,4 @@
-#include "fault_snapshot.h"
+#include "sys_fault_snapshot.h"
 
 #include <stddef.h>
 #include <string.h>

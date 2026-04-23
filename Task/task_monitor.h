@@ -6,7 +6,7 @@
 #include "task.h"
 
 #define MONITOR_TASK_PRIO      1
-#define MONITOR_STK_SIZE       256
+#define MONITOR_STK_SIZE       512
 #define MONITOR_PERIOD_MS      1000
 
 extern TaskHandle_t Monitor_Task_Handler;

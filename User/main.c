@@ -19,7 +19,7 @@
 #include "sys_mode_manager.h"
 #include "sys_systick.h"
 
-#include "fault_snapshot.h"
+#include "sys_fault_snapshot.h"
 
 #include "task_comm.h"
 #include "task_control.h"
