@@ -22,6 +22,9 @@
  * ============================================================================ */
 extern TaskHandle_t RT_Comm_Task_Handler;
 extern TaskHandle_t NRT_Comm_Task_Handler;
+extern volatile uint32_t g_nrt_rx_isr_tick;
+extern volatile uint32_t g_nrt_dispatch_tick;
+extern volatile uint16_t g_nrt_last_rx_len;
 
 /* ============================================================================
  * 对外开放的 API 接口

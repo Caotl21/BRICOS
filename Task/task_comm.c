@@ -21,6 +21,9 @@ volatile uint32_t g_rt_drop_cnt = 0; // 实时通信丢包计数器
 volatile uint32_t g_nrt_drop_cnt = 0; // 非实时通信丢包计数器
 
 // RTOS 消息队列：零拷贝传递的是数据地址
+volatile uint32_t g_nrt_rx_isr_tick = 0;
+volatile uint32_t g_nrt_dispatch_tick = 0;
+volatile uint16_t g_nrt_last_rx_len = 0;
 static QueueHandle_t s_rt_rx_ptr_queue = NULL;
 static QueueHandle_t s_nrt_rx_ptr_queue = NULL;
 
@@ -87,6 +90,8 @@ void Task_Comm_SetRtChannelEnabled(uint8_t enabled)
 
 static void Opi_NRT_Comm_Rx_Callback(uint8_t *data, uint16_t len) {
     BaseType_t xWoken = pdFALSE;
+    g_nrt_rx_isr_tick = (uint32_t)xTaskGetTickCountFromISR();
+    g_nrt_last_rx_len = len;
 
     opi_rx_msg_t msg = { 
         .buf = data, 
@@ -122,6 +127,7 @@ void vTask_NRT_Comm_Opi(void *pvParameters) {
 
     while (1) {
         if (xQueueReceive(s_nrt_rx_ptr_queue, &rx_msg, portMAX_DELAY) == pdPASS) {
+            g_nrt_dispatch_tick = (uint32_t)xTaskGetTickCount();
             Driver_Protocol_Dispatch(rx_msg.buf, rx_msg.len);
         }
     }

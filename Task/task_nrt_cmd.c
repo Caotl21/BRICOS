@@ -1,5 +1,8 @@
 #include <string.h>
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include "bsp_watchdog.h"
 #include "bsp_cpu.h"
 
@@ -14,6 +17,16 @@
 #include "sys_log.h"
 
 #include "task_nrt_cmd.h"
+
+volatile nrt_sysmode_probe_t g_nrt_sysmode_probe = {0};
+
+static void prv_send_sysmode_ack_with_probe(uint8_t ack_code)
+{
+    g_nrt_sysmode_probe.last_ack_code = ack_code;
+    g_nrt_sysmode_probe.t_ack_start_tick = (uint32_t)xTaskGetTickCount();
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, ack_code, 0, USE_DMA);
+    g_nrt_sysmode_probe.t_ack_done_tick = (uint32_t)xTaskGetTickCount();
+}
 
 
 // 接收OTA升级命令的回调函数
@@ -97,25 +110,38 @@ static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
 
 // 接收设置系统模式命令的回调函数(切换待机/加锁/解锁)
 static void On_Receive_Sys_Mode_Cmd(const uint8_t *payload, uint16_t len){
+    sys_mode_mgr_status_t mode_mgr_status = SYS_MODE_MGR_INVALID_PARAM;
+    uint8_t ack_code = INVALID_PARAM;
+
+    g_nrt_sysmode_probe.seq++;
+    g_nrt_sysmode_probe.t_cmd_enter_tick = (uint32_t)xTaskGetTickCount();
+    g_nrt_sysmode_probe.t_mode_req_done_tick = 0u;
+    g_nrt_sysmode_probe.t_ack_start_tick = 0u;
+    g_nrt_sysmode_probe.t_ack_done_tick = 0u;
+    g_nrt_sysmode_probe.last_payload_len = len;
+    g_nrt_sysmode_probe.last_req_mode = ((payload != NULL) && (len > 0u)) ? payload[0] : 0xFFu;
+    g_nrt_sysmode_probe.last_ack_code = 0xFFu;
+    g_nrt_sysmode_probe.last_mode_mgr_status = 0xFFu;
 
     if(len != 1) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, LENGTH_ERROR, 0, USE_DMA);
+        g_nrt_sysmode_probe.last_mode_mgr_status = (uint8_t)mode_mgr_status;
+        prv_send_sysmode_ack_with_probe(LENGTH_ERROR);
         return;
     }
 
-    bool res;
     bot_sys_mode_e new_mode = (bot_sys_mode_e)payload[0];
     if(new_mode > SYS_MODE_MOTION_ARMED) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, INVALID_PARAM, 0, USE_DMA);
+        g_nrt_sysmode_probe.last_mode_mgr_status = (uint8_t)mode_mgr_status;
+        prv_send_sysmode_ack_with_probe(INVALID_PARAM);
         return;
     }
 
-    res = (System_ModeManager_RequestSysMode(new_mode) == SYS_MODE_MGR_OK);
-    if (!res) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, INVALID_PARAM, 0, USE_DMA);
-    } else {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, ACK_SUCCESS, 0, USE_DMA);
-    }
+    mode_mgr_status = System_ModeManager_RequestSysMode(new_mode);
+    g_nrt_sysmode_probe.t_mode_req_done_tick = (uint32_t)xTaskGetTickCount();
+    g_nrt_sysmode_probe.last_mode_mgr_status = (uint8_t)mode_mgr_status;
+
+    ack_code = (mode_mgr_status == SYS_MODE_MGR_OK) ? ACK_SUCCESS : INVALID_PARAM;
+    prv_send_sysmode_ack_with_probe(ack_code);
 }
 
 // 接收设置运动模式命令的回调函数(切换手动/自稳/自主导航)
