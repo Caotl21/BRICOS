@@ -176,6 +176,35 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .dma_tx_it_fe = DMA_IT_FEIF4,
         .dma_tx_irqn = DMA1_Stream4_IRQn,
         .dma_tx_nvic_priority = 7
+    },
+
+    [BSP_UART_DEBUG] = {
+        .uart_base = UART5,
+        .gpio_rcc = RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOD,
+        .uart_rcc = RCC_APB1Periph_UART5,
+        .dma_rcc = 0,
+        .uart_rcc_cmd = RCC_APB1PeriphClockCmd,
+        .gpio_tx_port = GPIOC,
+        .gpio_pin_tx = GPIO_Pin_12,
+        .gpio_pin_tx_src = GPIO_PinSource12,
+        .gpio_rx_port = GPIOD,
+        .gpio_pin_rx = GPIO_Pin_2,
+        .gpio_pin_rx_src = GPIO_PinSource2,
+        .gpio_af = GPIO_AF_UART5,
+        .irqn = UART5_IRQn,  // 需要串口接收中断
+        .nvic_priority = 7,
+        .dma_rx_stream = NULL,
+        .dma_tx_stream = NULL,
+        .dma_channel = 0,
+        .dma_priority = 0,
+        .dma_rx_clear_flags = 0,
+        .dma_tx_clear_flags = 0,
+        .dma_tx_it_tc = 0,
+        .dma_tx_it_te = 0,
+        .dma_tx_it_dme = 0,
+        .dma_tx_it_fe = 0,
+        .dma_tx_irqn = 0,
+        .dma_tx_nvic_priority = 0
     }
 
 };
@@ -371,6 +400,8 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
             USART_ITConfig(hw->uart_base, USART_IT_IDLE, ENABLE);
         } else if (port == BSP_UART_OPI_NRT) {
             USART_ITConfig(hw->uart_base, USART_IT_IDLE, ENABLE);
+        } else if (port == BSP_UART_DEBUG) {
+            USART_ITConfig(hw->uart_base, USART_IT_RXNE, ENABLE);
         }
     }
 
@@ -427,6 +458,9 @@ void bsp_uart_init_default(void)
     
     // 初始化 OrangePi 非实时通信/系统日志总线 (UART4)
     bsp_uart_init(BSP_UART_OPI_NRT, &default_config);
+
+    // 初始化 shell/log 调试接口（UART5）
+    bsp_uart_init(BSP_UART_DEBUG, &default_config);
 }
 
 

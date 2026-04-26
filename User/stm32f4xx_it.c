@@ -158,6 +158,11 @@ void DMA1_Stream4_IRQHandler(void)
     bsp_uart_dma_tx_isr_handler(BSP_UART_OPI_NRT);
 }
 
+void UART5_IRQHandler(void)
+{
+    bsp_uart_isr_handler(BSP_UART_DEBUG);
+}
+
 /******************************************************************************/
 /*                 STM32F4xx Peripherals Interrupt Handlers                   */
 /*  Add here the Interrupt Handler for the used peripheral(s) (PPP), for the  */
