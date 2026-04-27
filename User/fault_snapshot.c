@@ -4,11 +4,12 @@
 #include <string.h>
 
 #include "bsp_flash.h"
+#include "sys_flash_layout.h"
 
 #define FAULT_SNAPSHOT_MAGIC         ((uint32_t)0x46534F56u)  /* "FSOV" */
 #define FAULT_SNAPSHOT_VERSION       ((uint16_t)1u)
-#define FAULT_SNAPSHOT_FLASH_ADDR    ADDR_FLASH_SECTOR_10
-#define FAULT_SNAPSHOT_FLASH_SIZE    ((uint32_t)0x00020000u)
+#define FAULT_SNAPSHOT_FLASH_ADDR    SYS_FLASH_FAULT_SNAPSHOT_ADDR
+#define FAULT_SNAPSHOT_FLASH_SIZE    SYS_FLASH_FAULT_SNAPSHOT_SIZE
 #define FAULT_SNAPSHOT_NAME_SIZE     ((uint16_t)32u)
 
 typedef struct

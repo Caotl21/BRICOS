@@ -4,9 +4,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "sys_data_pool.h"
+#include "sys_flash_layout.h"
 
-#define PID_PARAM_FLASH_ADDR      ((uint32_t)0x080E0000)   // Sector 11
-#define PID_PARAM_FLASH_ERASE_SZ  ((uint32_t)0x00020000)   // 128KB
+#define PID_PARAM_FLASH_ADDR      SYS_FLASH_PID_PARAM_ADDR
+#define PID_PARAM_FLASH_ERASE_SZ  SYS_FLASH_PID_PARAM_ERASE_SIZE
 
 bool Driver_PidParam_Load(bot_params_t *out_params);
 bool Driver_PidParam_Save(const bot_params_t *in_params);

@@ -3,9 +3,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "sys_flash_layout.h"
 
-#define BOOT_FLAG_ADDR      ((uint32_t)0x08004000)
-#define BOOT_FLAG_SIZE      ((uint32_t)0x4000)
+#define BOOT_FLAG_ADDR      SYS_FLASH_BOOT_FLAG_ADDR
+#define BOOT_FLAG_SIZE      SYS_FLASH_BOOT_FLAG_SIZE
 #define BOOT_VALID_FLAG     ((uint32_t)0x5A5A5A5A)
 
 typedef struct
