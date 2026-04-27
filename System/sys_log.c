@@ -8,12 +8,12 @@
 #include "semphr.h"
 #include "task.h"
 
-#include "driver_hydrocore.h"
+#include "bsp_uart.h"
 
 #define LOG_TMP_BUF_SIZE   192u
 #define LOG_QUEUE_DEPTH     16u
-#define LOG_TASK_STACK      256u
-#define LOG_TASK_PRIO       1u
+#define LOG_TASK_STACK      512u
+#define LOG_TASK_PRIO       3u
 
 typedef struct
 {
@@ -46,11 +46,7 @@ static void Log_Task_Core(void *pvParameters)
 
     while (1) {
         if (xQueueReceive(s_log_queue, &msg, portMAX_DELAY) == pdPASS) {
-            Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
-                                      DATA_TYPE_LOG,
-                                      (const uint8_t *)msg.text,
-                                      msg.len,
-                                      USE_DMA);
+            bsp_uart_send_buffer(BSP_UART_DEBUG, (const uint8_t *)msg.text, msg.len);
         }
     }
 }

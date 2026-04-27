@@ -118,6 +118,8 @@ static shell_ret_t prv_cmd_help(shell_cmd_ctx_t *ctx, int argc, char **argv)
                             "  sysmode request | sysmode set standby|disarmed|armed|failsafe\r\n"
                             "  momode request | momode set manual|stabilize|auto\r\n"
                             "  fault\r\n"
+                            "  thruster request | idle | all <pct> | set <id> <pct> | pulse <id> <pct> <ms>\r\n"
+                            "  servo set <angle>\r\n"
                             "  euler request\r\n"
                             "  depthtemp request\r\n"
                             "  power request\r\n"

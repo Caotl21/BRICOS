@@ -1,124 +1,128 @@
 #include "task_shell_transport_nrt.h"
 
-#include "driver_hydrocore.h"
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "task.h"
+
+#include "bsp_uart.h"
 #include "sys_port.h"
 
-/*
- * NRT 发送分片上限：
- * Driver_Protocol_SendFrame 的 payload_len 为 uint8_t，最大 255。
- * 这里保守设置为 240，给后续扩展字段预留空间。
- */
-#define SHELL_NRT_TX_CHUNK_MAX  (240u)
-#define SHELL_BOOT_STATUS_TEXT  "startup_success"
+#define SHELL_UART_RX_QUEUE_DEPTH  128u
+#define SHELL_UART_RX_TASK_STACK   256u
+#define SHELL_UART_RX_TASK_PRIO    3u
 
-/* Shell Core 在 start() 时注入的接收回调 */
 static shell_rx_cb_t s_shell_rx_cb = 0;
-static uint8_t s_startup_status_pending = 0u;
+static QueueHandle_t s_shell_rx_queue = NULL;
+static TaskHandle_t s_shell_rx_task = NULL;
+static const shell_peer_t s_uart_peer = {
+    .type = SHELL_TP_UART_STREAM,
+    .session_id = 0u
+};
 
-static void prv_send_shell_boot_status(void)
+static void prv_uart_debug_rx_isr(uint8_t *data, uint16_t len)
 {
-    static const uint8_t s_boot_status[] = SHELL_BOOT_STATUS_TEXT;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    uint16_t i;
 
-    Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
-                              (uint8_t)DATA_TYPE_SHELL_BOOT_STATUS,
-                              s_boot_status,
-                              (uint8_t)(sizeof(s_boot_status) - 1u),
-                              USE_DMA);
+    if ((data == NULL) || (len == 0u) || (s_shell_rx_queue == NULL)) {
+        return;
+    }
+
+    for (i = 0u; i < len; i++) {
+        (void)xQueueSendFromISR(s_shell_rx_queue, &data[i], &xHigherPriorityTaskWoken);
+    }
+
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-/*
- * NRT 命令回调：把收到的 payload 转交给 Shell Core。
- * 当前按 NRT_FRAME 模式处理（一帧一命令）。
- */
-static void prv_on_shell_req(const uint8_t *payload, uint16_t len)
+static void prv_shell_uart_rx_task(void *pvParameters)
 {
-    shell_peer_t peer;
+    uint8_t ch;
     shell_rx_cb_t cb;
+    (void)pvParameters;
 
-    if ((payload == 0) || (len == 0u)) {
-        return;
+    while (1) {
+        if (xQueueReceive(s_shell_rx_queue, &ch, portMAX_DELAY) == pdPASS) {
+            SYS_ENTER_CRITICAL();
+            cb = s_shell_rx_cb;
+            SYS_EXIT_CRITICAL();
+
+            if (cb != 0) {
+                cb(&s_uart_peer, &ch, 1u);
+            }
+        }
     }
-
-    SYS_ENTER_CRITICAL();
-    cb = s_shell_rx_cb;
-    SYS_EXIT_CRITICAL();
-
-    if (cb == 0) {
-        return;
-    }
-
-    peer.type = SHELL_TP_NRT_FRAME;
-    peer.session_id = 0u;
-    cb(&peer, payload, len);
-}
-
-static void prv_on_shell_boot_detect(const uint8_t *payload, uint16_t len)
-{
-    (void)payload;
-    (void)len;
-    prv_send_shell_boot_status();
 }
 
 static int prv_nrt_init(void)
 {
+    if (s_shell_rx_queue == NULL) {
+        s_shell_rx_queue = xQueueCreate(SHELL_UART_RX_QUEUE_DEPTH, sizeof(uint8_t));
+    }
+
+    if (s_shell_rx_queue == NULL) {
+        return -1;
+    }
+
+    if (s_shell_rx_task == NULL) {
+        if (xTaskCreate(prv_shell_uart_rx_task,
+                        "ShellU5Rx",
+                        SHELL_UART_RX_TASK_STACK,
+                        NULL,
+                        SHELL_UART_RX_TASK_PRIO,
+                        &s_shell_rx_task) != pdPASS) {
+            return -2;
+        }
+    }
+
     return 0;
 }
 
 static int prv_nrt_start(shell_rx_cb_t rx_cb)
 {
+    static const uint8_t s_boot_status[] = "startup_success\r\n";
+
     if (rx_cb == 0) {
         return -1;
     }
 
     SYS_ENTER_CRITICAL();
     s_shell_rx_cb = rx_cb;
-    s_startup_status_pending = 1u;
     SYS_EXIT_CRITICAL();
 
-    Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_REQ, prv_on_shell_req);
-    Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_BOOT_DETECT, prv_on_shell_boot_detect);
+    bsp_uart_register_rx_cb(BSP_UART_DEBUG, prv_uart_debug_rx_isr);
+    bsp_uart_send_buffer(BSP_UART_DEBUG, s_boot_status, (uint16_t)(sizeof(s_boot_status) - 1u));
+
     return 0;
 }
 
 static int prv_nrt_send(const shell_peer_t *peer, const uint8_t *data, uint16_t len)
 {
-    uint16_t offset = 0u;
-
-    if ((peer == 0) || (data == 0)) {
-        return -1;
-    }
-
     (void)peer;
 
+    if (data == 0) {
+        return -1;
+    }
     if (len == 0u) {
         return 0;
     }
 
-    while (offset < len) {
-        uint16_t remain = (uint16_t)(len - offset);
-        uint16_t chunk = (remain > SHELL_NRT_TX_CHUNK_MAX) ? SHELL_NRT_TX_CHUNK_MAX : remain;
-
-        Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
-                                  (uint8_t)DATA_TYPE_SHELL_RESP,
-                                  &data[offset],
-                                  (uint8_t)chunk,
-                                  USE_DMA);
-        offset = (uint16_t)(offset + chunk);
-    }
-
+    bsp_uart_send_buffer(BSP_UART_DEBUG, data, len);
     return 0;
 }
 
 static int prv_nrt_stop(void)
 {
+    bsp_uart_register_rx_cb(BSP_UART_DEBUG, NULL);
+
     SYS_ENTER_CRITICAL();
     s_shell_rx_cb = 0;
-    s_startup_status_pending = 0u;
     SYS_EXIT_CRITICAL();
 
-    /* 注销 shell 命令处理，避免 stop 后仍被分发 */
-    Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_REQ, 0);
-    Driver_Protocol_Register((uint8_t)DATA_TYPE_SHELL_BOOT_DETECT, 0);
+    if (s_shell_rx_queue != NULL) {
+        xQueueReset(s_shell_rx_queue);
+    }
+
     return 0;
 }
 
@@ -136,16 +140,4 @@ const shell_transport_vtable_t *Task_ShellTransportNRT_GetVTable(void)
 
 void Task_ShellTransportNRT_OnNrtCommStarted(void)
 {
-    uint8_t should_send = 0u;
-
-    SYS_ENTER_CRITICAL();
-    if (s_startup_status_pending != 0u) {
-        s_startup_status_pending = 0u;
-        should_send = 1u;
-    }
-    SYS_EXIT_CRITICAL();
-
-    if (should_send != 0u) {
-        prv_send_shell_boot_status();
-    }
 }

@@ -1,8 +1,5 @@
 #include <string.h>
 
-#include "FreeRTOS.h"
-#include "task.h"
-
 #include "bsp_watchdog.h"
 #include "bsp_cpu.h"
 
@@ -18,26 +15,15 @@
 
 #include "task_nrt_cmd.h"
 
-volatile nrt_sysmode_probe_t g_nrt_sysmode_probe = {0};
-
-static void prv_send_sysmode_ack_with_probe(uint8_t ack_code)
-{
-    g_nrt_sysmode_probe.last_ack_code = ack_code;
-    g_nrt_sysmode_probe.t_ack_start_tick = (uint32_t)xTaskGetTickCount();
-    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, ack_code, 0, USE_DMA);
-    g_nrt_sysmode_probe.t_ack_done_tick = (uint32_t)xTaskGetTickCount();
-}
-
-
 // 接收OTA升级命令的回调函数
 static void On_Receive_OTA_Cmd(const uint8_t *payload, uint16_t len){
     if(len == 4 && payload[0] == 0xDE && payload[1] == 0xAD && payload[2] == 0xBE && payload[3] == 0xEF){      
         Sys_BootFlag_RequestEnterBootloader();
 
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_OTA, ACK_SUCCESS, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_OTA, ACK_SUCCESS, 0, USE_CPU);
         bsp_cpu_reset();
     } else {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_OTA, INVALID_PARAM, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_OTA, INVALID_PARAM, 0, USE_CPU);
     }
 }
 
@@ -64,7 +50,7 @@ static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
     // 预期：7 个控制器 (Roll外/内, Pitch外/内, Yaw外/内, Depth单) * 每个 20 字节
     uint16_t expected_len = 7 * PAYLOAD_SIZE_PER_PID; // 7 * 20 = 140 字节
     if (len != expected_len) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_PID_PARAM, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_PID_PARAM, LENGTH_ERROR, 0, USE_CPU);
         return; // 长度对不上（串口丢包或上位机配错），直接拦截拒绝写入
     }
 
@@ -101,7 +87,7 @@ static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
     // 将修改后的完整参数包写入 Flash，掉电保存
     Driver_PidParam_Save(&temp_params);
 
-    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_PID_PARAM, ACK_SUCCESS, 0, USE_DMA);
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_PID_PARAM, ACK_SUCCESS, 0, USE_CPU);
 
     // 硬复位，让系统重新走一遍完整的开机初始化流程
     // 这样开机时会自动清空 PID 的 I 项累加器 (error_int)，防止带着旧状态起飞炸机
@@ -110,73 +96,60 @@ static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
 
 // 接收设置系统模式命令的回调函数(切换待机/加锁/解锁)
 static void On_Receive_Sys_Mode_Cmd(const uint8_t *payload, uint16_t len){
-    sys_mode_mgr_status_t mode_mgr_status = SYS_MODE_MGR_INVALID_PARAM;
-    uint8_t ack_code = INVALID_PARAM;
-
-    g_nrt_sysmode_probe.seq++;
-    g_nrt_sysmode_probe.t_cmd_enter_tick = (uint32_t)xTaskGetTickCount();
-    g_nrt_sysmode_probe.t_mode_req_done_tick = 0u;
-    g_nrt_sysmode_probe.t_ack_start_tick = 0u;
-    g_nrt_sysmode_probe.t_ack_done_tick = 0u;
-    g_nrt_sysmode_probe.last_payload_len = len;
-    g_nrt_sysmode_probe.last_req_mode = ((payload != NULL) && (len > 0u)) ? payload[0] : 0xFFu;
-    g_nrt_sysmode_probe.last_ack_code = 0xFFu;
-    g_nrt_sysmode_probe.last_mode_mgr_status = 0xFFu;
+    bool res;
 
     if(len != 1) {
-        g_nrt_sysmode_probe.last_mode_mgr_status = (uint8_t)mode_mgr_status;
-        prv_send_sysmode_ack_with_probe(LENGTH_ERROR);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, LENGTH_ERROR, 0, USE_CPU);
         return;
     }
 
     bot_sys_mode_e new_mode = (bot_sys_mode_e)payload[0];
     if(new_mode > SYS_MODE_MOTION_ARMED) {
-        g_nrt_sysmode_probe.last_mode_mgr_status = (uint8_t)mode_mgr_status;
-        prv_send_sysmode_ack_with_probe(INVALID_PARAM);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, INVALID_PARAM, 0, USE_CPU);
         return;
     }
 
-    mode_mgr_status = System_ModeManager_RequestSysMode(new_mode);
-    g_nrt_sysmode_probe.t_mode_req_done_tick = (uint32_t)xTaskGetTickCount();
-    g_nrt_sysmode_probe.last_mode_mgr_status = (uint8_t)mode_mgr_status;
-
-    ack_code = (mode_mgr_status == SYS_MODE_MGR_OK) ? ACK_SUCCESS : INVALID_PARAM;
-    prv_send_sysmode_ack_with_probe(ack_code);
+    res = (System_ModeManager_RequestSysMode(new_mode) == SYS_MODE_MGR_OK);
+    if (!res) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, INVALID_PARAM, 0, USE_CPU);
+    } else {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, ACK_SUCCESS, 0, USE_CPU);
+    }
 }
 
 // 接收设置运动模式命令的回调函数(切换手动/自稳/自主导航)
 static void On_Receive_Motion_Mode_Cmd(const uint8_t *payload, uint16_t len){
     if(len != 1) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, LENGTH_ERROR, 0, USE_CPU);
         return;
     }
 
     bool res;
     bot_run_mode_e new_mode = (bot_run_mode_e)payload[0];
     if(new_mode > MOTION_STATE_AUTO) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_CPU);
         return;
     }
 
     res = (System_ModeManager_RequestMotionMode(new_mode) == SYS_MODE_MGR_OK);
     if (!res) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_CPU);
     } else {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, ACK_SUCCESS, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, ACK_SUCCESS, 0, USE_CPU);
     }
 }
 
 // 接收设置舵机命令的回调函数
 static void On_Receive_Servo_Cmd(const uint8_t *payload, uint16_t len){
     if(len != 1) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SERVO, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SERVO, LENGTH_ERROR, 0, USE_CPU);
         return;
     }
 
     uint8_t servo_angle = payload[0];
 
     Driver_Servo_SetAngle(BSP_PWM_SERVO_2, servo_angle); // 相机云台舵机角度 (0-180)
-    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SERVO, ACK_SUCCESS, 0, USE_DMA);
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SERVO, ACK_SUCCESS, 0, USE_CPU);
 }
 
 // 接收设置探照灯强度命令的回调函数 (暂未实现，后续可以根据协议定义增加)
@@ -188,14 +161,14 @@ static void On_Receive_Light_Cmd(const uint8_t *payload, uint16_t len){
 static void On_Receive_TAM_Cmd(const uint8_t *payload, uint16_t len){
 
     if (payload == NULL || len < 1) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, LENGTH_ERROR, 0, USE_CPU);
         return;
     }
 
     // 取并校验推进器数量
     uint8_t thruster_count = payload[0];
     if (thruster_count == 0 || thruster_count > TAM_MAX_THRUSTERS) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, INVALID_PARAM, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, INVALID_PARAM, 0, USE_CPU);
         return; 
     }
 
@@ -203,7 +176,7 @@ static void On_Receive_TAM_Cmd(const uint8_t *payload, uint16_t len){
     // 预期长度 = 1字节(数量) + 推进器数量 * 6(自由度) * 4字节(sizeof(float))
     uint16_t expected_len = 1 + (thruster_count * TAM_MAX_DOF * sizeof(float));
     if (len != expected_len) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, LENGTH_ERROR, 0, USE_CPU);
         return; 
     }
 
@@ -237,7 +210,7 @@ static void On_Receive_TAM_Cmd(const uint8_t *payload, uint16_t len){
     // 重新计算 Checksum 并完整写入 Flash 
     Driver_PidParam_Save(&temp_params);
 
-    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, ACK_SUCCESS, 0, USE_DMA);
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, ACK_SUCCESS, 0, USE_CPU);
 
     // 安全收尾
     bsp_cpu_reset();

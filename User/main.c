@@ -45,7 +45,7 @@ int main(void)
 
     System_SysTick_Init(SYSCLK);
     Sys_BootFlag_MarkBootSuccess();
-    //System_Log_Init();
+    System_Log_Init();
     Bot_Data_Pool_Init();
     System_ModeManager_Init();
 

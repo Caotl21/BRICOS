@@ -263,7 +263,7 @@ static void vTask_Monitor_Core(void *pvParameters)
                                       DATA_TYPE_STATE_SYS,
                                       sys_report_buf,
                                       (uint8_t)sys_report_len,
-                                      USE_DMA);
+                                      USE_CPU);
         }
 
         if (actuator_report_len != 0u)
@@ -272,7 +272,7 @@ static void vTask_Monitor_Core(void *pvParameters)
                                       DATA_TYPE_STATE_ACTUATOR,
                                       actuator_report_buf,
                                       (uint8_t)actuator_report_len,
-                                      USE_DMA);
+                                      USE_CPU);
         }
 
         Bot_Task_CheckIn_Monitor(TASK_ID_MONITOR);
