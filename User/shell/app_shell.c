@@ -5,9 +5,8 @@
 #include "task_shell_transport_nrt.h"
 
 /*
- * @brief 初始化并启动 Shell（当前绑定 NRT 传输）。
- * @note  若后续切换到独立 shell UART，只需在本文件替换 transport 选择逻辑，
- *        main.c 无需改动。
+ * Shell transport is bound to UART5 (BSP_UART_DEBUG).
+ * Keep transport selection in this file to avoid touching main.c.
  */
 void App_Shell_Init(void)
 {
@@ -22,6 +21,6 @@ void App_Shell_Init(void)
     if (shell_ret != 0) {
         LOG_ERROR("ShellCore start failed: %d", shell_ret);
     } else {
-        LOG_INFO("ShellCore started on NRT transport");
+        LOG_INFO("ShellCore started on UART5 debug transport");
     }
 }

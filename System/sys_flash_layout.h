@@ -26,29 +26,29 @@
  * 2) If OTA/bootloader layout changes, update this table first.
  */
 
-#define SYS_FLASH_BASE_ADDR                     ((uint32_t)0x08000000u)
-#define SYS_FLASH_TOTAL_SIZE                    ((uint32_t)0x00100000u)
+#define SYS_FLASH_BASE_ADDR                     0x08000000u
+#define SYS_FLASH_TOTAL_SIZE                    0x00100000u
 #define SYS_FLASH_END_ADDR                      (SYS_FLASH_BASE_ADDR + SYS_FLASH_TOTAL_SIZE)
 
-#define SYS_FLASH_BOOT_FLAG_ADDR                ((uint32_t)0x08004000u)
-#define SYS_FLASH_BOOT_FLAG_SIZE                ((uint32_t)0x00004000u)
+#define SYS_FLASH_BOOT_FLAG_ADDR                0x08004000u
+#define SYS_FLASH_BOOT_FLAG_SIZE                0x00004000u
 
-#define SYS_FLASH_APP1_ADDR                     ((uint32_t)0x08008000u)
-#define SYS_FLASH_APP1_SIZE                     ((uint32_t)0x00018000u)
+#define SYS_FLASH_APP1_ADDR                     0x08008000u
+#define SYS_FLASH_APP1_SIZE                     0x00018000u
 
-#define SYS_FLASH_APP2_ADDR                     ((uint32_t)0x08020000u)
-#define SYS_FLASH_APP2_SIZE                     ((uint32_t)0x00020000u)
+#define SYS_FLASH_APP2_ADDR                     0x08020000u
+#define SYS_FLASH_APP2_SIZE                     0x00020000u
 
-#define SYS_FLASH_PERSIST_LOG_BANK0_ADDR        ((uint32_t)0x08080000u)
-#define SYS_FLASH_PERSIST_LOG_BANK1_ADDR        ((uint32_t)0x080A0000u)
-#define SYS_FLASH_PERSIST_LOG_BANK_SIZE         ((uint32_t)0x00020000u)
+#define SYS_FLASH_PERSIST_LOG_BANK0_ADDR        0x08080000u
+#define SYS_FLASH_PERSIST_LOG_BANK1_ADDR        0x080A0000u
+#define SYS_FLASH_PERSIST_LOG_BANK_SIZE         0x00020000u
 #define SYS_FLASH_PERSIST_LOG_TOTAL_SIZE        (SYS_FLASH_PERSIST_LOG_BANK_SIZE * 2u)
 
-#define SYS_FLASH_FAULT_SNAPSHOT_ADDR           ((uint32_t)0x080C0000u)
-#define SYS_FLASH_FAULT_SNAPSHOT_SIZE           ((uint32_t)0x00020000u)
+#define SYS_FLASH_FAULT_SNAPSHOT_ADDR           0x080C0000u
+#define SYS_FLASH_FAULT_SNAPSHOT_SIZE           0x00020000u
 
-#define SYS_FLASH_PID_PARAM_ADDR                ((uint32_t)0x080E0000u)
-#define SYS_FLASH_PID_PARAM_ERASE_SIZE          ((uint32_t)0x00020000u)
+#define SYS_FLASH_PID_PARAM_ADDR                0x080E0000u
+#define SYS_FLASH_PID_PARAM_ERASE_SIZE          0x00020000u
 
 /* Basic compile-time layout checks. */
 #if (SYS_FLASH_BOOT_FLAG_ADDR < SYS_FLASH_BASE_ADDR)

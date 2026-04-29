@@ -425,6 +425,9 @@ void bsp_uart_init_default(void)
     
     // 初始化 IMU2 (USART2)
     bsp_uart_init(BSP_UART_IMU2, &default_config);
+
+    // 初始化 shell/log 调试接口（UART5）
+    bsp_uart_init(BSP_UART_DEBUG, &default_config);
     
     default_config.baudrate  = 921600;
     // 初始化 OrangePi 实时通信总线 (USART3)
@@ -432,9 +435,6 @@ void bsp_uart_init_default(void)
     
     // 初始化 OrangePi 非实时通信/系统日志总线 (UART4)
     bsp_uart_init(BSP_UART_OPI_NRT, &default_config);
-
-    // 初始化 shell/log 调试接口（UART5）
-    bsp_uart_init(BSP_UART_DEBUG, &default_config);
 }
 
 

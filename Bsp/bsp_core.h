@@ -27,6 +27,8 @@ typedef enum {
     BSP_PWM_THRUSTER_4,
     BSP_PWM_THRUSTER_5,
     BSP_PWM_THRUSTER_6,
+    BSP_PWM_THRUSTER_7,
+    BSP_PWM_THRUSTER_8,
     BSP_PWM_SERVO_1,        // 舵机 1-2
     BSP_PWM_SERVO_2,
     BSP_PWM_LIGHT_1,        // 探照灯 1-2

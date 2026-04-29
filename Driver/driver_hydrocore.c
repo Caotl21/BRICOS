@@ -66,7 +66,7 @@ void Driver_Protocol_Dispatch(const uint8_t *raw_frame, uint16_t total_len)
     if (handler != NULL) {
         handler(&raw_frame[4], raw_frame[3]);
     } else {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, raw_frame[2], UNKNOWN_CMD, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, raw_frame[2], UNKNOWN_CMD, 0, USE_CPU);
     }
 }
 

@@ -54,7 +54,7 @@ static void prv_shell_uart_rx_task(void *pvParameters)
     }
 }
 
-static int prv_nrt_init(void)
+static int prv_uart5_init(void)
 {
     if (s_shell_rx_queue == NULL) {
         s_shell_rx_queue = xQueueCreate(SHELL_UART_RX_QUEUE_DEPTH, sizeof(uint8_t));
@@ -78,7 +78,7 @@ static int prv_nrt_init(void)
     return 0;
 }
 
-static int prv_nrt_start(shell_rx_cb_t rx_cb)
+static int prv_uart5_start(shell_rx_cb_t rx_cb)
 {
     static const uint8_t s_boot_status[] = "startup_success\r\n";
 
@@ -96,7 +96,7 @@ static int prv_nrt_start(shell_rx_cb_t rx_cb)
     return 0;
 }
 
-static int prv_nrt_send(const shell_peer_t *peer, const uint8_t *data, uint16_t len)
+static int prv_uart5_send(const shell_peer_t *peer, const uint8_t *data, uint16_t len)
 {
     (void)peer;
 
@@ -111,7 +111,7 @@ static int prv_nrt_send(const shell_peer_t *peer, const uint8_t *data, uint16_t 
     return 0;
 }
 
-static int prv_nrt_stop(void)
+static int prv_uart5_stop(void)
 {
     bsp_uart_register_rx_cb(BSP_UART_DEBUG, NULL);
 
@@ -126,18 +126,14 @@ static int prv_nrt_stop(void)
     return 0;
 }
 
-static const shell_transport_vtable_t s_shell_nrt_vtable = {
-    prv_nrt_init,
-    prv_nrt_start,
-    prv_nrt_send,
-    prv_nrt_stop
+static const shell_transport_vtable_t s_shell_uart5_vtable = {
+    prv_uart5_init,
+    prv_uart5_start,
+    prv_uart5_send,
+    prv_uart5_stop
 };
 
 const shell_transport_vtable_t *Task_ShellTransportNRT_GetVTable(void)
 {
-    return &s_shell_nrt_vtable;
-}
-
-void Task_ShellTransportNRT_OnNrtCommStarted(void)
-{
+    return &s_shell_uart5_vtable;
 }

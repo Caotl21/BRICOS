@@ -124,8 +124,8 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .prescaler = PSC_APB1_1MHZ,
         .period = ARR_50HZ
     },    
-    // --- 探照灯 1：TIM4 CH3 (PD14) [保持不变] ---
-    [BSP_PWM_LIGHT_1]    = {
+    // --- 电机 7：TIM4 CH3 (PD14) [预留] ---
+    [BSP_PWM_THRUSTER_7]    = {
         .tim = TIM4, 
         .tim_rcc = RCC_APB1Periph_TIM4,
         .tim_rcc_cmd = RCC_APB1PeriphClockCmd,
@@ -140,8 +140,8 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .prescaler = PSC_APB1_1MHZ,
         .period = ARR_50HZ
     },
-    // --- 探照灯 2：修改为 TIM4 CH2 (PD13) ---
-    [BSP_PWM_LIGHT_2]    = {
+    // --- 电机 8：TIM4 CH2 (PD13) 预留 ---
+    [BSP_PWM_THRUSTER_8]    = {
         .tim = TIM4, 
         .tim_rcc = RCC_APB1Periph_TIM4,
         .tim_rcc_cmd = RCC_APB1PeriphClockCmd,

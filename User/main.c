@@ -1,6 +1,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "stm32f4xx_rcc.h"
+
 #include "bsp_delay.h"
 #include "bsp_gpio.h"
 #include "bsp_pwm.h"
@@ -28,6 +30,30 @@
 #include "task_rt_cmd.h"
 #include "task_sensor.h"
 
+static void Main_Log_ResetReason(void)
+{
+    uint32_t csr = RCC->CSR;
+    uint8_t iwdg = (RCC_GetFlagStatus(RCC_FLAG_IWDGRST) == SET) ? 1u : 0u;
+    uint8_t wwdg = (RCC_GetFlagStatus(RCC_FLAG_WWDGRST) == SET) ? 1u : 0u;
+    uint8_t borrst = (RCC_GetFlagStatus(RCC_FLAG_BORRST) == SET) ? 1u : 0u;
+    uint8_t porrst = (RCC_GetFlagStatus(RCC_FLAG_PORRST) == SET) ? 1u : 0u;
+    uint8_t pinrst = (RCC_GetFlagStatus(RCC_FLAG_PINRST) == SET) ? 1u : 0u;
+    uint8_t sftrst = (RCC_GetFlagStatus(RCC_FLAG_SFTRST) == SET) ? 1u : 0u;
+    uint8_t lpwrrst = (RCC_GetFlagStatus(RCC_FLAG_LPWRRST) == SET) ? 1u : 0u;
+
+    LOG_INFO("Reset flags: CSR=0x%08lX IWDG=%u WWDG=%u BOR=%u POR=%u PIN=%u SFT=%u LPWR=%u",
+             (unsigned long)csr,
+             (unsigned)iwdg,
+             (unsigned)wwdg,
+             (unsigned)borrst,
+             (unsigned)porrst,
+             (unsigned)pinrst,
+             (unsigned)sftrst,
+             (unsigned)lpwrrst);
+
+    RCC_ClearFlag();
+}
+
 int main(void)
 {
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
@@ -46,6 +72,7 @@ int main(void)
     System_SysTick_Init(SYSCLK);
     Sys_BootFlag_MarkBootSuccess();
     System_Log_Init();
+    Main_Log_ResetReason();
     Bot_Data_Pool_Init();
     System_ModeManager_Init();
 
