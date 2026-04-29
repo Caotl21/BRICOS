@@ -81,6 +81,31 @@ static uint16_t prv_pack_current_pid_params(uint8_t *payload, uint16_t payload_s
     return offset;
 }
 
+static uint16_t prv_pack_current_tam_config(uint8_t *payload, uint16_t payload_size)
+{
+    uint16_t offset = 0u;
+    uint8_t row_size_bytes;
+    uint8_t t;
+    bot_params_t params;
+
+    row_size_bytes = (uint8_t)(TAM_MAX_DOF * sizeof(float));
+
+    if ((payload == NULL) || (payload_size < (uint16_t)(1u + (TAM_MAX_THRUSTERS * row_size_bytes)))) {
+        return 0u;
+    }
+
+    Bot_Params_Pull(&params);
+
+    payload[offset++] = params.tam_config.active_thrusters;
+
+    for (t = 0u; t < params.tam_config.active_thrusters; t++) {
+        memcpy(&payload[offset], &params.tam_config.matrix[t][0], row_size_bytes);
+        offset += row_size_bytes;
+    }
+
+    return offset;
+}
+
 static void prv_send_current_pid_params(void)
 {
     uint8_t payload[7u * PAYLOAD_SIZE_PER_PID];
@@ -94,6 +119,24 @@ static void prv_send_current_pid_params(void)
     Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_READ_PID_PARAM, ACK_SUCCESS, 0, USE_CPU);
     Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
                               DATA_TYPE_READ_PID_PARAM,
+                              payload,
+                              (uint8_t)payload_len,
+                              USE_CPU);
+}
+
+static void prv_send_current_tam_config(void)
+{
+    uint8_t payload[(1u + (TAM_MAX_THRUSTERS * TAM_MAX_DOF * sizeof(float)))];
+    uint16_t payload_len;
+
+    payload_len = prv_pack_current_tam_config(payload, sizeof(payload));
+    if (payload_len == 0u) {
+        return;
+    }
+
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_READ_TAM, ACK_SUCCESS, 0, USE_CPU);
+    Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                              DATA_TYPE_READ_TAM,
                               payload,
                               (uint8_t)payload_len,
                               USE_CPU);
@@ -159,6 +202,15 @@ static void On_Receive_Read_PID_Param_Cmd(const uint8_t *payload, uint16_t len)
     (void)len;
 
     prv_send_current_pid_params();
+}
+
+// 接收读取TAM参数命令的回调函数(先回ACK，再上报当前TAM)
+static void On_Receive_Read_TAM_Cmd(const uint8_t *payload, uint16_t len)
+{
+    (void)payload;
+    (void)len;
+
+    prv_send_current_tam_config();
 }
 
 // 接收设置系统模式命令的回调函数(切换待机/加锁/解锁)
@@ -287,6 +339,7 @@ void Task_NRT_Cmd_Init(void){
     Driver_Protocol_Register(DATA_TYPE_OTA, On_Receive_OTA_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_PID_PARAM, On_Receive_Set_PID_Param_Cmd);
     Driver_Protocol_Register(DATA_TYPE_READ_PID_PARAM, On_Receive_Read_PID_Param_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_READ_TAM, On_Receive_Read_TAM_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_SYS_MODE, On_Receive_Sys_Mode_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_MOTION_MODE, On_Receive_Motion_Mode_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_SERVO, On_Receive_Servo_Cmd);

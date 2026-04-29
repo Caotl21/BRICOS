@@ -24,6 +24,7 @@ typedef enum {
 #define DATA_TYPE_STATE_SYS       0x03
 #define DATA_TYPE_STATE_ACTUATOR  0x04
 #define DATA_TYPE_LOG             0x05
+#define DATA_TYPE_STATE_THRUSTER  0x06
 #define DATA_TYPE_CMD_ACK         0xFF
 
 #define DATA_TYPE_OTA             0x10
@@ -33,6 +34,7 @@ typedef enum {
 #define DATA_TYPE_SET_SERVO       0x14
 #define DATA_TYPE_SET_TAM         0x15
 #define DATA_TYPE_READ_PID_PARAM  0x16
+#define DATA_TYPE_READ_TAM        0x17
 
 // SERVICE ACK状态码定义
 #define ACK_SUCCESS               0x01

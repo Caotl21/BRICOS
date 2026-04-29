@@ -306,6 +306,54 @@ static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
                               USE_CPU);
 }
 
+static uint16_t Serialize_Thruster_Report(uint8_t *buf, const uint16_t *pulse_us)
+{
+    uint16_t offset = 0u;
+    uint8_t i;
+    const uint16_t thruster_limits[3] = {
+        THRUSTER_PWM_STOP,
+        THRUSTER_PWM_MAX_FWD,
+        THRUSTER_PWM_MAX_REV
+    };
+
+    if ((buf == NULL) || (pulse_us == NULL)) {
+        return 0u;
+    }
+
+    for (i = 0u; i < THRUSTER_COUNT; i++) {
+        memcpy(&buf[offset], &pulse_us[i], sizeof(uint16_t));
+        offset += sizeof(uint16_t);
+    }
+
+    for (i = 0u; i < 3u; i++) {
+        memcpy(&buf[offset], &thruster_limits[i], sizeof(uint16_t));
+        offset += sizeof(uint16_t);
+    }
+
+    return offset;
+}
+
+static void Report_Thruster_State_To_OrangePi(const uint16_t *pulse_us)
+{
+    uint8_t report_buf[(THRUSTER_COUNT + 3u) * sizeof(uint16_t)];
+    uint16_t report_len;
+
+    if (pulse_us == NULL) {
+        return;
+    }
+
+    report_len = Serialize_Thruster_Report(report_buf, pulse_us);
+    if (report_len == 0u) {
+        return;
+    }
+
+    Driver_Protocol_SendFrame(BSP_UART_OPI_RT,
+                              DATA_TYPE_STATE_THRUSTER,
+                              report_buf,
+                              (uint8_t)report_len,
+                              USE_CPU);
+}
+
 static void prv_set_idle_output(void)
 {
     Driver_Thruster_Set_Idle();
@@ -741,7 +789,15 @@ static void vTask_Control(void *pvParameters)
 
         /* STANDBY 下关闭 RT 遥测上报，降低实时通信负担 */
         if (ctx.current_mode != SYS_MODE_STANDBY) {
+            uint16_t thruster_pulse_us[THRUSTER_COUNT];
+            int i;
+
             Report_Body_State_To_OrangePi(&ctx.state);
+
+            for (i = 0; i < THRUSTER_COUNT; i++) {
+                thruster_pulse_us[i] = bsp_pwm_get_pulse_us((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i));
+            }
+            Report_Thruster_State_To_OrangePi(thruster_pulse_us);
         }
 
         Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
