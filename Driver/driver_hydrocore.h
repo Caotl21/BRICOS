@@ -32,6 +32,7 @@ typedef enum {
 #define DATA_TYPE_SET_MOTION_MODE 0x13
 #define DATA_TYPE_SET_SERVO       0x14
 #define DATA_TYPE_SET_TAM         0x15
+#define DATA_TYPE_READ_PID_PARAM  0x16
 
 // SERVICE ACK状态码定义
 #define ACK_SUCCESS               0x01

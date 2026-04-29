@@ -41,6 +41,64 @@ static void prv_extract_pid_params(PID_Controller_t *dest, const uint8_t *src)
     dest->output_max   = temp_buf[4];
 }
 
+static uint16_t prv_pack_pid_params(const PID_Controller_t *src, uint8_t *dst)
+{
+    float temp_buf[5];
+
+    if ((src == NULL) || (dst == NULL)) {
+        return 0u;
+    }
+
+    temp_buf[0] = src->kp;
+    temp_buf[1] = src->ki;
+    temp_buf[2] = src->kd;
+    temp_buf[3] = src->integral_max;
+    temp_buf[4] = src->output_max;
+
+    memcpy(dst, temp_buf, sizeof(temp_buf));
+    return (uint16_t)sizeof(temp_buf);
+}
+
+static uint16_t prv_pack_current_pid_params(uint8_t *payload, uint16_t payload_size)
+{
+    uint16_t offset = 0u;
+    bot_params_t params;
+
+    if ((payload == NULL) || (payload_size < (uint16_t)(7u * PAYLOAD_SIZE_PER_PID))) {
+        return 0u;
+    }
+
+    Bot_Params_Pull(&params);
+
+    offset += prv_pack_pid_params(&params.pid_roll.outer, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_roll.inner, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_pitch.outer, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_pitch.inner, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_yaw.outer, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_yaw.inner, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_depth, &payload[offset]);
+
+    return offset;
+}
+
+static void prv_send_current_pid_params(void)
+{
+    uint8_t payload[7u * PAYLOAD_SIZE_PER_PID];
+    uint16_t payload_len;
+
+    payload_len = prv_pack_current_pid_params(payload, sizeof(payload));
+    if (payload_len == 0u) {
+        return;
+    }
+
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_READ_PID_PARAM, ACK_SUCCESS, 0, USE_CPU);
+    Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                              DATA_TYPE_READ_PID_PARAM,
+                              payload,
+                              (uint8_t)payload_len,
+                              USE_CPU);
+}
+
 // 接收设置PID参数命令的回调函数(需要更新参数再写入Flash后重启)
 static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
     
@@ -92,6 +150,15 @@ static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
     // 硬复位，让系统重新走一遍完整的开机初始化流程
     // 这样开机时会自动清空 PID 的 I 项累加器 (error_int)，防止带着旧状态起飞炸机
     bsp_cpu_reset();
+}
+
+// 接收读取PID参数命令的回调函数(先回ACK，再上报当前PID参数)
+static void On_Receive_Read_PID_Param_Cmd(const uint8_t *payload, uint16_t len)
+{
+    (void)payload;
+    (void)len;
+
+    prv_send_current_pid_params();
 }
 
 // 接收设置系统模式命令的回调函数(切换待机/加锁/解锁)
@@ -219,6 +286,7 @@ static void On_Receive_TAM_Cmd(const uint8_t *payload, uint16_t len){
 void Task_NRT_Cmd_Init(void){
     Driver_Protocol_Register(DATA_TYPE_OTA, On_Receive_OTA_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_PID_PARAM, On_Receive_Set_PID_Param_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_READ_PID_PARAM, On_Receive_Read_PID_Param_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_SYS_MODE, On_Receive_Sys_Mode_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_MOTION_MODE, On_Receive_Motion_Mode_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_SERVO, On_Receive_Servo_Cmd);

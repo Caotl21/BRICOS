@@ -532,26 +532,31 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
         ctx->last_armed_motion_mode = ctx->current_motion_mode;
     }
 
-    if (ctx->target.target_mode != (uint8_t)ctx->current_motion_mode) {
-        Reset_All_Controllers();
-        prv_set_idle_output();
-        LOG_ERROR("Motion mode mismatch!");
-        return;
-    }
-
+    // if (ctx->target.target_mode != (uint8_t)ctx->current_motion_mode) {
+    //     Reset_All_Controllers();
+    //     prv_set_idle_output();
+    //     LOG_ERROR("Motion mode mismatch!");
+    //     return;
+    // }
+    Driver_IMU_Quaternion_ToEuler_Deg(ctx->state.Quater,
+                                                &ctx->euler_roll,
+                                                &ctx->euler_pitch,
+                                                &ctx->euler_yaw);
     switch (ctx->current_motion_mode) {
         case MOTION_STATE_MANUAL:
             ctx->wrench_out.force_x = ctx->target.cmd.manual_cmd.surge;
             ctx->wrench_out.force_y = ctx->target.cmd.manual_cmd.sway;
             ctx->wrench_out.force_z = ctx->target.cmd.manual_cmd.heave;
             ctx->wrench_out.torque_z = ctx->target.cmd.manual_cmd.yaw_cmd;
+            ctx->wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
+                                                          0.0f,
+                                                          ctx->euler_roll,
+                                                          ctx->state.gyro_x,
+                                                          TASK_CONTROL_PERIOD_S,
+                                                          0u);
             break;
 
         case MOTION_STATE_STABILIZE:
-            Driver_IMU_Quaternion_ToEuler_Deg(ctx->state.Quater,
-                                              &ctx->euler_roll,
-                                              &ctx->euler_pitch,
-                                              &ctx->euler_yaw);
 
             ctx->wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
                                                           0.0f,
