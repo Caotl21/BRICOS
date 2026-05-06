@@ -220,7 +220,7 @@ static float Thruster_Map(float total_thrust)
     float pwm;
 
     if (total_thrust < 0.0f) {
-        pwm = total_thrust * 25.0f;
+        pwm = total_thrust * 10.0f;
     } else {
         pwm = total_thrust * 8.0f;
     }
@@ -595,7 +595,12 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
             ctx->wrench_out.force_x = ctx->target.cmd.manual_cmd.surge;
             ctx->wrench_out.force_y = ctx->target.cmd.manual_cmd.sway;
             ctx->wrench_out.force_z = ctx->target.cmd.manual_cmd.heave;
-            ctx->wrench_out.torque_z = ctx->target.cmd.manual_cmd.yaw_cmd;
+            // ctx->wrench_out.torque_z = ctx->target.cmd.manual_cmd.yaw_cmd;
+            ctx->wrench_out.torque_z = PID_Update(&pid_yaw.inner,
+                                      ctx->target.cmd.manual_cmd.yaw_cmd,
+                                      ctx->state.gyro_z,
+                                      TASK_CONTROL_PERIOD_S,
+                                      0u);
             ctx->wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
                                                           0.0f,
                                                           ctx->euler_roll,
