@@ -13,6 +13,7 @@
 #include "driver_ms5837.h"
 #include "driver_power.h"
 #include "driver_thruster.h"
+#include "driver_ws2812.h"
 
 #include "shell/app_shell.h"
 #include "sys_boot_flag.h"
@@ -68,6 +69,7 @@ int main(void)
     Driver_DHT11_Init();
     Driver_Power_Init();
     Driver_Thruster_Init();
+    Driver_WS2812_Init();
 
     System_SysTick_Init(SYSCLK);
     Sys_BootFlag_MarkBootSuccess();

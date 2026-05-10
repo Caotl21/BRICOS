@@ -16,6 +16,7 @@ void System_Log_Init(void);
 void Log_Print(log_level_t level, const char *fmt, ...);
 void System_Log_PersistReplay(uint16_t max_count);
 bool System_Log_PersistClear(void);
+uint16_t System_Log_GetTaskStackWatermark(void);
 
 #define LOG_ERROR(fmt, ...)   Log_Print(LOG_LEVEL_ERROR,   fmt, ##__VA_ARGS__)
 #define LOG_WARNING(fmt, ...) Log_Print(LOG_LEVEL_WARNING, fmt, ##__VA_ARGS__)

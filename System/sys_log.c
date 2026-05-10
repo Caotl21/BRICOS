@@ -413,6 +413,22 @@ void System_Log_Init(void)
     Persist_Log_InitState();
 }
 
+uint16_t System_Log_GetTaskStackWatermark(void)
+{
+    UBaseType_t wm;
+
+    if (s_log_task == NULL) {
+        return 0u;
+    }
+
+    wm = uxTaskGetStackHighWaterMark(s_log_task);
+    if (wm > 0xFFFFu) {
+        return 0xFFFFu;
+    }
+
+    return (uint16_t)wm;
+}
+
 void Log_Print(log_level_t level, const char *fmt, ...)
 {
     int prefix_len;

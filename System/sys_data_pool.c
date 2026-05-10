@@ -10,6 +10,7 @@
 static bot_body_state_t s_bricsbot_state;
 static bot_sys_state_t s_bricsbot_sys_state;
 static bot_actuator_state_t s_bricsbot_actuator_target;
+static bot_stack_watermark_t s_bricsbot_stack_wm;
 static bot_target_t s_bricsbot_target;
 static bot_params_t s_bricsbot_params;
 
@@ -18,6 +19,7 @@ void Bot_Data_Pool_Init(void)
     memset(&s_bricsbot_state, 0, sizeof(s_bricsbot_state));
     memset(&s_bricsbot_sys_state, 0, sizeof(s_bricsbot_sys_state));
     memset(&s_bricsbot_actuator_target, 0, sizeof(s_bricsbot_actuator_target));
+    memset(&s_bricsbot_stack_wm, 0, sizeof(s_bricsbot_stack_wm));
     memset(&s_bricsbot_target, 0, sizeof(s_bricsbot_target));
     memset(&s_bricsbot_params, 0, sizeof(s_bricsbot_params));
 
@@ -144,6 +146,15 @@ void Bot_Actuator_Pull(bot_actuator_state_t *out_state)
     SYS_EXIT_CRITICAL();
 }
 
+void Bot_StackWatermark_Pull(bot_stack_watermark_t *out_stack_wm)
+{
+    if (out_stack_wm == NULL) return;
+
+    SYS_ENTER_CRITICAL();
+    memcpy(out_stack_wm, &s_bricsbot_stack_wm, sizeof(bot_stack_watermark_t));
+    SYS_EXIT_CRITICAL();
+}
+
 
 void Bot_Target_Push(const bot_target_t *new_target)
 {
@@ -151,5 +162,14 @@ void Bot_Target_Push(const bot_target_t *new_target)
 
     SYS_ENTER_CRITICAL();
     memcpy(&s_bricsbot_target, new_target, sizeof(bot_target_t));
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_StackWatermark_Push(const bot_stack_watermark_t *new_stack_wm)
+{
+    if (new_stack_wm == NULL) return;
+
+    SYS_ENTER_CRITICAL();
+    memcpy(&s_bricsbot_stack_wm, new_stack_wm, sizeof(bot_stack_watermark_t));
     SYS_EXIT_CRITICAL();
 }

@@ -23,7 +23,7 @@ TaskHandle_t Monitor_Task_Handler = NULL;
 #define MODE_SWITCH_GRACE_MS        (800u)
 /* 保护窗最大时长兜底，防止 control 心跳长期不同步导致一直屏蔽点名。 */
 #define MODE_SWITCH_GUARD_MAX_MS    (3000u)
-#define STACK_WATERMARK_LOG_PERIOD_MS (5000u)
+#define STACK_WATERMARK_FIELD_COUNT  (9u)
 
 static const uint32_t TASK_TIMEOUT_THERSHOLDS[MAX_MONITOR_TASKS] = {
     [TASK_ID_CONTROL] = pdMS_TO_TICKS(100),
@@ -125,6 +125,44 @@ static uint16_t Serialize_Actuator_Report(uint8_t *buf, const bot_actuator_state
     return 3u;
 }
 
+static uint16_t Serialize_Stack_Watermark_Report(uint8_t *buf, const bot_stack_watermark_t *stack_wm)
+{
+    uint16_t offset = 0u;
+
+    if ((buf == NULL) || (stack_wm == NULL)) {
+        return 0u;
+    }
+
+    memcpy(&buf[offset], &stack_wm->monitor_task, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(&buf[offset], &stack_wm->control_task, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(&buf[offset], &stack_wm->rt_comm_task, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(&buf[offset], &stack_wm->nrt_comm_task, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(&buf[offset], &stack_wm->imu_task, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(&buf[offset], &stack_wm->ms5837_task, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(&buf[offset], &stack_wm->power_task, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(&buf[offset], &stack_wm->dht11_task, sizeof(uint16_t)); offset += sizeof(uint16_t);
+    memcpy(&buf[offset], &stack_wm->log_task, sizeof(uint16_t)); offset += sizeof(uint16_t);
+
+    return offset;
+}
+
+static void Collect_Stack_Watermark(bot_stack_watermark_t *stack_wm)
+{
+    if (stack_wm == NULL) {
+        return;
+    }
+
+    stack_wm->monitor_task = (uint16_t)uxTaskGetStackHighWaterMark(NULL);
+    stack_wm->control_task = (uint16_t)((Control_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(Control_Task_Handler) : 0u);
+    stack_wm->rt_comm_task = (uint16_t)((RT_Comm_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(RT_Comm_Task_Handler) : 0u);
+    stack_wm->nrt_comm_task = (uint16_t)((NRT_Comm_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(NRT_Comm_Task_Handler) : 0u);
+    stack_wm->imu_task = (uint16_t)((IMU_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(IMU_Task_Handler) : 0u);
+    stack_wm->ms5837_task = (uint16_t)((MS5837_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(MS5837_Task_Handler) : 0u);
+    stack_wm->power_task = (uint16_t)((Power_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(Power_Task_Handler) : 0u);
+    stack_wm->dht11_task = (uint16_t)((DHT11_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(DHT11_Task_Handler) : 0u);
+    stack_wm->log_task = System_Log_GetTaskStackWatermark();
+}
+
 static void vTask_Monitor_Core(void *pvParameters)
 {
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -136,6 +174,7 @@ static void vTask_Monitor_Core(void *pvParameters)
     static bot_sys_state_t sys_state;
     static bot_params_t params;
     static bot_actuator_state_t actuator_state;
+    static bot_stack_watermark_t stack_wm;
     bot_sys_mode_e last_sys_mode = SYS_MODE_STANDBY;
     bot_sys_mode_e current_sys_mode = SYS_MODE_STANDBY;
     bot_run_mode_e current_motion_mode;
@@ -143,29 +182,22 @@ static void vTask_Monitor_Core(void *pvParameters)
     uint32_t last_ticks[MAX_MONITOR_TASKS];
     uint8_t sys_report_buf[2u + (7u * sizeof(float)) + 3u];
     uint8_t actuator_report_buf[3u];
+    uint8_t stack_report_buf[STACK_WATERMARK_FIELD_COUNT * sizeof(uint16_t)];
     /* 记录 STANDBY->DISARMED 过渡被 monitor 首次观测到的 tick。 */
     uint32_t mode_switch_tick = 0u;
     /* 保护窗激活标志：仅在 STANDBY->DISARMED 时置 1。 */
     uint8_t mode_switch_guard_active = 0u;
     /* 首轮循环只初始化基线模式，避免把上电初值误判成“模式切换边沿”。 */
     uint8_t mode_guard_initialized = 0u;
-    uint32_t last_stack_log_tick = 0u;
 
     bsp_wdg_init(5000);
 
     while (1) {
         uint32_t current_tick = xTaskGetTickCount();
-        UBaseType_t wm_monitor;
-        UBaseType_t wm_control;
-        UBaseType_t wm_rt_comm;
-        UBaseType_t wm_nrt_comm;
-        UBaseType_t wm_imu;
-        UBaseType_t wm_ms5837;
-        UBaseType_t wm_power;
-        UBaseType_t wm_dht11;
 
         uint16_t sys_report_len;
         uint16_t actuator_report_len;
+        uint16_t stack_report_len;
         uint32_t failsafe_faults;
 
         uint32_t cpu = System_Runtime_GetCpuUsagePercent();
@@ -177,6 +209,11 @@ static void vTask_Monitor_Core(void *pvParameters)
         Bot_Actuator_Pull(&actuator_state);
         Bot_Task_LastTick_Pull(last_ticks, MAX_MONITOR_TASKS);
         System_ModeManager_Pull(&current_sys_mode, &current_motion_mode, NULL);
+
+        Collect_Stack_Watermark(&stack_wm);
+
+        Bot_StackWatermark_Push(&stack_wm);
+        Bot_StackWatermark_Pull(&stack_wm);
 
         if (mode_guard_initialized == 0u) {
             last_sys_mode = current_sys_mode;
@@ -289,31 +326,14 @@ static void vTask_Monitor_Core(void *pvParameters)
                                       USE_CPU);
         }
 
-        if ((current_sys_mode == SYS_MODE_MOTION_ARMED) &&
-            prv_tick_elapsed_ge(current_tick,
-                                last_stack_log_tick,
-                                pdMS_TO_TICKS(STACK_WATERMARK_LOG_PERIOD_MS))) {
-            wm_monitor = uxTaskGetStackHighWaterMark(NULL);
-            wm_control = (Control_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(Control_Task_Handler) : 0u;
-            wm_rt_comm = (RT_Comm_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(RT_Comm_Task_Handler) : 0u;
-            wm_nrt_comm = (NRT_Comm_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(NRT_Comm_Task_Handler) : 0u;
-            wm_imu = (IMU_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(IMU_Task_Handler) : 0u;
-            wm_ms5837 = (MS5837_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(MS5837_Task_Handler) : 0u;
-            wm_power = (Power_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(Power_Task_Handler) : 0u;
-            wm_dht11 = (DHT11_Task_Handler != NULL) ? uxTaskGetStackHighWaterMark(DHT11_Task_Handler) : 0u;
-
-            LOG_INFO("StackHWM(words) MON=%lu CTRL=%lu RT=%lu NRT=%lu",
-                     (unsigned long)wm_monitor,
-                     (unsigned long)wm_control,
-                     (unsigned long)wm_rt_comm,
-                     (unsigned long)wm_nrt_comm);
-            LOG_INFO("StackHWM(words) IMU=%lu MS=%lu PWR=%lu DHT=%lu",
-                     (unsigned long)wm_imu,
-                     (unsigned long)wm_ms5837,
-                     (unsigned long)wm_power,
-                     (unsigned long)wm_dht11);
-
-            last_stack_log_tick = current_tick;
+        stack_report_len = Serialize_Stack_Watermark_Report(stack_report_buf, &stack_wm);
+        if (stack_report_len != 0u)
+        {
+            Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                                      DATA_TYPE_STATE_STACK_WM,
+                                      stack_report_buf,
+                                      (uint8_t)stack_report_len,
+                                      USE_CPU);
         }
 
         Bot_Task_CheckIn_Monitor(TASK_ID_MONITOR);

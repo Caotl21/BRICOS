@@ -77,11 +77,11 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .gpio_af = GPIO_AF_USART1,
         .irqn = 0,  // 零中断架构 不需要NVIC配置
         .nvic_priority = 0,
-        .dma_rx_stream = DMA2_Stream2,
+        .dma_rx_stream = DMA2_Stream5,
         .dma_tx_stream = NULL,
         .dma_channel = DMA_Channel_4,
         .dma_priority = DMA_Priority_High,
-        .dma_rx_clear_flags = DMA_FLAG_TCIF2 | DMA_FLAG_HTIF2 | DMA_FLAG_TEIF2 | DMA_FLAG_DMEIF2 | DMA_FLAG_FEIF2,
+        .dma_rx_clear_flags = DMA_FLAG_TCIF5 | DMA_FLAG_HTIF5 | DMA_FLAG_TEIF5 | DMA_FLAG_DMEIF5 | DMA_FLAG_FEIF5,
         .dma_tx_clear_flags = 0,
         .dma_tx_it_tc = 0,
         .dma_tx_it_te = 0,
@@ -426,6 +426,7 @@ void bsp_uart_init_default(void)
     // 初始化 IMU2 (USART2)
     bsp_uart_init(BSP_UART_IMU2, &default_config);
 
+    default_config.baudrate  = 1500000;
     // 初始化 shell/log 调试接口（UART5）
     bsp_uart_init(BSP_UART_DEBUG, &default_config);
     

@@ -31,10 +31,10 @@ typedef enum {
     BSP_PWM_THRUSTER_8,
     BSP_PWM_SERVO_1,        // 舵机 1-2
     BSP_PWM_SERVO_2,
-    BSP_PWM_LIGHT_1,        // 探照灯 1-2
-    BSP_PWM_LIGHT_2,
     BSP_PWM_LED_1,          // ws2812 RGB LED 1-2
     BSP_PWM_LED_2,
+    BSP_PWM_SEARCHLIGHT_1,        // 探照灯 1-2
+    BSP_PWM_SEARCHLIGHT_2,
     BSP_PWM_MAX
 } bsp_pwm_ch_t;
 

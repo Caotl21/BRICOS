@@ -23,6 +23,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_it.h"
 #include "stm32f4xx_conf.h"
+#include "bsp_pwm.h"
 #include "bsp_uart.h"
 
 /** @addtogroup Template_Project
@@ -156,6 +157,16 @@ void UART4_IRQHandler(void)
 void DMA1_Stream4_IRQHandler(void)
 {
     bsp_uart_dma_tx_isr_handler(BSP_UART_OPI_NRT);
+}
+
+void DMA2_Stream1_IRQHandler(void)
+{
+    bsp_pwm_dma_waveform_irq_handler(BSP_PWM_LED_1);
+}
+
+void DMA2_Stream2_IRQHandler(void)
+{
+    bsp_pwm_dma_waveform_irq_handler(BSP_PWM_LED_2);
 }
 
 void UART5_IRQHandler(void)

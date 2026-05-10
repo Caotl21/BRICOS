@@ -858,6 +858,16 @@
               <FileType>5</FileType>
               <FilePath>..\Driver\driver_power.h</FilePath>
             </File>
+            <File>
+              <FileName>driver_ws2812.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_ws2812.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_ws2812.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_ws2812.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

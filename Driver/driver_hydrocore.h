@@ -25,6 +25,7 @@ typedef enum {
 #define DATA_TYPE_STATE_ACTUATOR  0x04
 #define DATA_TYPE_LOG             0x05
 #define DATA_TYPE_STATE_THRUSTER  0x06
+#define DATA_TYPE_STATE_STACK_WM  0x07
 #define DATA_TYPE_CMD_ACK         0xFF
 
 #define DATA_TYPE_OTA             0x10
