@@ -6,6 +6,7 @@
 #include "driver_hydrocore.h"
 #include "driver_param.h"
 #include "driver_servo.h"
+#include "driver_ws2812.h"
 
 #include "sys_data_pool.h"
 #include "sys_mode_manager.h"
@@ -271,6 +272,23 @@ static void On_Receive_Servo_Cmd(const uint8_t *payload, uint16_t len){
     Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SERVO, ACK_SUCCESS, 0, USE_CPU);
 }
 
+// 接收设置ws2812灯带颜色命令的回调函数
+static void On_Receive_WS2812_Color_Cmd(const uint8_t *payload, uint16_t len){
+    if(len != 4) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_WS2812_COLOR, LENGTH_ERROR, 0, USE_CPU);
+        return;
+    }
+
+    uint8_t strip = payload[0];
+    uint8_t r =     payload[1];
+    uint8_t g =     payload[2];
+    uint8_t b =     payload[3];
+
+    Driver_WS2812_SetAllRGB((ws2812_strip_t)strip, r, g, b);
+    Driver_WS2812_Refresh((ws2812_strip_t)strip);
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_WS2812_COLOR, ACK_SUCCESS, 0, USE_CPU);
+}
+
 // 接收设置探照灯强度命令的回调函数 (暂未实现，后续可以根据协议定义增加)
 static void On_Receive_Light_Cmd(const uint8_t *payload, uint16_t len){
     // 解析 payload，设置探照灯亮度
@@ -344,5 +362,6 @@ void Task_NRT_Cmd_Init(void){
     Driver_Protocol_Register(DATA_TYPE_SET_MOTION_MODE, On_Receive_Motion_Mode_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_SERVO, On_Receive_Servo_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_TAM, On_Receive_TAM_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_SET_WS2812_COLOR, On_Receive_WS2812_Color_Cmd);
 }
 
