@@ -4,6 +4,7 @@
 #include "bsp_cpu.h"
 
 #include "driver_hydrocore.h"
+#include "driver_imu.h"
 #include "driver_param.h"
 #include "driver_servo.h"
 #include "driver_ws2812.h"
@@ -353,6 +354,25 @@ static void On_Receive_TAM_Cmd(const uint8_t *payload, uint16_t len){
     bsp_cpu_reset();
 }
 
+static void On_Receive_IMU_Calibrate_Acc_Cmd(const uint8_t *payload, uint16_t len)
+{
+    (void)payload;
+
+    if (len != 0u) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CALIBRATE_IMU_ACC, LENGTH_ERROR, 0, USE_CPU);
+        return;
+    }
+
+    if (!Driver_IMU_JY901S_CalibrateAcc()) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CALIBRATE_IMU_ACC, INVALID_PARAM, 0, USE_CPU);
+        return;
+    }
+
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CALIBRATE_IMU_ACC, ACK_SUCCESS, 0, USE_CPU);
+
+    bsp_cpu_reset();
+}
+
 void Task_NRT_Cmd_Init(void){
     Driver_Protocol_Register(DATA_TYPE_OTA, On_Receive_OTA_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_PID_PARAM, On_Receive_Set_PID_Param_Cmd);
@@ -363,5 +383,6 @@ void Task_NRT_Cmd_Init(void){
     Driver_Protocol_Register(DATA_TYPE_SET_SERVO, On_Receive_Servo_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_TAM, On_Receive_TAM_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_WS2812_COLOR, On_Receive_WS2812_Color_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_CALIBRATE_IMU_ACC, On_Receive_IMU_Calibrate_Acc_Cmd);
 }
 

@@ -69,7 +69,7 @@ int main(void)
     Driver_DHT11_Init();
     Driver_Power_Init();
     Driver_Thruster_Init();
-    Driver_WS2812_Init();
+    // Driver_WS2812_Init();
 
     System_SysTick_Init(SYSCLK);
     Sys_BootFlag_MarkBootSuccess();

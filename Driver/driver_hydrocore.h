@@ -37,6 +37,7 @@ typedef enum {
 #define DATA_TYPE_READ_PID_PARAM    0x16
 #define DATA_TYPE_READ_TAM          0x17
 #define DATA_TYPE_SET_WS2812_COLOR  0x18
+#define DATA_TYPE_CALIBRATE_IMU_ACC 0x19
 
 // SERVICE ACK状态码定义
 #define ACK_SUCCESS                 0x01
