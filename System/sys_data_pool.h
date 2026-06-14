@@ -61,6 +61,19 @@ typedef struct {
     bool is_imu_error;    /* IMU 异常标志 */
 } bot_sys_state_t;
 
+/* 任务栈最低水位线 */
+typedef struct {
+    uint16_t monitor_task;
+    uint16_t control_task;
+    uint16_t rt_comm_task;
+    uint16_t nrt_comm_task;
+    uint16_t imu_task;
+    uint16_t ms5837_task;
+    uint16_t power_task;
+    uint16_t dht11_task;
+    uint16_t log_task;
+} bot_stack_watermark_t;
+
 /* 执行机构状态（舵机/灯光等） */
 typedef struct {
     uint8_t servo_angle;  /* 舵机角度（0~180） */
@@ -141,6 +154,7 @@ void Bot_Target_Pull(bot_target_t *out_target);
 void Bot_Params_Pull(bot_params_t *out_params);
 void Bot_State_LeakStatus_Pull(bool *out_is_leaking);
 void Bot_Actuator_Pull(bot_actuator_state_t *out_state);
+void Bot_StackWatermark_Pull(bot_stack_watermark_t *out_stack_wm);
 
 /* ------------------------------ Push 接口 ---------------------------------- */
 void Bot_State_Push_IMU(bot_body_state_t *imu_data);
@@ -148,6 +162,7 @@ void Bot_State_Push_DepthTemp(float depth, float water_temp);
 void Bot_State_Push_CabinEnv(float temp, float humi, bool leak);
 void Bot_State_Push_Power(float vol, float cur);
 void Bot_State_Push_SysStatus(float cpu_usage, float chip_temp);
+void Bot_StackWatermark_Push(const bot_stack_watermark_t *new_stack_wm);
 
 void Bot_Target_Push(const bot_target_t *new_target);
 
@@ -157,4 +172,3 @@ void Bot_Params_Push_Servo(uint8_t angle);
 void Bot_Params_Push_Light(uint8_t light1_pwm, uint8_t light2_pwm);
 
 #endif // __BOT_DATA_POOL_H
-

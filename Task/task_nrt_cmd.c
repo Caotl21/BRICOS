@@ -4,8 +4,10 @@
 #include "bsp_cpu.h"
 
 #include "driver_hydrocore.h"
+#include "driver_imu.h"
 #include "driver_param.h"
 #include "driver_servo.h"
+#include "driver_ws2812.h"
 
 #include "sys_data_pool.h"
 #include "sys_mode_manager.h"
@@ -15,16 +17,15 @@
 
 #include "task_nrt_cmd.h"
 
-
 // 接收OTA升级命令的回调函数
 static void On_Receive_OTA_Cmd(const uint8_t *payload, uint16_t len){
     if(len == 4 && payload[0] == 0xDE && payload[1] == 0xAD && payload[2] == 0xBE && payload[3] == 0xEF){      
         Sys_BootFlag_RequestEnterBootloader();
 
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_OTA, ACK_SUCCESS, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_OTA, ACK_SUCCESS, 0, USE_CPU);
         bsp_cpu_reset();
     } else {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_OTA, INVALID_PARAM, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_OTA, INVALID_PARAM, 0, USE_CPU);
     }
 }
 
@@ -42,6 +43,107 @@ static void prv_extract_pid_params(PID_Controller_t *dest, const uint8_t *src)
     dest->output_max   = temp_buf[4];
 }
 
+static uint16_t prv_pack_pid_params(const PID_Controller_t *src, uint8_t *dst)
+{
+    float temp_buf[5];
+
+    if ((src == NULL) || (dst == NULL)) {
+        return 0u;
+    }
+
+    temp_buf[0] = src->kp;
+    temp_buf[1] = src->ki;
+    temp_buf[2] = src->kd;
+    temp_buf[3] = src->integral_max;
+    temp_buf[4] = src->output_max;
+
+    memcpy(dst, temp_buf, sizeof(temp_buf));
+    return (uint16_t)sizeof(temp_buf);
+}
+
+static uint16_t prv_pack_current_pid_params(uint8_t *payload, uint16_t payload_size)
+{
+    uint16_t offset = 0u;
+    bot_params_t params;
+
+    if ((payload == NULL) || (payload_size < (uint16_t)(7u * PAYLOAD_SIZE_PER_PID))) {
+        return 0u;
+    }
+
+    Bot_Params_Pull(&params);
+
+    offset += prv_pack_pid_params(&params.pid_roll.outer, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_roll.inner, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_pitch.outer, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_pitch.inner, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_yaw.outer, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_yaw.inner, &payload[offset]);
+    offset += prv_pack_pid_params(&params.pid_depth, &payload[offset]);
+
+    return offset;
+}
+
+static uint16_t prv_pack_current_tam_config(uint8_t *payload, uint16_t payload_size)
+{
+    uint16_t offset = 0u;
+    uint8_t row_size_bytes;
+    uint8_t t;
+    bot_params_t params;
+
+    row_size_bytes = (uint8_t)(TAM_MAX_DOF * sizeof(float));
+
+    if ((payload == NULL) || (payload_size < (uint16_t)(1u + (TAM_MAX_THRUSTERS * row_size_bytes)))) {
+        return 0u;
+    }
+
+    Bot_Params_Pull(&params);
+
+    payload[offset++] = params.tam_config.active_thrusters;
+
+    for (t = 0u; t < params.tam_config.active_thrusters; t++) {
+        memcpy(&payload[offset], &params.tam_config.matrix[t][0], row_size_bytes);
+        offset += row_size_bytes;
+    }
+
+    return offset;
+}
+
+static void prv_send_current_pid_params(void)
+{
+    uint8_t payload[7u * PAYLOAD_SIZE_PER_PID];
+    uint16_t payload_len;
+
+    payload_len = prv_pack_current_pid_params(payload, sizeof(payload));
+    if (payload_len == 0u) {
+        return;
+    }
+
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_READ_PID_PARAM, ACK_SUCCESS, 0, USE_CPU);
+    Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                              DATA_TYPE_READ_PID_PARAM,
+                              payload,
+                              (uint8_t)payload_len,
+                              USE_CPU);
+}
+
+static void prv_send_current_tam_config(void)
+{
+    uint8_t payload[(1u + (TAM_MAX_THRUSTERS * TAM_MAX_DOF * sizeof(float)))];
+    uint16_t payload_len;
+
+    payload_len = prv_pack_current_tam_config(payload, sizeof(payload));
+    if (payload_len == 0u) {
+        return;
+    }
+
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_READ_TAM, ACK_SUCCESS, 0, USE_CPU);
+    Driver_Protocol_SendFrame(BSP_UART_OPI_NRT,
+                              DATA_TYPE_READ_TAM,
+                              payload,
+                              (uint8_t)payload_len,
+                              USE_CPU);
+}
+
 // 接收设置PID参数命令的回调函数(需要更新参数再写入Flash后重启)
 static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
     
@@ -51,7 +153,7 @@ static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
     // 预期：7 个控制器 (Roll外/内, Pitch外/内, Yaw外/内, Depth单) * 每个 20 字节
     uint16_t expected_len = 7 * PAYLOAD_SIZE_PER_PID; // 7 * 20 = 140 字节
     if (len != expected_len) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_PID_PARAM, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_PID_PARAM, LENGTH_ERROR, 0, USE_CPU);
         return; // 长度对不上（串口丢包或上位机配错），直接拦截拒绝写入
     }
 
@@ -88,69 +190,104 @@ static void On_Receive_Set_PID_Param_Cmd(const uint8_t *payload, uint16_t len){
     // 将修改后的完整参数包写入 Flash，掉电保存
     Driver_PidParam_Save(&temp_params);
 
-    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_PID_PARAM, ACK_SUCCESS, 0, USE_DMA);
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_PID_PARAM, ACK_SUCCESS, 0, USE_CPU);
 
     // 硬复位，让系统重新走一遍完整的开机初始化流程
     // 这样开机时会自动清空 PID 的 I 项累加器 (error_int)，防止带着旧状态起飞炸机
     bsp_cpu_reset();
 }
 
+// 接收读取PID参数命令的回调函数(先回ACK，再上报当前PID参数)
+static void On_Receive_Read_PID_Param_Cmd(const uint8_t *payload, uint16_t len)
+{
+    (void)payload;
+    (void)len;
+
+    prv_send_current_pid_params();
+}
+
+// 接收读取TAM参数命令的回调函数(先回ACK，再上报当前TAM)
+static void On_Receive_Read_TAM_Cmd(const uint8_t *payload, uint16_t len)
+{
+    (void)payload;
+    (void)len;
+
+    prv_send_current_tam_config();
+}
+
 // 接收设置系统模式命令的回调函数(切换待机/加锁/解锁)
 static void On_Receive_Sys_Mode_Cmd(const uint8_t *payload, uint16_t len){
+    bool res;
 
     if(len != 1) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, LENGTH_ERROR, 0, USE_CPU);
         return;
     }
 
-    bool res;
     bot_sys_mode_e new_mode = (bot_sys_mode_e)payload[0];
     if(new_mode > SYS_MODE_MOTION_ARMED) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, INVALID_PARAM, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, INVALID_PARAM, 0, USE_CPU);
         return;
     }
 
     res = (System_ModeManager_RequestSysMode(new_mode) == SYS_MODE_MGR_OK);
     if (!res) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, INVALID_PARAM, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, INVALID_PARAM, 0, USE_CPU);
     } else {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, ACK_SUCCESS, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SYS_MODE, ACK_SUCCESS, 0, USE_CPU);
     }
 }
 
 // 接收设置运动模式命令的回调函数(切换手动/自稳/自主导航)
 static void On_Receive_Motion_Mode_Cmd(const uint8_t *payload, uint16_t len){
     if(len != 1) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, LENGTH_ERROR, 0, USE_CPU);
         return;
     }
 
     bool res;
     bot_run_mode_e new_mode = (bot_run_mode_e)payload[0];
     if(new_mode > MOTION_STATE_AUTO) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_CPU);
         return;
     }
 
     res = (System_ModeManager_RequestMotionMode(new_mode) == SYS_MODE_MGR_OK);
     if (!res) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_CPU);
     } else {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, ACK_SUCCESS, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, ACK_SUCCESS, 0, USE_CPU);
     }
 }
 
 // 接收设置舵机命令的回调函数
 static void On_Receive_Servo_Cmd(const uint8_t *payload, uint16_t len){
     if(len != 1) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SERVO, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SERVO, LENGTH_ERROR, 0, USE_CPU);
         return;
     }
 
     uint8_t servo_angle = payload[0];
 
     Driver_Servo_SetAngle(BSP_PWM_SERVO_2, servo_angle); // 相机云台舵机角度 (0-180)
-    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SERVO, ACK_SUCCESS, 0, USE_DMA);
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_SERVO, ACK_SUCCESS, 0, USE_CPU);
+}
+
+// 接收设置ws2812灯带颜色命令的回调函数
+static void On_Receive_WS2812_Color_Cmd(const uint8_t *payload, uint16_t len){
+    if(len != 4) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_WS2812_COLOR, LENGTH_ERROR, 0, USE_CPU);
+        return;
+    }
+
+    uint8_t strip = payload[0];
+    uint8_t r =     payload[1];
+    uint8_t g =     payload[2];
+    uint8_t b =     payload[3];
+
+    Driver_WS2812_SetAllRGB((ws2812_strip_t)strip, r, g, b);
+    Driver_WS2812_Refresh((ws2812_strip_t)strip);
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_WS2812_COLOR, ACK_SUCCESS, 0, USE_CPU);
 }
 
 // 接收设置探照灯强度命令的回调函数 (暂未实现，后续可以根据协议定义增加)
@@ -162,14 +299,14 @@ static void On_Receive_Light_Cmd(const uint8_t *payload, uint16_t len){
 static void On_Receive_TAM_Cmd(const uint8_t *payload, uint16_t len){
 
     if (payload == NULL || len < 1) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, LENGTH_ERROR, 0, USE_CPU);
         return;
     }
 
     // 取并校验推进器数量
     uint8_t thruster_count = payload[0];
     if (thruster_count == 0 || thruster_count > TAM_MAX_THRUSTERS) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, INVALID_PARAM, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, INVALID_PARAM, 0, USE_CPU);
         return; 
     }
 
@@ -177,7 +314,7 @@ static void On_Receive_TAM_Cmd(const uint8_t *payload, uint16_t len){
     // 预期长度 = 1字节(数量) + 推进器数量 * 6(自由度) * 4字节(sizeof(float))
     uint16_t expected_len = 1 + (thruster_count * TAM_MAX_DOF * sizeof(float));
     if (len != expected_len) {
-        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, LENGTH_ERROR, 0, USE_DMA);
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, LENGTH_ERROR, 0, USE_CPU);
         return; 
     }
 
@@ -211,18 +348,41 @@ static void On_Receive_TAM_Cmd(const uint8_t *payload, uint16_t len){
     // 重新计算 Checksum 并完整写入 Flash 
     Driver_PidParam_Save(&temp_params);
 
-    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, ACK_SUCCESS, 0, USE_DMA);
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_TAM, ACK_SUCCESS, 0, USE_CPU);
 
     // 安全收尾
+    bsp_cpu_reset();
+}
+
+static void On_Receive_IMU_Calibrate_Acc_Cmd(const uint8_t *payload, uint16_t len)
+{
+    (void)payload;
+
+    if (len != 0u) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CALIBRATE_IMU_ACC, LENGTH_ERROR, 0, USE_CPU);
+        return;
+    }
+
+    if (!Driver_IMU_JY901S_CalibrateAcc()) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CALIBRATE_IMU_ACC, INVALID_PARAM, 0, USE_CPU);
+        return;
+    }
+
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CALIBRATE_IMU_ACC, ACK_SUCCESS, 0, USE_CPU);
+
     bsp_cpu_reset();
 }
 
 void Task_NRT_Cmd_Init(void){
     Driver_Protocol_Register(DATA_TYPE_OTA, On_Receive_OTA_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_PID_PARAM, On_Receive_Set_PID_Param_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_READ_PID_PARAM, On_Receive_Read_PID_Param_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_READ_TAM, On_Receive_Read_TAM_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_SYS_MODE, On_Receive_Sys_Mode_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_MOTION_MODE, On_Receive_Motion_Mode_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_SERVO, On_Receive_Servo_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_TAM, On_Receive_TAM_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_SET_WS2812_COLOR, On_Receive_WS2812_Color_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_CALIBRATE_IMU_ACC, On_Receive_IMU_Calibrate_Acc_Cmd);
 }
 

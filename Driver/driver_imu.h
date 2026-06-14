@@ -19,6 +19,7 @@ typedef struct {
 
 //初始化
 void Driver_IMU_Init(void);
+bool Driver_IMU_JY901S_CalibrateAcc(void);
 
 // --- 统一 API ---
 uint8_t* Driver_IMU_GetRxBuf(imu_id_t id);

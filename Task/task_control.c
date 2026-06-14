@@ -29,10 +29,11 @@
 #define STANDBY_ESC_KICK_INTERVAL_CYCLES ((STANDBY_ESC_KICK_INTERVAL_MS + TASK_CONTROL_STANDBY_PERIOD_MS - 1u) / TASK_CONTROL_STANDBY_PERIOD_MS)
 #define STANDBY_ESC_KICK_DURATION_CYCLES ((STANDBY_ESC_KICK_DURATION_MS + TASK_CONTROL_STANDBY_PERIOD_MS - 1u) / TASK_CONTROL_STANDBY_PERIOD_MS)
 /* 暂时关闭STANDBY任务挂起/恢复，优先保证模式切换稳定性 */
-#define STANDBY_TASK_PAUSE_ENABLE        (0u)
+#define STANDBY_TASK_PAUSE_ENABLE        (1u)
 
 /* ARMED 进入动作：每个推进器依次轻转 0.2s */
 #define ARMED_ENTRY_SPIN_DURATION_MS     (200u)
+#define ARMED_ENTRY_SPIN_SLICE_MS  (50u)
 #define ARMED_ENTRY_SPIN_SPEED           (8.0f)
 
 /* 控制器实例 */
@@ -219,7 +220,7 @@ static float Thruster_Map(float total_thrust)
     float pwm;
 
     if (total_thrust < 0.0f) {
-        pwm = total_thrust * 25.0f;
+        pwm = total_thrust * 10.0f;
     } else {
         pwm = total_thrust * 8.0f;
     }
@@ -286,7 +287,7 @@ static uint16_t Serialize_Body_Report(uint8_t *buf, const bot_body_state_t *body
 
 static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
 {
-    uint8_t report_buf[13u * sizeof(float)];
+    uint8_t report_buf[14u * sizeof(float)];
     uint16_t report_len;
 
     if (body_state == NULL) {
@@ -305,6 +306,54 @@ static void Report_Body_State_To_OrangePi(const bot_body_state_t *body_state)
                               USE_CPU);
 }
 
+static uint16_t Serialize_Thruster_Report(uint8_t *buf, const uint16_t *pulse_us)
+{
+    uint16_t offset = 0u;
+    uint8_t i;
+    const uint16_t thruster_limits[3] = {
+        THRUSTER_PWM_STOP,
+        THRUSTER_PWM_MAX_FWD,
+        THRUSTER_PWM_MAX_REV
+    };
+
+    if ((buf == NULL) || (pulse_us == NULL)) {
+        return 0u;
+    }
+
+    for (i = 0u; i < THRUSTER_COUNT; i++) {
+        memcpy(&buf[offset], &pulse_us[i], sizeof(uint16_t));
+        offset += sizeof(uint16_t);
+    }
+
+    for (i = 0u; i < 3u; i++) {
+        memcpy(&buf[offset], &thruster_limits[i], sizeof(uint16_t));
+        offset += sizeof(uint16_t);
+    }
+
+    return offset;
+}
+
+static void Report_Thruster_State_To_OrangePi(const uint16_t *pulse_us)
+{
+    uint8_t report_buf[(THRUSTER_COUNT + 3u) * sizeof(uint16_t)];
+    uint16_t report_len;
+
+    if (pulse_us == NULL) {
+        return;
+    }
+
+    report_len = Serialize_Thruster_Report(report_buf, pulse_us);
+    if (report_len == 0u) {
+        return;
+    }
+
+    Driver_Protocol_SendFrame(BSP_UART_OPI_RT,
+                              DATA_TYPE_STATE_THRUSTER,
+                              report_buf,
+                              (uint8_t)report_len,
+                              USE_CPU);
+}
+
 static void prv_set_idle_output(void)
 {
     Driver_Thruster_Set_Idle();
@@ -312,17 +361,29 @@ static void prv_set_idle_output(void)
 
 static void prv_armed_entry_spin_once(void)
 {
-    TickType_t spin_ticks = pdMS_TO_TICKS(ARMED_ENTRY_SPIN_DURATION_MS);
+    TickType_t total_ticks = pdMS_TO_TICKS(ARMED_ENTRY_SPIN_DURATION_MS);
+    TickType_t slice_ticks = pdMS_TO_TICKS(ARMED_ENTRY_SPIN_SLICE_MS);
     int i;
 
-    if (spin_ticks == 0u) {
-        spin_ticks = 1u;
+    if (total_ticks == 0u) {
+        total_ticks = 1u;
     }
-
+    if (slice_ticks == 0u) {
+        slice_ticks = 1u;
+    }
+    // 由于需要定时器打卡，因此不能直接vTaskDelay(ARMED_ENTRY_SPIN_DURATION_MS)，而是需要切分成多个小片段
     for (i = 0; i < THRUSTER_COUNT; i++) {
+        TickType_t remain = total_ticks;
+
         prv_set_idle_output();
         Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), ARMED_ENTRY_SPIN_SPEED);
-        vTaskDelay(spin_ticks);
+
+        while (remain > 0u) {
+            TickType_t step = (remain > slice_ticks) ? slice_ticks : remain;
+            Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
+            vTaskDelay(step);
+            remain -= step;
+        }
     }
 
     prv_set_idle_output();
@@ -405,6 +466,7 @@ static void prv_resume_standby_tasks(control_fsm_ctx_t *ctx)
 static void prv_apply_standby_kick_output(void)
 {
     int i;
+    
 
     /* STANDBY 仅用于岸上调试：避免 ESC 长时间静止啸叫 */
     prv_set_idle_output();
@@ -518,26 +580,36 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
         ctx->last_armed_motion_mode = ctx->current_motion_mode;
     }
 
-    if (ctx->target.target_mode != (uint8_t)ctx->current_motion_mode) {
-        Reset_All_Controllers();
-        prv_set_idle_output();
-        LOG_ERROR("Motion mode mismatch!");
-        return;
-    }
-
+    // if (ctx->target.target_mode != (uint8_t)ctx->current_motion_mode) {
+    //     Reset_All_Controllers();
+    //     prv_set_idle_output();
+    //     LOG_ERROR("Motion mode mismatch!");
+    //     return;
+    // }
+    Driver_IMU_Quaternion_ToEuler_Deg(ctx->state.Quater,
+                                                &ctx->euler_roll,
+                                                &ctx->euler_pitch,
+                                                &ctx->euler_yaw);
     switch (ctx->current_motion_mode) {
         case MOTION_STATE_MANUAL:
             ctx->wrench_out.force_x = ctx->target.cmd.manual_cmd.surge;
             ctx->wrench_out.force_y = ctx->target.cmd.manual_cmd.sway;
             ctx->wrench_out.force_z = ctx->target.cmd.manual_cmd.heave;
-            ctx->wrench_out.torque_z = ctx->target.cmd.manual_cmd.yaw_cmd;
+            // ctx->wrench_out.torque_z = ctx->target.cmd.manual_cmd.yaw_cmd;
+            ctx->wrench_out.torque_z = PID_Update(&pid_yaw.inner,
+                                      ctx->target.cmd.manual_cmd.yaw_cmd,
+                                      ctx->state.gyro_z,
+                                      TASK_CONTROL_PERIOD_S,
+                                      0u);
+            ctx->wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
+                                                          0.0f,
+                                                          ctx->euler_roll,
+                                                          ctx->state.gyro_x,
+                                                          TASK_CONTROL_PERIOD_S,
+                                                          0u);
             break;
 
         case MOTION_STATE_STABILIZE:
-            Driver_IMU_Quaternion_ToEuler_Deg(ctx->state.Quater,
-                                              &ctx->euler_roll,
-                                              &ctx->euler_pitch,
-                                              &ctx->euler_yaw);
 
             ctx->wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
                                                           0.0f,
@@ -589,9 +661,9 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
         Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), ctx->thruster_pwm[i]);
     }
 
-    LOG_DEBUG("Thruster PWMs: [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f]",
-              ctx->thruster_pwm[0], ctx->thruster_pwm[1], ctx->thruster_pwm[2],
-              ctx->thruster_pwm[3], ctx->thruster_pwm[4], ctx->thruster_pwm[5]);
+    //LOG_DEBUG("Thruster PWMs: [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f]",
+    //          ctx->thruster_pwm[0], ctx->thruster_pwm[1], ctx->thruster_pwm[2],
+    //          ctx->thruster_pwm[3], ctx->thruster_pwm[4], ctx->thruster_pwm[5]);
 }
 
 static void prv_armed_exit(control_fsm_ctx_t *ctx)
@@ -722,7 +794,15 @@ static void vTask_Control(void *pvParameters)
 
         /* STANDBY 下关闭 RT 遥测上报，降低实时通信负担 */
         if (ctx.current_mode != SYS_MODE_STANDBY) {
+            uint16_t thruster_pulse_us[THRUSTER_COUNT];
+            int i;
+
             Report_Body_State_To_OrangePi(&ctx.state);
+
+            for (i = 0; i < THRUSTER_COUNT; i++) {
+                thruster_pulse_us[i] = bsp_pwm_get_pulse_us((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i));
+            }
+            Report_Thruster_State_To_OrangePi(thruster_pulse_us);
         }
 
         Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);

@@ -77,11 +77,11 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .gpio_af = GPIO_AF_USART1,
         .irqn = 0,  // 零中断架构 不需要NVIC配置
         .nvic_priority = 0,
-        .dma_rx_stream = DMA2_Stream2,
+        .dma_rx_stream = DMA2_Stream5,
         .dma_tx_stream = NULL,
         .dma_channel = DMA_Channel_4,
         .dma_priority = DMA_Priority_High,
-        .dma_rx_clear_flags = DMA_FLAG_TCIF2 | DMA_FLAG_HTIF2 | DMA_FLAG_TEIF2 | DMA_FLAG_DMEIF2 | DMA_FLAG_FEIF2,
+        .dma_rx_clear_flags = DMA_FLAG_TCIF5 | DMA_FLAG_HTIF5 | DMA_FLAG_TEIF5 | DMA_FLAG_DMEIF5 | DMA_FLAG_FEIF5,
         .dma_tx_clear_flags = 0,
         .dma_tx_it_tc = 0,
         .dma_tx_it_te = 0,
@@ -176,6 +176,35 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .dma_tx_it_fe = DMA_IT_FEIF4,
         .dma_tx_irqn = DMA1_Stream4_IRQn,
         .dma_tx_nvic_priority = 7
+    },
+
+    [BSP_UART_DEBUG] = {
+        .uart_base = UART5,
+        .gpio_rcc = RCC_AHB1Periph_GPIOC | RCC_AHB1Periph_GPIOD,
+        .uart_rcc = RCC_APB1Periph_UART5,
+        .dma_rcc = 0,
+        .uart_rcc_cmd = RCC_APB1PeriphClockCmd,
+        .gpio_tx_port = GPIOC,
+        .gpio_pin_tx = GPIO_Pin_12,
+        .gpio_pin_tx_src = GPIO_PinSource12,
+        .gpio_rx_port = GPIOD,
+        .gpio_pin_rx = GPIO_Pin_2,
+        .gpio_pin_rx_src = GPIO_PinSource2,
+        .gpio_af = GPIO_AF_UART5,
+        .irqn = UART5_IRQn,  // 需要串口接收中断
+        .nvic_priority = 7,
+        .dma_rx_stream = NULL,
+        .dma_tx_stream = NULL,
+        .dma_channel = 0,
+        .dma_priority = 0,
+        .dma_rx_clear_flags = 0,
+        .dma_tx_clear_flags = 0,
+        .dma_tx_it_tc = 0,
+        .dma_tx_it_te = 0,
+        .dma_tx_it_dme = 0,
+        .dma_tx_it_fe = 0,
+        .dma_tx_irqn = 0,
+        .dma_tx_nvic_priority = 0
     }
 
 };
@@ -183,8 +212,6 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
 /* 实例化映射表 */
 static uart_ctx_t s_uart_ctx[BSP_UART_MAX] = {0};
 static SemaphoreHandle_t s_uart_tx_mutex[BSP_UART_MAX] = {NULL};
-static SemaphoreHandle_t s_uart_tx_sync_sem[BSP_UART_MAX] = {NULL};
-static volatile bool s_uart_tx_error[BSP_UART_MAX] = {false};
 
 static void prv_uart_tx_mutex_init(bsp_uart_port_t port)
 {
@@ -199,18 +226,7 @@ static void prv_uart_tx_mutex_init(bsp_uart_port_t port)
     }
 }
 
-static void prv_uart_tx_sync_init(bsp_uart_port_t port)
-{
-    if (port >= BSP_UART_MAX)
-    {
-        return;
-    }
 
-    if (s_uart_tx_sync_sem[port] == NULL)
-    {
-        s_uart_tx_sync_sem[port] = xSemaphoreCreateBinary();
-    }
-}
 
 /* --- 注册回调函数 --- */
 void bsp_uart_register_rx_cb(bsp_uart_port_t port, bsp_uart_rx_cb_t cb) {
@@ -245,28 +261,28 @@ void bsp_uart_isr_handler(bsp_uart_port_t port) {
     if (USART_GetITStatus(uart, USART_IT_IDLE) != RESET) 
     {
         if (dma_rx != NULL && ctx->rx_buf_ptr != NULL && ctx->rx_buf_size > 0) {
-            // 1. 清除 IDLE 标志 (读 SR 后读 DR)
+            // 清除 IDLE 标志 (读 SR 后读 DR)
             volatile uint32_t temp = uart->SR;
             temp = uart->DR; 
             (void)temp;
                  
             if (dma_rx != NULL) 
             {
-                // 2. 停止 DMA，等待彻底关闭
+                // 停止 DMA，等待彻底关闭
                 DMA_Cmd(dma_rx, DISABLE);
                 while((dma_rx->CR & DMA_SxCR_EN) != 0);
                 
                 DMA_ClearFlag(dma_rx, hw->dma_rx_clear_flags);
 
-                // 3. 计算实际接收的长度
+                // 计算实际接收的长度
                 uint16_t rx_len = ctx->rx_buf_size - DMA_GetCurrDataCounter(dma_rx);
 
-                // 4. 调用回调交出数据
+                // 调用回调交出数据
                 if (ctx->rx_cb != NULL && rx_len > 0) {
                     ctx->rx_cb(ctx->rx_buf_ptr, rx_len);
                 }
 
-                // 5. 重置 DMA (注意地址已经在一开始的初始化里绑好了，不需要再填 M0AR)
+                // 重新使能DMA
                 DMA_SetCurrDataCounter(dma_rx, ctx->rx_buf_size);
                 DMA_Cmd(dma_rx, ENABLE);
             }
@@ -292,7 +308,7 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
     NVIC_InitTypeDef NVIC_InitStructure;
 
     // =========================================================
-    // 第一阶段：时钟开启与 GPIO 引脚复用映射 (完全根据你的真实硬件)
+    // 时钟开启与 GPIO 引脚复用映射
     // =========================================================
 
     RCC_AHB1PeriphClockCmd(hw->gpio_rcc, ENABLE);
@@ -303,7 +319,7 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
     }
 
     // ==========================================
-    // 2. 自动配置引脚复用映射
+    // 自动配置引脚复用映射
     // ==========================================
     GPIO_PinAFConfig(hw->gpio_tx_port, hw->gpio_pin_tx_src, hw->gpio_af);
     GPIO_PinAFConfig(hw->gpio_rx_port, hw->gpio_pin_rx_src, hw->gpio_af);
@@ -322,7 +338,7 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
     GPIO_Init(hw->gpio_rx_port, &GPIO_InitStructure);
 
     // ===========================================================
-    // 第二阶段：将通用 config 结构体翻译为标准库的 USART_InitTypeDef
+    // 将通用 config 结构体翻译为标准库的 USART_InitTypeDef
     // ===========================================================
     USART_InitStructure.USART_BaudRate = config->baudrate;
 
@@ -356,7 +372,7 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
     USART_Init(hw->uart_base, &USART_InitStructure);
 
     // ==========================================
-    // 4. 按需配置 NVIC (查表判断是否需要中断)
+    // 按需配置 NVIC (查表判断是否需要中断)
     // ==========================================
     if (hw->irqn != 0) 
     {
@@ -371,29 +387,18 @@ bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config) {
             USART_ITConfig(hw->uart_base, USART_IT_IDLE, ENABLE);
         } else if (port == BSP_UART_OPI_NRT) {
             USART_ITConfig(hw->uart_base, USART_IT_IDLE, ENABLE);
+        } else if (port == BSP_UART_DEBUG) {
+            USART_ITConfig(hw->uart_base, USART_IT_RXNE, ENABLE);
         }
     }
 
     // ==========================================
-    // 5. 使能外设
+    // 使能外设
     // ==========================================
-    if (hw->dma_tx_stream != NULL)
-    {
-        if (hw->dma_tx_irqn != 0)
-        {
-            NVIC_InitStructure.NVIC_IRQChannel = hw->dma_tx_irqn;
-            NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = hw->dma_tx_nvic_priority;
-            NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-            NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-            NVIC_Init(&NVIC_InitStructure);
-        }
-
-        DMA_ITConfig(hw->dma_tx_stream, DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_IT_FE, ENABLE);
-    }
+    (void)NVIC_InitStructure;
 
     USART_Cmd(hw->uart_base, ENABLE);
     prv_uart_tx_mutex_init(port);
-    prv_uart_tx_sync_init(port);
 
     return true;
 }
@@ -420,6 +425,10 @@ void bsp_uart_init_default(void)
     
     // 初始化 IMU2 (USART2)
     bsp_uart_init(BSP_UART_IMU2, &default_config);
+
+    default_config.baudrate  = 1500000;
+    // 初始化 shell/log 调试接口（UART5）
+    bsp_uart_init(BSP_UART_DEBUG, &default_config);
     
     default_config.baudrate  = 921600;
     // 初始化 OrangePi 实时通信总线 (USART3)
@@ -451,7 +460,6 @@ void bsp_uart_start_dma_rx_circular(bsp_uart_port_t port, uint8_t *buf_addr, uin
     DMA_InitStructure.DMA_Channel = s_uart_hw_info[port].dma_channel;
     DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&s_uart_hw_info[port].uart_base->DR;
 
-    // 【关键】：这里使用了上层传进来的缓冲区指针与大小，实现了零拷贝解耦！
     DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)buf_addr; 
     DMA_InitStructure.DMA_BufferSize = buf_size;
     
@@ -500,7 +508,6 @@ void bsp_uart_start_dma_rx_normal(bsp_uart_port_t port, uint8_t *buf_addr, uint1
     DMA_InitStructure.DMA_Channel = s_uart_hw_info[port].dma_channel;
     DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&s_uart_hw_info[port].uart_base->DR;
 
-    // 【关键】：这里使用了上层传进来的缓冲区指针与大小，实现了零拷贝解耦！
     DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)buf_addr; 
     DMA_InitStructure.DMA_BufferSize = buf_size;
     
@@ -528,6 +535,11 @@ void bsp_uart_start_dma_rx_normal(bsp_uart_port_t port, uint8_t *buf_addr, uint1
     DMA_Cmd(dma_rx, ENABLE);
 }
 
+/* -------------------------------------------------------------------------
+ * bsp_uart_stop_dma_rx
+ * 功  能：停止指定串口的 DMA 接收，清理相关标志位，确保后续可以安全重启 DMA 或切换到其他接收模式
+ * 参  数：port - 串口端口枚举 (IMU1, IMU2, RT, NRT, DEBUG)
+ * ------------------------------------------------------------------------- */
 void bsp_uart_stop_dma_rx(bsp_uart_port_t port)
 {
     DMA_Stream_TypeDef* dma_rx;
@@ -565,6 +577,11 @@ uint16_t bsp_uart_get_dma_rx_remaining(bsp_uart_port_t port) {
     return DMA_GetCurrDataCounter(s_uart_hw_info[port].dma_rx_stream);
 }
 
+/* -------------------------------------------------------------------------
+ * bsp_uart_send_buffer
+ * 功  能：通过串口发送数据缓冲区中的内容
+ * 参  数：port - 串口端口枚举 (IMU1, IMU2, RT, NRT, DEBUG) data - 要发送的数据指针 len - 要发送的数据长度
+ * ------------------------------------------------------------------------- */
 void bsp_uart_send_buffer(bsp_uart_port_t port, const uint8_t *data, uint16_t len) {
     if(port >= BSP_UART_MAX || data == NULL || len == 0) return;
 
@@ -590,157 +607,20 @@ void bsp_uart_send_buffer(bsp_uart_port_t port, const uint8_t *data, uint16_t le
     }
 }
 
+/* -------------------------------------------------------------------------
+ * bsp_uart_send_dma
+ * 功  能：通过串口发送数据缓冲区中的内容
+ * 参  数：port - 串口端口枚举 (IMU1, IMU2, RT, NRT, DEBUG) data - 要发送的数据指针 len - 要发送的数据长度
+ * ------------------------------------------------------------------------- */
 bool bsp_uart_send_dma(bsp_uart_port_t port, uint8_t *data, uint16_t len)
 {
-    const uart_hw_info_t* hw;
-    DMA_Stream_TypeDef* dma_tx;
-    SemaphoreHandle_t tx_mutex;
-    SemaphoreHandle_t sync_sem;
-    bool should_signal = false;
-
-    if (port >= BSP_UART_MAX || data == NULL || len == 0 || s_uart_hw_info[port].dma_tx_stream == NULL)
-    {
-        return false;
-    }
-
-    hw = &s_uart_hw_info[port];
-    dma_tx = hw->dma_tx_stream;
-    tx_mutex = s_uart_tx_mutex[port];
-
-    if (tx_mutex != NULL)
-    {
-        xSemaphoreTake(tx_mutex, portMAX_DELAY);
-    }
-
-    prv_uart_tx_sync_init(port);
-    sync_sem = s_uart_tx_sync_sem[port];
-    if (sync_sem == NULL)
-    {
-        if (tx_mutex != NULL)
-        {
-            xSemaphoreGive(tx_mutex);
-        }
-        return false;
-    }
-
-    s_uart_tx_error[port] = false;
-
-    while ((dma_tx->CR & DMA_SxCR_EN) != 0u)
-    {
-        ;
-    }
-
-    DMA_Cmd(dma_tx, DISABLE);
-    USART_DMACmd(hw->uart_base, USART_DMAReq_Tx, DISABLE);
-    DMA_ClearFlag(dma_tx, hw->dma_tx_clear_flags);
-
-    while (xSemaphoreTake(sync_sem, 0) == pdTRUE)
-    {
-        ;
-    }
-
-    DMA_DeInit(dma_tx);
-
-    {
-        DMA_InitTypeDef DMA_InitStructure;
-        DMA_InitStructure.DMA_Channel = hw->dma_channel;
-        DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&hw->uart_base->DR;
-        DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)data;
-        DMA_InitStructure.DMA_BufferSize = len;
-        DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
-        DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-        DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
-        DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
-        DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
-        DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
-        DMA_InitStructure.DMA_Priority = hw->dma_priority;
-        DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
-        DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
-        DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
-        DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-        DMA_Init(dma_tx, &DMA_InitStructure);
-    }
-
-    DMA_ITConfig(dma_tx, DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_IT_FE, ENABLE);
-    USART_DMACmd(hw->uart_base, USART_DMAReq_Tx, ENABLE);
-    DMA_Cmd(dma_tx, ENABLE);
-
-    if (xSemaphoreTake(sync_sem, portMAX_DELAY) != pdTRUE)
-    {
-        DMA_Cmd(dma_tx, DISABLE);
-        USART_DMACmd(hw->uart_base, USART_DMAReq_Tx, DISABLE);
-        if (tx_mutex != NULL)
-        {
-            xSemaphoreGive(tx_mutex);
-        }
-        return false;
-    }
-
-    if (s_uart_tx_error[port] == false)
-    {
-        while (USART_GetFlagStatus(hw->uart_base, USART_FLAG_TC) == RESET)
-        {
-            ;
-        }
-    }
-
-    if (tx_mutex != NULL)
-    {
-        xSemaphoreGive(tx_mutex);
-    }
-
-    should_signal = (s_uart_tx_error[port] == false);
-    return should_signal;
+    (void)port;
+    (void)data;
+    (void)len;
+    return false;
 }
 
 void bsp_uart_dma_tx_isr_handler(bsp_uart_port_t port)
 {
-    const uart_hw_info_t* hw;
-    DMA_Stream_TypeDef* dma_tx;
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    bool should_signal = false;
-
-    if (port >= BSP_UART_MAX || s_uart_hw_info[port].dma_tx_stream == NULL)
-    {
-        return;
-    }
-
-    hw = &s_uart_hw_info[port];
-    dma_tx = hw->dma_tx_stream;
-
-    if (hw->dma_tx_it_tc != 0u && DMA_GetITStatus(dma_tx, hw->dma_tx_it_tc) != RESET)
-    {
-        DMA_ClearITPendingBit(dma_tx, hw->dma_tx_it_tc);
-        should_signal = true;
-    }
-
-    if (hw->dma_tx_it_te != 0u && DMA_GetITStatus(dma_tx, hw->dma_tx_it_te) != RESET)
-    {
-        DMA_ClearITPendingBit(dma_tx, hw->dma_tx_it_te);
-        s_uart_tx_error[port] = true;
-        should_signal = true;
-    }
-
-    if (hw->dma_tx_it_dme != 0u && DMA_GetITStatus(dma_tx, hw->dma_tx_it_dme) != RESET)
-    {
-        DMA_ClearITPendingBit(dma_tx, hw->dma_tx_it_dme);
-        s_uart_tx_error[port] = true;
-        should_signal = true;
-    }
-
-    if (hw->dma_tx_it_fe != 0u && DMA_GetITStatus(dma_tx, hw->dma_tx_it_fe) != RESET)
-    {
-        DMA_ClearITPendingBit(dma_tx, hw->dma_tx_it_fe);
-        s_uart_tx_error[port] = true;
-        should_signal = true;
-    }
-
-    if (should_signal && s_uart_tx_sync_sem[port] != NULL)
-    {
-        DMA_Cmd(dma_tx, DISABLE);
-        USART_DMACmd(hw->uart_base, USART_DMAReq_Tx, DISABLE);
-        xSemaphoreGiveFromISR(s_uart_tx_sync_sem[port], &xHigherPriorityTaskWoken);
-    }
-
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    (void)port;
 }

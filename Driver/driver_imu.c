@@ -3,6 +3,8 @@
 #include "bsp_delay.h"
 #include "bsp_uart.h"
 #include "im948_CMD.h"
+#include "wit_c_sdk.h"
+#include "sys_log.h"
 #include <math.h>
 
 #define IMU_FIFO_SIZE 256
@@ -22,10 +24,17 @@ static imu_dev_t s_devs[IMU_MAX_NUM] = {0};
 /* ===================================================================
  * 各个 IMU 专属的解析逻辑 (未来添加新 IMU 就在这里加)
  * =================================================================== */
-
+static void JY901S_Hardware_Tx(uint8_t *pBuf, uint32_t len)
+{
+    bsp_uart_send_buffer(BSP_UART_IMU2, pBuf, (uint16_t)len);
+}
 // --- JY901S：初始化以及解析 ---
 static void Init_JY901S(void) 
 {
+    WitInit(WIT_PROTOCOL_NORMAL, 0x50);
+    WitSerialWriteRegister(JY901S_Hardware_Tx);
+    WitDelayMsRegister(bsp_delay_ms);
+
     bsp_uart_start_dma_rx_circular(BSP_UART_IMU2,
                                    Driver_IMU_GetRxBuf(IMU_JY901S),
                                    Driver_IMU_GetBufSize(IMU_JY901S));
@@ -205,6 +214,31 @@ void Driver_IMU_Init(void)
 {
     Init_JY901S();
     Init_IM948();
+}
+
+bool Driver_IMU_JY901S_CalibrateAcc(void)
+{
+
+    // LOG_INFO("WitStartAccCali:%d", WitStartAccCali()); 
+
+    if (WitStartAccCali() != WIT_HAL_OK) {
+        return false;
+    }
+
+    bsp_delay_ms(3000);
+
+
+    if (WitStopAccCali() != WIT_HAL_OK) {
+        return false;
+    }
+
+    bsp_delay_ms(20);
+
+    if (WitSaveParameter() != WIT_HAL_OK) {
+        return false;
+    }
+
+    return true;
 }
     
 

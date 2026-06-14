@@ -107,7 +107,7 @@
 #define configUSE_MUTEXES						1                       //Ϊ1ʱʹ�û����ź���
 #define configQUEUE_REGISTRY_SIZE				8                       //��Ϊ0ʱ��ʾ���ö��м�¼�������ֵ�ǿ���
                                                                         //��¼�Ķ��к��ź��������Ŀ��
-#define configCHECK_FOR_STACK_OVERFLOW			0                       //����0ʱ���ö�ջ�����⹦�ܣ����ʹ�ô˹���
+#define configCHECK_FOR_STACK_OVERFLOW			2                       //0: disabled, 1 or 2: enabled (2 = more checks)
                                                                         //�û������ṩһ��ջ������Ӻ��������ʹ�õĻ�
                                                                         //��ֵ����Ϊ1����2����Ϊ������ջ�����ⷽ����
 #define configUSE_RECURSIVE_MUTEXES				1                       //Ϊ1ʱʹ�õݹ黥���ź���
@@ -165,6 +165,7 @@
 #define INCLUDE_vTaskDelayUntil			        1
 #define INCLUDE_vTaskDelay				        1
 #define INCLUDE_eTaskGetState			        1
+#define INCLUDE_uxTaskGetStackHighWaterMark    1
 #define INCLUDE_xTimerPendFunctionCall	        1
 
 /***************************************************************************************************************/

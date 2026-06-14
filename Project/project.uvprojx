@@ -16,8 +16,8 @@
         <TargetCommonOption>
           <Device>STM32F407ZGTx</Device>
           <Vendor>STMicroelectronics</Vendor>
-          <PackID>Keil.STM32F4xx_DFP.2.17.0</PackID>
-          <PackURL>https://www.keil.com/pack/</PackURL>
+          <PackID>Keil.STM32F4xx_DFP.2.16.0</PackID>
+          <PackURL>http://www.keil.com/pack/</PackURL>
           <Cpu>IRAM(0x20000000,0x00020000) IRAM2(0x10000000,0x00010000) IROM(0x08000000,0x00100000) CPUTYPE("Cortex-M4") FPU2 CLOCK(12000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
           <StartupFile></StartupFile>
@@ -618,22 +618,32 @@
             <File>
               <FileName>app_shell.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\app_shell.c</FilePath>
+              <FilePath>..\User\shell\app_shell.c</FilePath>
+            </File>
+            <File>
+              <FileName>freertos_hooks.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\freertos_hooks.c</FilePath>
+            </File>
+            <File>
+              <FileName>fault_snapshot.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\fault_snapshot.c</FilePath>
             </File>
             <File>
               <FileName>core_cmd.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\core_cmd.c</FilePath>
+              <FilePath>..\User\shell\core_cmd.c</FilePath>
             </File>
             <File>
               <FileName>query_cmd.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\query_cmd.c</FilePath>
+              <FilePath>..\User\shell\query_cmd.c</FilePath>
             </File>
             <File>
               <FileName>app_shell.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\User\app_shell.h</FilePath>
+              <FilePath>..\User\shell\app_shell.h</FilePath>
             </File>
             <File>
               <FileName>stm32f4xx_it.c</FileName>
@@ -644,6 +654,11 @@
               <FileName>stm32f4xx_it.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\User\stm32f4xx_it.h</FilePath>
+            </File>
+            <File>
+              <FileName>actuator_cmd.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\shell\actuator_cmd.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -842,6 +857,16 @@
               <FileName>driver_power.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Driver\driver_power.h</FilePath>
+            </File>
+            <File>
+              <FileName>driver_ws2812.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_ws2812.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_ws2812.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_ws2812.h</FilePath>
             </File>
           </Files>
         </Group>
