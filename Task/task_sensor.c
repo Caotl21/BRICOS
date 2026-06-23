@@ -141,8 +141,10 @@ static void IMU_Fuse(const imu_data_t frames[], bot_body_state_t *out)
      * - JY901S 继续提供四元数给控制链路使用。
      * 同时在这里直接比较两路 IMU 的姿态一致性。
      */
-    main_imu = &frames[IMU_JY901S];
-    aux_imu = &frames[IMU_IM948];
+    // main_imu = &frames[IMU_JY901S];
+    // aux_imu = &frames[IMU_IM948];
+    main_imu = &frames[IMU_IM948];
+    aux_imu = &frames[IMU_JY901S];
 
     /* 先把两路四元数都转成欧拉角，再比较 roll 和 pitch。 */
     Driver_IMU_Quaternion_ToEuler_Deg(main_imu->quat, &main_roll, &main_pitch, &main_yaw);
