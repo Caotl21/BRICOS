@@ -120,6 +120,35 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .dma_tx_nvic_priority = 0
     },
 
+    [BSP_UART_IMU3] = {
+        .uart_base = USART6,
+        .gpio_rcc = RCC_AHB1Periph_GPIOC,
+        .uart_rcc = RCC_APB2Periph_USART6,
+        .dma_rcc = RCC_AHB1Periph_DMA2,
+        .uart_rcc_cmd = RCC_APB2PeriphClockCmd,
+        .gpio_tx_port = GPIOC,
+        .gpio_pin_tx = GPIO_Pin_6,
+        .gpio_pin_tx_src = GPIO_PinSource6,
+        .gpio_rx_port = GPIOC,
+        .gpio_pin_rx = GPIO_Pin_7,
+        .gpio_pin_rx_src = GPIO_PinSource7,
+        .gpio_af = GPIO_AF_USART6,
+        .irqn = 0,
+        .nvic_priority = 0,
+        .dma_rx_stream = DMA2_Stream1,
+        .dma_tx_stream = NULL,
+        .dma_channel = DMA_Channel_5,
+        .dma_priority = DMA_Priority_High,
+        .dma_rx_clear_flags = DMA_FLAG_TCIF1 | DMA_FLAG_HTIF1 | DMA_FLAG_TEIF1 | DMA_FLAG_DMEIF1 | DMA_FLAG_FEIF1,
+        .dma_tx_clear_flags = 0,
+        .dma_tx_it_tc = 0,
+        .dma_tx_it_te = 0,
+        .dma_tx_it_dme = 0,
+        .dma_tx_it_fe = 0,
+        .dma_tx_irqn = 0,
+        .dma_tx_nvic_priority = 0
+    },
+
     [BSP_UART_OPI_RT] = {
         .uart_base = USART3,
         .gpio_rcc = RCC_AHB1Periph_GPIOB,
@@ -425,6 +454,9 @@ void bsp_uart_init_default(void)
     
     // 初始化 IMU2 (USART2)
     bsp_uart_init(BSP_UART_IMU2, &default_config);
+
+    // Initialize IMU3 (USART6)
+    bsp_uart_init(BSP_UART_IMU3, &default_config);
 
     default_config.baudrate  = 1500000;
     // 初始化 shell/log 调试接口（UART5）

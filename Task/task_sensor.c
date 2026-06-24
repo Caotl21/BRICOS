@@ -188,6 +188,7 @@ static void vTask_IMU_Core(void *pvParameters)
 {
     imu_data_t data_jy901s;
     imu_data_t data_im948;
+    imu_data_t data_im948_2;
     bot_body_state_t fused_imu;
     uint8_t log_divider = 0;
 
@@ -224,6 +225,17 @@ static void vTask_IMU_Core(void *pvParameters)
             // 存入全局数组
             g_imu_body_frame[IMU_IM948] = data_im948;
         }
+
+        // --- Poll IM948_2 ---
+        uint16_t remain_3 = bsp_uart_get_dma_rx_remaining(BSP_UART_IMU3);
+        Driver_IMU_Poll_DMA_Update(IMU_IM948_2, remain_3);
+
+        if (Driver_IMU_Process(IMU_IM948_2, &data_im948_2) == true)
+        {
+            IMU_Align_To_BodyFrame(&data_im948_2);
+            g_imu_body_frame[IMU_IM948_2] = data_im948_2;
+        }
+
         IMU_Fuse(g_imu_body_frame, &fused_imu);
         Bot_State_Push_IMU(&fused_imu);
         if(++log_divider >= 50) // 每 50 次循环打印一次日志 (即每 1000ms)
@@ -235,6 +247,10 @@ static void vTask_IMU_Core(void *pvParameters)
             LOG_INFO("IMU_IM948  Quat[0:%.2f 1:%.2f 2:%.2f 3:%.2f]", 
                       g_imu_body_frame[IMU_IM948].quat[0], g_imu_body_frame[IMU_IM948].quat[1], 
                       g_imu_body_frame[IMU_IM948].quat[2], g_imu_body_frame[IMU_IM948].quat[3]);
+
+            LOG_INFO("IMU_IM948_2 Quat[0:%.2f 1:%.2f 2:%.2f 3:%.2f]",
+                      g_imu_body_frame[IMU_IM948_2].quat[0], g_imu_body_frame[IMU_IM948_2].quat[1],
+                      g_imu_body_frame[IMU_IM948_2].quat[2], g_imu_body_frame[IMU_IM948_2].quat[3]);
             log_divider = 0;
         }
 
