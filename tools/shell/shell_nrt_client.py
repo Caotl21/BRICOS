@@ -70,6 +70,7 @@ class ShellClient:
         "reboot",
         "thruster",
         "servo",
+        "led",
         "ws2812",
         "euler",
         "depthtemp",
@@ -81,6 +82,7 @@ class ShellClient:
     SYSMODE_TARGETS = ["standby", "disarmed", "armed", "failsafe"]
     MOMODE_TARGETS = ["manual", "stabilize", "auto"]
     THRUSTER_ACTIONS = ["request", "idle", "stop", "all", "set", "pulse"]
+    LED_ACTIONS = ["auto", "solid", "breath", "chase", "warn", "clearwarn"]
     WS2812_ACTIONS = ["request", "clear", "all", "color", "set", "pixel", "refresh"]
     WS2812_STRIP_TARGETS = ["1", "2", "all", "strip1", "strip2", "both"]
     WS2812_SINGLE_STRIP_TARGETS = ["1", "2", "strip1", "strip2"]
@@ -238,6 +240,13 @@ class ShellClient:
         elif cmd == "servo":
             if arg_index == 1:
                 pool = ["set"]
+        elif cmd == "led":
+            if arg_index == 1:
+                pool = self.LED_ACTIONS
+            elif (arg_index == 2) and (len(args_before) >= 1):
+                action = args_before[0].lower()
+                if action in ("solid", "breath", "chase", "warn"):
+                    pool = self.WS2812_COLOR_TARGETS
         elif cmd == "thruster":
             if arg_index == 1:
                 pool = self.THRUSTER_ACTIONS

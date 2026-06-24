@@ -126,6 +126,7 @@ static shell_ret_t prv_cmd_help(shell_cmd_ctx_t *ctx, int argc, char **argv)
                             "  fault clear_overflow\r\n"
                             "  thruster request | idle | all <pct> | set <id> <pct> | pulse <id> <pct> <ms>\r\n"
                             "  servo set <angle>\r\n"
+                            "  led auto | solid | breath | chase | warn | clearwarn\r\n"
                             "  ws2812 request | clear | all | color | set | pixel | refresh\r\n"
                             "  euler request\r\n"
                             "  depthtemp request\r\n"
