@@ -211,7 +211,7 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .period = ARR_50HZ
     },
     // --- 灯带 1：TIM1 CH1 (PE9) ---
-    // --- 灯带 1：TIM1 CH1 (PE9)，DMA2 Stream1 / Channel6 ---
+    // --- 灯带 1：TIM1 CH1 (PE9)，DMA2 Stream3 / Channel6 ---
     [BSP_PWM_LED_1] = {
         .tim = TIM1,
         .tim_rcc = RCC_APB2Periph_TIM1,
@@ -231,11 +231,11 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .dma_rcc = RCC_AHB1Periph_DMA2,
         .dma_channel = DMA_Channel_6,
         .dma_priority = DMA_Priority_High,
-        .dma_clear_flags = DMA_FLAG_TCIF1 | DMA_FLAG_HTIF1 | DMA_FLAG_TEIF1 | DMA_FLAG_DMEIF1 | DMA_FLAG_FEIF1,
-        .dma_tc_it = DMA_IT_TCIF1,
-        .dma_te_it = DMA_IT_TEIF1,
+        .dma_clear_flags = DMA_FLAG_TCIF3 | DMA_FLAG_HTIF3 | DMA_FLAG_TEIF3 | DMA_FLAG_DMEIF3 | DMA_FLAG_FEIF3,
+        .dma_tc_it = DMA_IT_TCIF3,
+        .dma_te_it = DMA_IT_TEIF3,
         .tim_dma_src = TIM_DMA_CC1,
-        .dma_irqn = DMA2_Stream1_IRQn,
+        .dma_irqn = DMA2_Stream3_IRQn,
         .dma_irq_preemption_prio = 6U
     },
     // --- 灯带 2：TIM1 CH2 (PE11) ---

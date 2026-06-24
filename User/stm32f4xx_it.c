@@ -159,7 +159,7 @@ void DMA1_Stream4_IRQHandler(void)
     bsp_uart_dma_tx_isr_handler(BSP_UART_OPI_NRT);
 }
 
-void DMA2_Stream1_IRQHandler(void)
+void DMA2_Stream3_IRQHandler(void)
 {
     bsp_pwm_dma_waveform_irq_handler(BSP_PWM_LED_1);
 }
