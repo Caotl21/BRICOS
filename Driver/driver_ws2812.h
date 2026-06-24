@@ -30,6 +30,9 @@
 #define WS2812_CCR_BIT_0           29U
 #define WS2812_CCR_BIT_1           58U
 
+// CC 触发 DMA 时，CCR=0 可能不再产生后续比较事件；用 1 tick 近似低电平 reset。
+#define WS2812_CCR_RESET           1U
+
 typedef enum {
     WS2812_STRIP_1 = 0,
     WS2812_STRIP_2,

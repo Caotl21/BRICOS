@@ -8,6 +8,7 @@
 // 上电后给灯带和电源留一点稳定时间，再发送默认颜色首帧。
 // 这样可以避免刚上电时首帧过早，被灯带漏收或误收。
 #define WS2812_POWER_ON_SETTLE_MS   2U
+#define WS2812_WAIT_IDLE_TIMEOUT_US 3000U
 
 // 单路 WS2812 灯带的 Driver 运行时上下文：
 // - pwm_ch       对应的底层 PWM 输出通道
@@ -82,12 +83,31 @@ static bool prv_ws2812_any_strip_busy(void)
     return false;
 }
 
-// 仅在初始化阶段使用，等待当前所有灯带发送结束。
-static void prv_ws2812_wait_all_idle(void)
+static void prv_ws2812_abort_all(void)
 {
-    while (prv_ws2812_any_strip_busy()) {
-        ;
+    uint8_t i;
+
+    for (i = 0U; i < WS2812_STRIP_MAX; i++) {
+        bsp_pwm_abort_dma_waveform(s_ws2812_ctx[i].pwm_ch);
     }
+}
+
+// 仅在初始化阶段使用，等待当前所有灯带发送结束。
+static bool prv_ws2812_wait_all_idle(uint32_t timeout_us)
+{
+    uint32_t elapsed_us = 0U;
+
+    while (prv_ws2812_any_strip_busy()) {
+        if (elapsed_us >= timeout_us) {
+            prv_ws2812_abort_all();
+            return false;
+        }
+
+        bsp_delay_us(1U);
+        elapsed_us++;
+    }
+
+    return true;
 }
 
 // 按 WS2812 要求使用 MSB first，把一个字节编码成 8 个 CCR 点位。
@@ -122,7 +142,7 @@ static void prv_ws2812_encode_strip(ws2812_ctx_t *ctx)
 
     // 帧尾补足一段低电平，满足 WS2812 的 reset / latch 时间要求。
     for (i = 0U; i < WS2812_RESET_SLOT_COUNT; i++) {
-        *buf++ = 0U;
+        *buf++ = WS2812_CCR_RESET;
     }
 }
 
@@ -157,7 +177,9 @@ bool Driver_WS2812_Init(void)
             return false;
         }
 
-        prv_ws2812_wait_all_idle();
+        if (!prv_ws2812_wait_all_idle(WS2812_WAIT_IDLE_TIMEOUT_US)) {
+            return false;
+        }
     }
 
     return true;

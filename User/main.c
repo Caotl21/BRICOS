@@ -57,6 +57,8 @@ static void Main_Log_ResetReason(void)
 
 int main(void)
 {
+    bool ws2812_init_ok;
+
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
 
     bsp_delay_init();
@@ -64,19 +66,25 @@ int main(void)
     bsp_gpio_init();
     bsp_pwm_init(0);
 
-    Driver_IMU_Init();
-    Driver_Ms5837_Init();
-    Driver_DHT11_Init();
-    Driver_Power_Init();
-    Driver_Thruster_Init();
-    // Driver_WS2812_Init();
-
-    System_SysTick_Init(SYSCLK);
+	System_SysTick_Init(SYSCLK);
     Sys_BootFlag_MarkBootSuccess();
     System_Log_Init();
     Main_Log_ResetReason();
     Bot_Data_Pool_Init();
     System_ModeManager_Init();
+	
+    Driver_IMU_Init();
+    Driver_Ms5837_Init();
+    Driver_DHT11_Init();
+    Driver_Power_Init();
+    Driver_Thruster_Init();
+    ws2812_init_ok = Driver_WS2812_Init();
+    if (ws2812_init_ok) {
+        LOG_INFO("WS2812 init OK");
+    } else {
+        LOG_ERROR("WS2812 init failed");
+    }
+	
 
     {
         char overflow_task_name[32];

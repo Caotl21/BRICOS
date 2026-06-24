@@ -27,6 +27,7 @@ ACK_MAP = {
     0x02: "INVALID_PARAM",
     0x03: "UNKNOWN_CMD",
     0x04: "LENGTH_ERROR",
+    0x05: "EXECUTION_FAILED",
 }
 
 
