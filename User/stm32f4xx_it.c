@@ -159,7 +159,7 @@ void DMA1_Stream4_IRQHandler(void)
     bsp_uart_dma_tx_isr_handler(BSP_UART_OPI_NRT);
 }
 
-void DMA2_Stream1_IRQHandler(void)
+void DMA2_Stream3_IRQHandler(void)
 {
     /* DMA2_Stream1 is reserved for USART6_RX polling mode. */
 }

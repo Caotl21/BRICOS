@@ -29,9 +29,6 @@ void Bot_Data_Pool_Init(void)
     if (!Driver_PidParam_Load(&s_bricsbot_params)) {
         (void)Driver_PidParam_Save(&s_bricsbot_params);
     }
-
-    s_bricsbot_params.failsafe_max_depth = 10.0f;
-    s_bricsbot_params.failsafe_low_voltage = 10.0f;
 }
 
 void Bot_State_Pull(bot_body_state_t *out_state)

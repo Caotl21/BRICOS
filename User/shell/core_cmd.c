@@ -4,6 +4,8 @@
 #include "bsp_delay.h"
 #include "bsp_cpu.h"
 
+#include "fault_snapshot.h"
+#include "sys_log.h"
 #include "sys_mode_manager.h"
 #include "sys_shell_export.h"
 
@@ -117,7 +119,11 @@ static shell_ret_t prv_cmd_help(shell_cmd_ctx_t *ctx, int argc, char **argv)
                             "  echo <text>\r\n"
                             "  sysmode request | sysmode set standby|disarmed|armed|failsafe\r\n"
                             "  momode request | momode set manual|stabilize|auto\r\n"
+                            "  log clear\r\n"
+                            "  persistlog clear\r\n"
+                            "  persist_log clear\r\n"
                             "  fault\r\n"
+                            "  fault clear_overflow\r\n"
                             "  thruster request | idle | all <pct> | set <id> <pct> | pulse <id> <pct> <ms>\r\n"
                             "  servo set <angle>\r\n"
                             "  ws2812 request | clear | all | color | set | pixel | refresh\r\n"
@@ -224,10 +230,39 @@ static shell_ret_t prv_cmd_momode(shell_cmd_ctx_t *ctx, int argc, char **argv)
 
 static shell_ret_t prv_cmd_fault(shell_cmd_ctx_t *ctx, int argc, char **argv)
 {
-    (void)argc;
-    (void)argv;
+    if ((argc == 2) && prv_streq_ignore_case(argv[1], "clear_overflow")) {
+        if (!System_FaultSnapshot_ClearStackOverflowTask()) {
+            return SHELL_RET_INTERNAL;
+        }
+
+        System_ShellCore_Printf(ctx, "overflow snapshot cleared");
+        return SHELL_RET_OK;
+    }
+
+    if (argc != 1) {
+        System_ShellCore_Printf(ctx, "usage: fault | fault clear_overflow");
+        return SHELL_RET_BAD_ARGS;
+    }
+
     System_ShellCore_Printf(ctx, "fault_flags=0x%08lX", (unsigned long)ctx->fault_flags_snapshot);
     return SHELL_RET_OK;
+}
+
+static shell_ret_t prv_cmd_log(shell_cmd_ctx_t *ctx, int argc, char **argv)
+{
+    (void)ctx;
+
+    if ((argc == 2) && prv_streq_ignore_case(argv[1], "clear")) {
+        if (!System_Log_PersistClear()) {
+            return SHELL_RET_INTERNAL;
+        }
+
+        System_ShellCore_Printf(ctx, "persist_log cleared");
+        return SHELL_RET_OK;
+    }
+
+    System_ShellCore_Printf(ctx, "usage: log clear");
+    return SHELL_RET_BAD_ARGS;
 }
 
 static shell_ret_t prv_cmd_reboot(shell_cmd_ctx_t *ctx, int argc, char **argv)
@@ -244,5 +279,8 @@ EXPORT_SHELL_CMD("help", "show command list", prv_cmd_help, SHELL_PERM_READONLY,
 EXPORT_SHELL_CMD("echo", "echo text", prv_cmd_echo, SHELL_PERM_READONLY, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("sysmode", "sysmode request | sysmode set standby|disarmed|armed|failsafe", prv_cmd_sysmode, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("momode", "momode request | momode set manual|stabilize|auto", prv_cmd_momode, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
+EXPORT_SHELL_CMD("log", "log clear (clear persisted logs)", prv_cmd_log, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
+EXPORT_SHELL_CMD("persistlog", "persistlog clear", prv_cmd_log, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
+EXPORT_SHELL_CMD("persist_log", "persist_log clear", prv_cmd_log, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("reboot", "reboot the system", prv_cmd_reboot, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("fault", "show fault flags", prv_cmd_fault, SHELL_PERM_READONLY, SHELL_MODE_ANY);

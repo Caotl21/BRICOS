@@ -211,7 +211,7 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .period = ARR_50HZ
     },
     // --- 灯带 1：TIM1 CH1 (PE9) ---
-    // --- 灯带 1：TIM1 CH1 (PE9)，DMA2 Stream1 / Channel6 ---
+    // --- 灯带 1：TIM1 CH1 (PE9)，DMA2 Stream3 / Channel6 ---
     [BSP_PWM_LED_1] = {
         .tim = TIM1,
         .tim_rcc = RCC_APB2Periph_TIM1,
@@ -227,15 +227,15 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .prescaler = PSC_APB2_WS2812,
         .period = ARR_WS2812,
         .dma_waveform_capable = true,
-        .dma_stream = DMA2_Stream1,
+        .dma_stream = DMA2_Stream3,
         .dma_rcc = RCC_AHB1Periph_DMA2,
         .dma_channel = DMA_Channel_6,
         .dma_priority = DMA_Priority_High,
-        .dma_clear_flags = DMA_FLAG_TCIF1 | DMA_FLAG_HTIF1 | DMA_FLAG_TEIF1 | DMA_FLAG_DMEIF1 | DMA_FLAG_FEIF1,
-        .dma_tc_it = DMA_IT_TCIF1,
-        .dma_te_it = DMA_IT_TEIF1,
+        .dma_clear_flags = DMA_FLAG_TCIF3 | DMA_FLAG_HTIF3 | DMA_FLAG_TEIF3 | DMA_FLAG_DMEIF3 | DMA_FLAG_FEIF3,
+        .dma_tc_it = DMA_IT_TCIF3,
+        .dma_te_it = DMA_IT_TEIF3,
         .tim_dma_src = TIM_DMA_CC1,
-        .dma_irqn = DMA2_Stream1_IRQn,
+        .dma_irqn = DMA2_Stream3_IRQn,
         .dma_irq_preemption_prio = 6U
     },
     // --- 灯带 2：TIM1 CH2 (PE11) ---
@@ -598,6 +598,11 @@ bool bsp_pwm_start_dma_waveform(bsp_pwm_ch_t ch, const uint16_t *ccr_buf, uint16
 void bsp_pwm_abort_dma_waveform(bsp_pwm_ch_t ch)
 {
     prv_pwm_finish_dma_waveform(ch);
+}
+
+void bsp_pwm_poll_dma_waveform(bsp_pwm_ch_t ch)
+{
+    bsp_pwm_dma_waveform_irq_handler(ch);
 }
 
 // 查询指定 PWM 通道当前是否处于 DMA 波形发送中

@@ -105,7 +105,7 @@ void Driver_PidParam_FillDefault(bot_params_t *params)
     prv_fill_pid(&params->pid_depth, 3.0f, 0.0f, 0.3f, 50.0f, 500.0f);
 
     params->failsafe_max_depth = 30.0f;
-    params->failsafe_low_voltage = 10.0f;
+    params->failsafe_low_voltage = 22.0f;
 
 
     // ==========================================
