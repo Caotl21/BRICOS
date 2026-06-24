@@ -8,7 +8,7 @@
 #include "sys_port.h"
 
 #define SHELL_UART_RX_QUEUE_DEPTH  128u
-#define SHELL_UART_RX_TASK_STACK   256u
+#define SHELL_UART_RX_TASK_STACK   512u
 #define SHELL_UART_RX_TASK_PRIO    3u
 
 static shell_rx_cb_t s_shell_rx_cb = 0;
