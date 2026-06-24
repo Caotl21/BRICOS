@@ -15,6 +15,7 @@
 
 #include "task_comm.h"
 #include "task_control.h"
+#include "task_led.h"
 #include "task_sensor.h"
 
 #include <string.h>
@@ -481,6 +482,7 @@ static void prv_standby_enter(control_fsm_ctx_t *ctx)
     Reset_All_Controllers();
     prv_set_idle_output();
     prv_pause_standby_tasks(ctx);
+    Task_LED_SetMode(SYS_MODE_STANDBY);
 
     ctx->standby_kick_active = 0u;
     ctx->standby_cycle_counter = 0u;
@@ -544,6 +546,7 @@ static void prv_disarmed_enter(control_fsm_ctx_t *ctx)
     (void)ctx;
     Reset_All_Controllers();
     prv_set_idle_output();
+    Task_LED_SetMode(SYS_MODE_ACTIVE_DISARMED);
 }
 
 static void prv_disarmed_run(control_fsm_ctx_t *ctx)
@@ -562,6 +565,7 @@ static void prv_armed_enter(control_fsm_ctx_t *ctx)
 {
     Reset_All_Controllers();
     ctx->last_armed_motion_mode = ctx->current_motion_mode;
+    Task_LED_SetMode(SYS_MODE_MOTION_ARMED);
 
     LOG_INFO("ARMED entry spin start");
     prv_armed_entry_spin_once();
@@ -679,6 +683,7 @@ static void prv_failsafe_enter(control_fsm_ctx_t *ctx)
     (void)ctx;
     Reset_All_Controllers();
     prv_set_idle_output();
+    Task_LED_SetMode(SYS_MODE_FAILSAFE);
 }
 
 static void prv_failsafe_run(control_fsm_ctx_t *ctx)

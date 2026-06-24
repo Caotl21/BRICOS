@@ -26,6 +26,7 @@
 
 #include "task_comm.h"
 #include "task_control.h"
+#include "task_led.h"
 #include "task_monitor.h"
 #include "task_nrt_cmd.h"
 #include "task_rt_cmd.h"
@@ -90,6 +91,7 @@ int main(void)
 
     Task_Comm_Init();
     Task_Sensor_Init();
+    Task_LED_Init();
     Task_Control_Init();
     Task_NRT_Cmd_Init();
     Task_RT_Cmd_Init();

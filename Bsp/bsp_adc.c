@@ -30,7 +30,7 @@ typedef struct {
 } adc_core_info_t;
 
 static const adc_hw_info_t s_adc_hw_info[BSP_ADC_MAX] = {
-    [BSP_ADC_VOLTAGE] = {
+    [BSP_ADC_CURRENT] = {
         .adc = ADC3,
         .gpio_port = GPIOF,
         .gpio_rcc = RCC_AHB1Periph_GPIOF,
@@ -39,7 +39,7 @@ static const adc_hw_info_t s_adc_hw_info[BSP_ADC_MAX] = {
         .needs_gpio = 1,
         .need_temp = 0
     },
-    [BSP_ADC_CURRENT] = {
+    [BSP_ADC_VOLTAGE] = {
         .adc = ADC3,
         .gpio_port = GPIOF,
         .gpio_rcc = RCC_AHB1Periph_GPIOF,
