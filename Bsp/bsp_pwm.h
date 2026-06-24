@@ -82,6 +82,7 @@ bool bsp_pwm_start_dma_waveform(bsp_pwm_ch_t ch, const uint16_t *ccr_buf, uint16
  * @param  ch - PWM 通道枚举。
  */
 void bsp_pwm_abort_dma_waveform(bsp_pwm_ch_t ch);
+void bsp_pwm_poll_dma_waveform(bsp_pwm_ch_t ch);
 
 /**
  * @brief  查询指定 PWM 通道当前是否处于 DMA 波形发送中。

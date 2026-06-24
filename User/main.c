@@ -58,6 +58,7 @@ static void Main_Log_ResetReason(void)
 int main(void)
 {
     bool ws2812_init_ok;
+    ws2812_init_status_t ws2812_status;
 
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
 
@@ -82,7 +83,10 @@ int main(void)
     if (ws2812_init_ok) {
         LOG_INFO("WS2812 init OK");
     } else {
-        LOG_ERROR("WS2812 init failed");
+        ws2812_status = Driver_WS2812_GetLastInitStatus();
+        LOG_ERROR("WS2812 init failed: status=%u(%s)",
+                  (unsigned int)ws2812_status,
+                  Driver_WS2812_InitStatusString(ws2812_status));
     }
 	
 

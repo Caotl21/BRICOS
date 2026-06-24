@@ -3,32 +3,22 @@ import argparse
 import os
 import select
 import sys
-import termios
 import threading
 import time
-import tty
 
-import serial
+try:
+    import serial
+except ModuleNotFoundError:
+    serial = None
 
-START1 = 0xAA
-START2 = 0xBB
-END1 = 0xCC
-END2 = 0xDD
+IS_WINDOWS = os.name == "nt"
 
-CMD_SHELL_REQ = 0x20
-CMD_SHELL_RESP = 0x21
-CMD_SHELL_BOOT_DETECT = 0x22
-CMD_SHELL_BOOT_STATUS = 0x23
-CMD_ACK = 0xFF
-CMD_LOG = 0x05
-
-ACK_MAP = {
-    0x01: "ACK_SUCCESS",
-    0x02: "INVALID_PARAM",
-    0x03: "UNKNOWN_CMD",
-    0x04: "LENGTH_ERROR",
-    0x05: "EXECUTION_FAILED",
-}
+if IS_WINDOWS:
+    import ctypes
+    import msvcrt
+else:
+    import termios
+    import tty
 
 
 class RawMode:
@@ -37,71 +27,47 @@ class RawMode:
         self._old = None
 
     def __enter__(self):
-        self._old = termios.tcgetattr(self.fd)
-        tty.setraw(self.fd)
+        if not IS_WINDOWS:
+            self._old = termios.tcgetattr(self.fd)
+            tty.setraw(self.fd)
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        if self._old is not None:
+        if (not IS_WINDOWS) and self._old is not None:
             termios.tcsetattr(self.fd, termios.TCSADRAIN, self._old)
 
 
-class HydroParser:
-    def __init__(self):
-        self.buf = bytearray()
+def enable_windows_virtual_terminal():
+    if not IS_WINDOWS:
+        return
 
-    @staticmethod
-    def _checksum(data: bytes) -> int:
-        c = 0
-        for b in data:
-            c ^= b
-        return c
+    kernel32 = ctypes.windll.kernel32
+    stdout_handle = kernel32.GetStdHandle(-11)
+    if stdout_handle == 0 or stdout_handle == -1:
+        return
 
-    def feed(self, data: bytes):
-        self.buf.extend(data)
-        out = []
-        while True:
-            idx = self.buf.find(bytes([START1, START2]))
-            if idx < 0:
-                self.buf.clear()
-                break
-            if idx > 0:
-                del self.buf[:idx]
-            if len(self.buf) < 4:
-                break
+    mode = ctypes.c_uint32()
+    if kernel32.GetConsoleMode(stdout_handle, ctypes.byref(mode)) == 0:
+        return
 
-            cmd = self.buf[2]
-            payload_len = self.buf[3]
-            total_len = payload_len + 7
-            if len(self.buf) < total_len:
-                break
+    enable_vt = 0x0004
+    if mode.value & enable_vt:
+        return
 
-            frame = self.buf[:total_len]
-            if frame[-2] != END1 or frame[-1] != END2:
-                del self.buf[:2]
-                continue
-
-            expected = self._checksum(frame[2:4 + payload_len])
-            actual = frame[4 + payload_len]
-            if expected != actual:
-                del self.buf[:2]
-                continue
-
-            payload = bytes(frame[4:4 + payload_len])
-            out.append((cmd, payload))
-            del self.buf[:total_len]
-        return out
+    kernel32.SetConsoleMode(stdout_handle, mode.value | enable_vt)
 
 
 class ShellClient:
     COMMANDS = [
         "help",
-        "reboot",
         "echo",
         "sysmode",
         "momode",
-        "servo",
         "fault",
+        "reboot",
+        "thruster",
+        "servo",
+        "ws2812",
         "euler",
         "depthtemp",
         "power",
@@ -111,32 +77,38 @@ class ShellClient:
     QUERY_COMMANDS = ["euler", "depthtemp", "power", "cabin", "chip"]
     SYSMODE_TARGETS = ["standby", "disarmed", "armed", "failsafe"]
     MOMODE_TARGETS = ["manual", "stabilize", "auto"]
-    SHELL_RET_MAP = {
-        0: ("OK", "成功"),
-        1: ("UNKNOWN_CMD", "未知命令"),
-        2: ("BAD_ARGS", "参数错误"),
-        3: ("DENIED", "权限不足或被安全策略拒绝"),
-        4: ("MODE_BLOCKED", "当前系统模式不允许执行"),
-        5: ("BUSY", "资源忙"),
-        6: ("INTERNAL_ERROR", "内部错误"),
-    }
+    THRUSTER_ACTIONS = ["request", "idle", "stop", "all", "set", "pulse"]
+    WS2812_ACTIONS = ["request", "clear", "all", "color", "set", "pixel", "refresh"]
+    WS2812_STRIP_TARGETS = ["1", "2", "all", "strip1", "strip2", "both"]
+    WS2812_SINGLE_STRIP_TARGETS = ["1", "2", "strip1", "strip2"]
+    WS2812_COLOR_TARGETS = [
+        "black",
+        "off",
+        "white",
+        "red",
+        "green",
+        "blue",
+        "yellow",
+        "cyan",
+        "magenta",
+        "pink",
+        "orange",
+        "purple",
+        "violet",
+    ]
 
     ANSI_RESET = "\033[0m"
     ANSI_GREEN = "\033[92m"
     ANSI_WHITE = "\033[97m"
     ANSI_GRADIENT = [196, 202, 226, 82, 45]
     RECONNECT_RETRY_SEC = 0.3
-    SHELL_BOOT_PROBE_INTERVAL_SEC = 0.3
     BOOT_STATUS_DUP_GUARD_SEC = 1.0
     BOOT_STATUS_STARTUP_SETTLE_SEC = 3.0
-    REBOOT_BOOT_PROBE_DELAY_SEC = 0.25
-    SHELL_BOOT_DETECT_PAYLOAD = b"detect"
     SHELL_BOOT_STATUS_TEXT = "startup_success"
 
     @staticmethod
     def _write_line(text: str = ""):
-        # In raw tty mode, '\n' does not reliably return to column 0.
-        # Always emit CRLF explicitly for aligned multi-line output.
+        # In raw tty mode, "\n" does not reliably return to column 0.
         sys.stdout.write(text + "\r\n")
 
     def __init__(self, port: str, baud: int, verbose_frames: bool = False):
@@ -144,53 +116,27 @@ class ShellClient:
         self.baud = baud
         self.ser = None
         self.connected = False
-        self.parser = HydroParser()
         self.running = True
         self.line = ""
         self.prompt_name = "bricsbot1"
         self.prompt_symbol = "$"
-        self.waiting_response = False
         self.history = []
         self.history_index = 0
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.rx_thread = threading.Thread(target=self._rx_loop, daemon=True)
         self.verbose_frames = verbose_frames
-        self._shell_resp_buf = bytearray()
         self._shell_ready = False
-        self._next_boot_probe_ts = 0.0
         self._last_boot_status_ts = 0.0
         self._shell_ready_since_ts = 0.0
-
-    @staticmethod
-    def _checksum(data: bytes) -> int:
-        c = 0
-        for b in data:
-            c ^= b
-        return c
-
-    def _build_frame(self, cmd_id: int, payload: bytes) -> bytes:
-        if len(payload) > 255:
-            raise ValueError("payload too long")
-        frame = bytearray()
-        frame.append(START1)
-        frame.append(START2)
-        frame.append(cmd_id & 0xFF)
-        frame.append(len(payload) & 0xFF)
-        frame.extend(payload)
-        frame.append(self._checksum(frame[2:]))
-        frame.append(END1)
-        frame.append(END2)
-        return bytes(frame)
+        self._rx_line_buf = bytearray()
+        self._rx_last_was_cr = False
 
     def send_shell_line(self, line: str):
-        # Clear pending fragments before sending next command.
-        self._shell_resp_buf.clear()
-        payload = line.encode("utf-8", errors="ignore")
-        frame = self._build_frame(CMD_SHELL_REQ, payload)
+        payload = line.encode("ascii", errors="ignore") + b"\r\n"
         try:
             if (not self.connected) or (self.ser is None):
                 return False
-            self.ser.write(frame)
+            self.ser.write(payload)
             self.ser.flush()
             return True
         except (serial.SerialException, OSError):
@@ -201,16 +147,16 @@ class ShellClient:
     def _is_reboot_command(line: str) -> bool:
         return line.strip().lower() == "reboot"
 
-    def _set_boot_wait_state(self, delay_sec: float):
-        self._shell_ready = False
-        self.waiting_response = False
-        self._shell_resp_buf.clear()
-        self._shell_ready_since_ts = 0.0
-        self._next_boot_probe_ts = time.monotonic() + max(0.0, delay_sec)
+    def _set_boot_wait_state(self):
+        with self.lock:
+            self._shell_ready = False
+            self._shell_ready_since_ts = 0.0
+            self.line = ""
+            self._redraw_input_unlocked()
 
     def _print_shell_intro_unlocked(self):
         self._print_logo()
-        self._write_line("BRICOS Shell (NRT Frame Transport)")
+        self._write_line("BRICOS Shell (UART Stream Transport)")
         self._write_line("Ctrl-C to quit")
         self._write_line("This client provides local command + argument completion for Tab.")
         self._write_line("Welcome to our bot world! Type 'help' to get started.")
@@ -222,32 +168,11 @@ class ShellClient:
             if self._shell_ready and (not force_refresh):
                 return
             self._shell_ready = True
-            self.waiting_response = False
-            self._shell_resp_buf.clear()
             self.line = ""
             self._shell_ready_since_ts = time.monotonic()
             sys.stdout.write("\r\n")
             self._print_shell_intro_unlocked()
             self._redraw_input_unlocked()
-
-    def _send_boot_detect(self):
-        frame = self._build_frame(CMD_SHELL_BOOT_DETECT, self.SHELL_BOOT_DETECT_PAYLOAD)
-        try:
-            if (not self.connected) or (self.ser is None):
-                return
-            self.ser.write(frame)
-            self.ser.flush()
-        except (serial.SerialException, OSError):
-            self._handle_disconnect()
-
-    def _poll_boot_detect(self):
-        if self._shell_ready or (not self.connected):
-            return
-        now = time.monotonic()
-        if now < self._next_boot_probe_ts:
-            return
-        self._next_boot_probe_ts = now + self.SHELL_BOOT_PROBE_INTERVAL_SEC
-        self._send_boot_detect()
 
     def _print_async(self, text: str):
         with self.lock:
@@ -255,14 +180,11 @@ class ShellClient:
             self._redraw_input_unlocked()
 
     def _redraw_input_unlocked(self):
-        if not self._shell_ready:
+        if (not self.connected) or (not self._shell_ready):
             sys.stdout.write("\r\033[2K")
             sys.stdout.flush()
             return
-        if self.waiting_response:
-            sys.stdout.write("\r\033[2K")
-            sys.stdout.flush()
-            return
+
         sys.stdout.write(
             "\r\033[2K"
             + self.ANSI_GREEN
@@ -300,6 +222,22 @@ class ShellClient:
         elif cmd == "servo":
             if arg_index == 1:
                 pool = ["set"]
+        elif cmd == "thruster":
+            if arg_index == 1:
+                pool = self.THRUSTER_ACTIONS
+        elif cmd == "ws2812":
+            if arg_index == 1:
+                pool = self.WS2812_ACTIONS
+            elif (arg_index == 2) and (len(args_before) >= 1):
+                action = args_before[0].lower()
+                if action in ("clear", "all", "color", "refresh"):
+                    pool = self.WS2812_STRIP_TARGETS
+                elif action in ("set", "pixel"):
+                    pool = self.WS2812_SINGLE_STRIP_TARGETS
+            elif (arg_index == 3) and (len(args_before) >= 2) and (args_before[0].lower() == "color"):
+                pool = self.WS2812_COLOR_TARGETS
+            elif (arg_index == 4) and (len(args_before) >= 3) and (args_before[0].lower() == "pixel"):
+                pool = self.WS2812_COLOR_TARGETS
 
         return [x for x in pool if x.startswith(pfx)]
 
@@ -395,6 +333,72 @@ class ShellClient:
                 break
         return bytes(seq)
 
+    @staticmethod
+    def _wait_for_key(fd: int, timeout_sec: float) -> bool:
+        if IS_WINDOWS:
+            deadline = time.monotonic() + timeout_sec
+            while time.monotonic() < deadline:
+                if msvcrt.kbhit():
+                    return True
+                time.sleep(0.01)
+            return False
+
+        rlist, _, _ = select.select([fd], [], [], timeout_sec)
+        return bool(rlist)
+
+    @staticmethod
+    def _read_key(fd: int):
+        if IS_WINDOWS:
+            try:
+                ch = msvcrt.getwch()
+            except KeyboardInterrupt:
+                return ("ctrl_c", None)
+
+            if ch == "\x03":
+                return ("ctrl_c", None)
+            if ch in ("\r", "\n"):
+                return ("enter", None)
+            if ch == "\t":
+                return ("tab", None)
+            if ch == "\b":
+                return ("backspace", None)
+            if ch == "\x1b":
+                return ("escape", None)
+            if ch in ("\x00", "\xe0"):
+                ext = msvcrt.getwch()
+                if ext == "H":
+                    return ("up", None)
+                if ext == "P":
+                    return ("down", None)
+                return ("other", None)
+            if len(ch) == 1 and 32 <= ord(ch) <= 126:
+                return ("char", ch)
+            return ("other", None)
+
+        ch = os.read(fd, 1)
+        if not ch:
+            return ("other", None)
+
+        c = ch[0]
+        if c == 3:
+            return ("ctrl_c", None)
+        if c in (13, 10):
+            return ("enter", None)
+        if c in (8, 127):
+            return ("backspace", None)
+        if c == 9:
+            return ("tab", None)
+        if c == 27:
+            seq = ShellClient._read_escape_seq(fd)
+            if seq in (b"[A", b"OA"):
+                return ("up", None)
+            if seq in (b"[B", b"OB"):
+                return ("down", None)
+            return ("escape", None)
+        if 32 <= c <= 126:
+            return ("char", chr(c))
+        return ("other", None)
+
     def _print_logo(self):
         logo_lines = [
             " ____  ____  ___ ____ ___  ____",
@@ -413,108 +417,74 @@ class ShellClient:
             try:
                 self.ser = serial.Serial(port=self.port, baudrate=self.baud, timeout=0.05)
                 self.connected = True
-                self.parser = HydroParser()
-                self._set_boot_wait_state(delay_sec=0.0)
+                self._rx_line_buf.clear()
+                self._rx_last_was_cr = False
+                self._last_boot_status_ts = 0.0
+                self._mark_shell_ready(force_refresh=not initial)
                 if not initial:
-                    self._print_async("[INFO] serial reconnected, waiting for startup ack...")
+                    self._print_async("[INFO] serial reconnected.")
                 return
             except (serial.SerialException, OSError):
                 time.sleep(self.RECONNECT_RETRY_SEC)
 
     def _handle_disconnect(self):
+        was_connected = self.connected
         self.connected = False
-        self._shell_ready = False
-        self.waiting_response = False
-        self._shell_resp_buf.clear()
-        self._next_boot_probe_ts = 0.0
-        self._last_boot_status_ts = 0.0
+        with self.lock:
+            self._shell_ready = False
+            self._shell_ready_since_ts = 0.0
+            self._rx_line_buf.clear()
+            self._rx_last_was_cr = False
         if self.ser is not None:
             try:
                 self.ser.close()
             except Exception:
                 pass
         self.ser = None
+        if was_connected and self.running:
+            self._print_async("[WARN] serial disconnected, retrying...")
 
-    def _format_shell_response_text(self, raw_text: str) -> str:
-        text = raw_text or ""
-        if not text.startswith("ret="):
-            return text
+    def _handle_rx_line(self, text: str):
+        status_text = text.strip().lower()
+        if status_text == self.SHELL_BOOT_STATUS_TEXT:
+            now = time.monotonic()
+            last_ts = self._last_boot_status_ts
+            self._last_boot_status_ts = now
 
-        tail = text[4:]
-        pos = 0
-        while pos < len(tail) and tail[pos].isdigit():
-            pos += 1
-
-        if pos == 0:
-            return text
-
-        ret = int(tail[:pos])
-        payload = tail[pos:].lstrip()
-
-        if ret == 0:
-            return payload
-
-        ret_name, ret_desc = self.SHELL_RET_MAP.get(ret, (f"RET_{ret}", "未知错误"))
-        if payload:
-            return f"[ERR {ret}:{ret_name}] {payload}"
-        return f"[ERR {ret}:{ret_name}] {ret_desc}"
-
-    def _handle_frame(self, cmd: int, payload: bytes):
-        if cmd == CMD_SHELL_BOOT_STATUS:
-            status_text = payload.decode("utf-8", errors="replace").strip().lower()
-            if status_text == self.SHELL_BOOT_STATUS_TEXT:
-                now = time.monotonic()
-                last_ts = self._last_boot_status_ts
-                self._last_boot_status_ts = now
-
-                if self._shell_ready:
-                    ready_since = self._shell_ready_since_ts
-                    if (ready_since > 0.0) and ((now - ready_since) < self.BOOT_STATUS_STARTUP_SETTLE_SEC):
-                        return
-                    if (now - last_ts) < self.BOOT_STATUS_DUP_GUARD_SEC:
-                        return
-                    self._mark_shell_ready(force_refresh=True)
-                else:
-                    self._mark_shell_ready()
-            elif self.verbose_frames:
-                self._print_async(f"[BOOT] unexpected status: {status_text}")
+            if self._shell_ready:
+                ready_since = self._shell_ready_since_ts
+                if (ready_since > 0.0) and ((now - ready_since) < self.BOOT_STATUS_STARTUP_SETTLE_SEC):
+                    return
+                if (now - last_ts) < self.BOOT_STATUS_DUP_GUARD_SEC:
+                    return
+                self._mark_shell_ready(force_refresh=True)
+            else:
+                self._mark_shell_ready()
             return
 
-        if cmd == CMD_SHELL_RESP:
-            # Shell response may be split across multiple 0x21 frames.
-            self._shell_resp_buf.extend(payload)
-            if self._shell_resp_buf.endswith(b"\r\n") or self._shell_resp_buf.endswith(b"\n"):
-                raw_txt = self._shell_resp_buf.decode("utf-8", errors="replace").rstrip("\r\n")
-                txt = self._format_shell_response_text(raw_txt)
-                self.waiting_response = False
-                self._print_async(txt)
-                self._shell_resp_buf.clear()
-            return
+        self._print_async(text)
 
-        if cmd == CMD_ACK and len(payload) >= 4 and payload[0] == CMD_ACK:
-            ack_cmd = payload[1]
-            ack_code = payload[2]
-            seq = payload[3]
-            desc = ACK_MAP.get(ack_code, f"0x{ack_code:02X}")
-            self._print_async(f"[ACK] cmd=0x{ack_cmd:02X} code={desc} seq={seq}")
-            return
-        
-        if cmd == CMD_LOG:
-            txt = payload.decode("utf-8", errors="replace").rstrip("\r\n")
-            self._print_async(f"[LOG] {txt}")
-            return
+    def _process_rx_bytes(self, data: bytes):
+        for byte in data:
+            if byte in (0x0D, 0x0A):
+                if byte == 0x0A and self._rx_last_was_cr:
+                    self._rx_last_was_cr = False
+                    continue
 
+                text = self._rx_line_buf.decode("utf-8", errors="replace")
+                self._rx_line_buf.clear()
+                self._handle_rx_line(text)
+                self._rx_last_was_cr = byte == 0x0D
+                continue
 
-        if self.verbose_frames:
-            self._print_async(f"[FRAME] cmd=0x{cmd:02X} len={len(payload)}")
+            self._rx_last_was_cr = False
+            self._rx_line_buf.append(byte)
 
     def _rx_loop(self):
         while self.running:
             if not self.connected:
                 self._connect_serial(initial=False)
                 continue
-
-            self._poll_boot_detect()
 
             try:
                 if self.ser is None:
@@ -528,105 +498,88 @@ class ShellClient:
             if not data:
                 continue
 
-            for cmd, payload in self.parser.feed(data):
-                self._handle_frame(cmd, payload)
+            self._process_rx_bytes(data)
 
     def run(self):
+        enable_windows_virtual_terminal()
         self._connect_serial(initial=True)
         self.rx_thread.start()
-        print("Waiting for device startup ack...")
 
         fd = sys.stdin.fileno()
-        with RawMode(fd):
-            with self.lock:
-                self._redraw_input_unlocked()
-            while self.running:
-                rlist, _, _ = select.select([fd], [], [], 0.05)
-                if not rlist:
-                    continue
-
-                ch = os.read(fd, 1)
-                if not ch:
-                    continue
-                c = ch[0]
-
-                if c == 3:
-                    self.running = False
-                    break
-
+        try:
+            with RawMode(fd):
                 with self.lock:
-                    if not self._shell_ready:
-                        if c == 27:
-                            _ = self._read_escape_seq(fd)
-                        sys.stdout.write("\a")
-                        sys.stdout.flush()
+                    self._redraw_input_unlocked()
+                while self.running:
+                    if not self._wait_for_key(fd, 0.05):
                         continue
 
-                    if self.waiting_response:
-                        if c == 27:
-                            _ = self._read_escape_seq(fd)
-                        sys.stdout.write("\a")
-                        sys.stdout.flush()
-                        continue
+                    key_kind, key_value = self._read_key(fd)
+                    if key_kind == "ctrl_c":
+                        self.running = False
+                        break
 
-                    if c in (13, 10):
-                        line = self.line.strip()
-                        sys.stdout.write("\r\n")
-                        sys.stdout.flush()
-                        self.line = ""
-                        if line:
-                            if (not self.history) or (self.history[-1] != line):
-                                self.history.append(line)
-                            self.history_index = len(self.history)
-                            if self.send_shell_line(line):
-                                if self._is_reboot_command(line):
-                                    self._set_boot_wait_state(self.REBOOT_BOOT_PROBE_DELAY_SEC)
-                                    sys.stdout.write("[INFO] reboot sent, waiting for startup ack...\r\n")
-                                    sys.stdout.flush()
-                                else:
-                                    self.waiting_response = True
-                            else:
-                                self.waiting_response = False
-                        else:
-                            self.history_index = len(self.history)
-                        self._redraw_input_unlocked()
-                        continue
-
-                    if c in (8, 127):
-                        if self.line:
-                            self.line = self.line[:-1]
-                            self.history_index = len(self.history)
-                            self._redraw_input_unlocked()
-                        else:
+                    with self.lock:
+                        if (not self.connected) or (not self._shell_ready):
                             sys.stdout.write("\a")
                             sys.stdout.flush()
-                        continue
+                            continue
 
-                    if c == 9:
-                        self._complete_line()
-                        continue
+                        if key_kind == "enter":
+                            line = self.line.strip()
+                            sys.stdout.write("\r\n")
+                            sys.stdout.flush()
+                            self.line = ""
+                            if line:
+                                if (not self.history) or (self.history[-1] != line):
+                                    self.history.append(line)
+                                self.history_index = len(self.history)
+                                if self.send_shell_line(line):
+                                    if self._is_reboot_command(line):
+                                        self._set_boot_wait_state()
+                                        sys.stdout.write("[INFO] reboot sent, waiting for startup banner...\r\n")
+                                        sys.stdout.flush()
+                                else:
+                                    sys.stdout.write("[WARN] send failed.\r\n")
+                                    sys.stdout.flush()
+                            else:
+                                self.history_index = len(self.history)
+                            self._redraw_input_unlocked()
+                            continue
 
-                    if c == 27:
-                        seq = self._read_escape_seq(fd)
-                        if seq in (b"[A", b"OA"):
+                        if key_kind == "backspace":
+                            if self.line:
+                                self.line = self.line[:-1]
+                                self.history_index = len(self.history)
+                                self._redraw_input_unlocked()
+                            else:
+                                sys.stdout.write("\a")
+                                sys.stdout.flush()
+                            continue
+
+                        if key_kind == "tab":
+                            self._complete_line()
+                            continue
+
+                        if key_kind == "up":
                             self._history_up()
                             continue
-                        if seq in (b"[B", b"OB"):
+
+                        if key_kind == "down":
                             self._history_down()
                             continue
+
+                        if key_kind == "char":
+                            self.line += key_value
+                            self.history_index = len(self.history)
+                            sys.stdout.write(key_value)
+                            sys.stdout.flush()
+                            continue
+
                         sys.stdout.write("\a")
                         sys.stdout.flush()
-                        continue
-
-                    if 32 <= c <= 126:
-                        self.line += chr(c)
-                        self.history_index = len(self.history)
-                        sys.stdout.write(chr(c))
-                        sys.stdout.flush()
-                        continue
-
-                    sys.stdout.write("\a")
-                    sys.stdout.flush()
+        except KeyboardInterrupt:
+            self.running = False
 
         self.running = False
         self.rx_thread.join(timeout=0.2)
@@ -636,15 +589,22 @@ class ShellClient:
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="NRT shell client")
-    p.add_argument("--port", default="/dev/ttyS7", help="serial port")
-    p.add_argument("--baud", type=int, default=921600, help="baud rate")
-    p.add_argument("--verbose-frames", action="store_true", help="print non-shell frames")
+    p = argparse.ArgumentParser(description="UART shell client")
+    default_port = "COM7" if IS_WINDOWS else "/dev/ttyS7"
+    p.add_argument("--port", default=default_port, help="serial port")
+    p.add_argument("--baud", type=int, default=1500000, help="baud rate")
+    p.add_argument(
+        "--verbose-frames",
+        action="store_true",
+        help="legacy no-op option kept for backward compatibility",
+    )
     return p.parse_args()
 
 
 def main():
     args = parse_args()
+    if serial is None:
+        raise SystemExit("pyserial is required. Install it with: pip install pyserial")
     client = ShellClient(args.port, args.baud, verbose_frames=args.verbose_frames)
     client.run()
 

@@ -227,7 +227,7 @@ static const pwm_ch_hw_t pwm_hw_info[BSP_PWM_MAX] = {
         .prescaler = PSC_APB2_WS2812,
         .period = ARR_WS2812,
         .dma_waveform_capable = true,
-        .dma_stream = DMA2_Stream1,
+        .dma_stream = DMA2_Stream3,
         .dma_rcc = RCC_AHB1Periph_DMA2,
         .dma_channel = DMA_Channel_6,
         .dma_priority = DMA_Priority_High,
@@ -598,6 +598,11 @@ bool bsp_pwm_start_dma_waveform(bsp_pwm_ch_t ch, const uint16_t *ccr_buf, uint16
 void bsp_pwm_abort_dma_waveform(bsp_pwm_ch_t ch)
 {
     prv_pwm_finish_dma_waveform(ch);
+}
+
+void bsp_pwm_poll_dma_waveform(bsp_pwm_ch_t ch)
+{
+    bsp_pwm_dma_waveform_irq_handler(ch);
 }
 
 // 查询指定 PWM 通道当前是否处于 DMA 波形发送中
