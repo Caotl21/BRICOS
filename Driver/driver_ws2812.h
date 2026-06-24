@@ -43,7 +43,7 @@ typedef struct {
 #define WS2812_COLOR_ORANGE    ((ws2812_rgb_t){255U, 128U, 0U})
 #define WS2812_COLOR_PURPLE    ((ws2812_rgb_t){128U, 0U,   255U})
 
-#define WS2812_POWER_ON_COLOR  WS2812_COLOR_RED
+#define WS2812_POWER_ON_COLOR  WS2812_COLOR_WHITE
 
 typedef enum {
     WS2812_INIT_STATUS_OK = 0,
@@ -62,8 +62,11 @@ bool Driver_WS2812_IsBusy(ws2812_strip_t strip);
 bool Driver_WS2812_SetPixelRGB(ws2812_strip_t strip, uint16_t index, uint8_t r, uint8_t g, uint8_t b);
 bool Driver_WS2812_SetPixel(ws2812_strip_t strip, uint16_t index, ws2812_rgb_t color);
 void Driver_WS2812_SetAllRGB(ws2812_strip_t strip, uint8_t r, uint8_t g, uint8_t b);
+void Driver_WS2812_SetAllStripsRGB(uint8_t r, uint8_t g, uint8_t b);
 void Driver_WS2812_Clear(ws2812_strip_t strip);
 void Driver_WS2812_ClearAll(void);
 bool Driver_WS2812_Refresh(ws2812_strip_t strip);
+bool Driver_WS2812_RefreshBlocking(ws2812_strip_t strip, uint32_t timeout_us);
+bool Driver_WS2812_ApplySolidColorAll(ws2812_rgb_t color, uint32_t timeout_us);
 
 #endif

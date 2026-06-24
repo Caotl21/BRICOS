@@ -258,6 +258,15 @@ void Driver_WS2812_SetAllRGB(ws2812_strip_t strip, uint8_t r, uint8_t g, uint8_t
     }
 }
 
+void Driver_WS2812_SetAllStripsRGB(uint8_t r, uint8_t g, uint8_t b)
+{
+    uint8_t i;
+
+    for (i = 0U; i < WS2812_STRIP_MAX; i++) {
+        Driver_WS2812_SetAllRGB((ws2812_strip_t)i, r, g, b);
+    }
+}
+
 void Driver_WS2812_Clear(ws2812_strip_t strip)
 {
     Driver_WS2812_SetAllRGB(strip, 0U, 0U, 0U);
@@ -284,4 +293,28 @@ bool Driver_WS2812_Refresh(ws2812_strip_t strip)
 
     prv_ws2812_encode_strip(ctx);
     return bsp_pwm_start_dma_waveform(ctx->pwm_ch, ctx->waveform_buf, ctx->waveform_len);
+}
+
+bool Driver_WS2812_RefreshBlocking(ws2812_strip_t strip, uint32_t timeout_us)
+{
+    if (!Driver_WS2812_Refresh(strip)) {
+        return false;
+    }
+
+    return prv_ws2812_wait_all_idle(timeout_us);
+}
+
+bool Driver_WS2812_ApplySolidColorAll(ws2812_rgb_t color, uint32_t timeout_us)
+{
+    uint8_t i;
+
+    Driver_WS2812_SetAllStripsRGB(color.r, color.g, color.b);
+
+    for (i = 0U; i < WS2812_STRIP_MAX; i++) {
+        if (!Driver_WS2812_RefreshBlocking((ws2812_strip_t)i, timeout_us)) {
+            return false;
+        }
+    }
+
+    return true;
 }

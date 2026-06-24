@@ -904,6 +904,16 @@
               <FilePath>..\Task\task_sensor.c</FilePath>
             </File>
             <File>
+              <FileName>task_led.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\task_led.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_led.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Task\task_led.h</FilePath>
+            </File>
+            <File>
               <FileName>task_shell_transport_nrt.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Task\task_shell_transport_nrt.c</FilePath>
