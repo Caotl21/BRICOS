@@ -63,6 +63,9 @@ class ShellClient:
         "echo",
         "sysmode",
         "momode",
+        "log",
+        "persistlog",
+        "persist_log",
         "fault",
         "reboot",
         "thruster",
@@ -104,6 +107,8 @@ class ShellClient:
     RECONNECT_RETRY_SEC = 0.3
     BOOT_STATUS_DUP_GUARD_SEC = 1.0
     BOOT_STATUS_STARTUP_SETTLE_SEC = 3.0
+    PROMPT_REFRESH_DELAY_SEC = 0.15
+    PARTIAL_LINE_FLUSH_SEC = 0.15
     SHELL_BOOT_STATUS_TEXT = "startup_success"
 
     @staticmethod
@@ -130,6 +135,8 @@ class ShellClient:
         self._shell_ready_since_ts = 0.0
         self._rx_line_buf = bytearray()
         self._rx_last_was_cr = False
+        self._last_rx_byte_ts = 0.0
+        self._next_prompt_refresh_ts = 0.0
 
     def send_shell_line(self, line: str):
         payload = line.encode("ascii", errors="ignore") + b"\r\n"
@@ -152,6 +159,7 @@ class ShellClient:
             self._shell_ready = False
             self._shell_ready_since_ts = 0.0
             self.line = ""
+            self._next_prompt_refresh_ts = 0.0
             self._redraw_input_unlocked()
 
     def _print_shell_intro_unlocked(self):
@@ -170,6 +178,7 @@ class ShellClient:
             self._shell_ready = True
             self.line = ""
             self._shell_ready_since_ts = time.monotonic()
+            self._next_prompt_refresh_ts = self._shell_ready_since_ts + self.PROMPT_REFRESH_DELAY_SEC
             sys.stdout.write("\r\n")
             self._print_shell_intro_unlocked()
             self._redraw_input_unlocked()
@@ -177,6 +186,7 @@ class ShellClient:
     def _print_async(self, text: str):
         with self.lock:
             sys.stdout.write("\r\033[2K" + text + "\r\n")
+            self._next_prompt_refresh_ts = time.monotonic() + self.PROMPT_REFRESH_DELAY_SEC
             self._redraw_input_unlocked()
 
     def _redraw_input_unlocked(self):
@@ -219,6 +229,12 @@ class ShellClient:
                 pool = ["request", "set"]
             elif (arg_index == 2) and (len(args_before) >= 1) and (args_before[0].lower() == "set"):
                 pool = self.MOMODE_TARGETS
+        elif cmd == "fault":
+            if arg_index == 1:
+                pool = ["clear_overflow"]
+        elif cmd in ("log", "persistlog", "persist_log"):
+            if arg_index == 1:
+                pool = ["clear"]
         elif cmd == "servo":
             if arg_index == 1:
                 pool = ["set"]
@@ -464,7 +480,33 @@ class ShellClient:
 
         self._print_async(text)
 
+    def _flush_partial_rx_line(self, force: bool = False):
+        if not self._rx_line_buf:
+            return
+
+        now = time.monotonic()
+        if (not force) and ((now - self._last_rx_byte_ts) < self.PARTIAL_LINE_FLUSH_SEC):
+            return
+
+        text = self._rx_line_buf.decode("utf-8", errors="replace")
+        self._rx_line_buf.clear()
+        self._rx_last_was_cr = False
+        self._handle_rx_line(text)
+
+    def _maybe_refresh_prompt(self):
+        if self._next_prompt_refresh_ts <= 0.0:
+            return
+
+        now = time.monotonic()
+        if now < self._next_prompt_refresh_ts:
+            return
+
+        with self.lock:
+            self._next_prompt_refresh_ts = 0.0
+            self._redraw_input_unlocked()
+
     def _process_rx_bytes(self, data: bytes):
+        self._last_rx_byte_ts = time.monotonic()
         for byte in data:
             if byte in (0x0D, 0x0A):
                 if byte == 0x0A and self._rx_last_was_cr:
@@ -496,9 +538,12 @@ class ShellClient:
                 continue
 
             if not data:
+                self._flush_partial_rx_line(force=False)
+                self._maybe_refresh_prompt()
                 continue
 
             self._process_rx_bytes(data)
+            self._maybe_refresh_prompt()
 
     def run(self):
         enable_windows_virtual_terminal()

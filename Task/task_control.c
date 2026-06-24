@@ -406,9 +406,9 @@ static void prv_pause_standby_tasks(control_fsm_ctx_t *ctx)
     if (MS5837_Task_Handler != NULL) {
         vTaskSuspend(MS5837_Task_Handler);
     }
-    if (Power_Task_Handler != NULL) {
-        vTaskSuspend(Power_Task_Handler);
-    }
+    // if (Power_Task_Handler != NULL) {
+    //     vTaskSuspend(Power_Task_Handler);
+    // }
     if (DHT11_Task_Handler != NULL) {
         vTaskSuspend(DHT11_Task_Handler);
     }
@@ -442,11 +442,11 @@ static void prv_resume_standby_tasks(control_fsm_ctx_t *ctx)
         Bot_Task_LastTick_Reset(TASK_ID_MS5837);
         LOG_INFO("MS5837 task resumed");
     }
-    if (Power_Task_Handler != NULL) {
-        vTaskResume(Power_Task_Handler);
-        Bot_Task_LastTick_Reset(TASK_ID_POWER);
-        LOG_INFO("Power task resumed");
-    }
+    // if (Power_Task_Handler != NULL) {
+    //     vTaskResume(Power_Task_Handler);
+    //     Bot_Task_LastTick_Reset(TASK_ID_POWER);
+    //     LOG_INFO("Power task resumed");
+    // }
     if (DHT11_Task_Handler != NULL) {
         vTaskResume(DHT11_Task_Handler);
         Bot_Task_LastTick_Reset(TASK_ID_DHT11);

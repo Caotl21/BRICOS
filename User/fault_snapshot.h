@@ -6,5 +6,6 @@
 
 bool System_FaultSnapshot_SaveStackOverflowTask(const char *task_name);
 bool System_FaultSnapshot_LoadLastStackOverflowTask(char *task_name, uint32_t task_name_size);
+bool System_FaultSnapshot_ClearStackOverflowTask(void);
 
 #endif // FAULT_SNAPSHOT_H
