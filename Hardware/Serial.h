@@ -26,5 +26,7 @@ void UART_SendByte(uint8_t byte);
 void UART_SendInt(int32_t value);
 void UART_SendHex(uint32_t value);
 
+void Debug_SendString(char *String);
+
 
 #endif

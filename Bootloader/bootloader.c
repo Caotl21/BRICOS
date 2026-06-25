@@ -721,7 +721,7 @@ static int32_t Process_YmodemDownload(uint8_t app_num)
 /* ============ 命令处理 ============ */
 
 /**
- * @brief  处理来自USART1的调试命令
+ * @brief  处理来自USART3的调试命令
  * @param  cmd: 收到的命令字符
  */
 static void Bootloader_ProcessCommand(uint8_t cmd)
@@ -844,9 +844,10 @@ void Bootloader_CommandLoop(void)
 
     while (1)
     {
-        if (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) != RESET)
+        if (USART_GetFlagStatus(USART3, USART_FLAG_RXNE) != RESET)
         {
-            cmd = USART_ReceiveData(USART1);
+						
+            cmd = USART_ReceiveData(USART3);
             Bootloader_ProcessCommand(cmd);
         }
     }

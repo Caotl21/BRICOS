@@ -9,64 +9,212 @@ uint8_t Serial_RxFlag;		//定义串口接收的标志位变量
 
 /* ============ UART 函数 ============ */
 
+static void USART1_Init(uint32_t baudrate)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    USART_InitTypeDef USART_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    // 1. 开启时钟 (注意：USART1 挂载在 APB2 高速总线上)
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE); // 关键修改：APB1 改为 APB2
+
+    // 2. 配置引脚复用
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_USART1);   // PA9 -> USART1_TX
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_USART1);  // PA10 -> USART1_RX
+
+    // 3. GPIO 初始化
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9 | GPIO_Pin_10;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    // 4. UART 参数配置
+    USART_InitStructure.USART_BaudRate = baudrate;
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    USART_Init(USART1, &USART_InitStructure);
+
+    // 5. 开启接收中断
+    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
+
+    // 6. NVIC 配置
+    NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;         // 修改中断通道为 USART1
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    // 7. 使能 USART1
+    USART_Cmd(USART1, ENABLE);
+}
+
+static void USART3_Init(uint32_t baudrate)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    USART_InitTypeDef USART_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    // 1. 开启时钟：USART3 挂在 APB1，GPIO B 挂在 AHB1
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
+
+    // 2. 配置引脚复用：将 PB10, PB11 映射到 AF7 (USART3)
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_USART3); // PB10 -> USART3_TX
+    GPIO_PinAFConfig(GPIOB, GPIO_PinSource11, GPIO_AF_USART3); // PB11 -> USART3_RX
+
+    // 3. GPIO 初始化
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 | GPIO_Pin_11;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;      // 复用模式
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;    // 推挽输出
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;      // 上拉
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+    // 4. USART 参数配置
+    USART_InitStructure.USART_BaudRate = baudrate;
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    USART_Init(USART3, &USART_InitStructure);
+
+    // 5. 开启接收中断 (RXNE)
+    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);
+
+    // 6. NVIC 中断优先级配置
+    NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;          // 改为 USART3 的中断通道
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;  // 抢占优先级
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;         // 子优先级
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    // 7. 使能 USART3
+    USART_Cmd(USART3, ENABLE);
+}
+
+static void UART4_Init(uint32_t baudrate)
+{
+    GPIO_InitTypeDef GPIO_InitStructure;
+    USART_InitTypeDef USART_InitStructure;
+    NVIC_InitTypeDef NVIC_InitStructure;
+
+    // 1. 开启时钟
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART4, ENABLE);
+
+    // 2. 配置引脚复用
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource0, GPIO_AF_UART4);   // PA0 -> UART4_TX
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource1, GPIO_AF_UART4);   // PA1 -> UART4_RX
+
+    // 3. GPIO 初始化
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    // 4. UART 参数配置
+    USART_InitStructure.USART_BaudRate = baudrate;
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+    USART_Init(UART4, &USART_InitStructure);
+
+    // 5. 开启接收中断
+    USART_ITConfig(UART4, USART_IT_RXNE, ENABLE);
+
+    // 6. NVIC 配置
+    NVIC_InitStructure.NVIC_IRQChannel = UART4_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+
+    // 7. 使能 UART4
+    USART_Cmd(UART4, ENABLE);
+}
+
 /**
- * @brief  UART初始化 (USART1 + USART2, 115200, 8N1)
- *         USART1: PA9(TX), PA10(RX) - 调试/命令
- *         USART2: PA2(TX), PA3(RX)  - Ymodem通信
+ * @brief  UART初始化 (USART3 + USART4, 115200, 8N1)
+ *         UART4: PA0(TX), PA1(RX) - 调试/命令
+ *         USART3: PB10(TX), PB11(RX)  - Ymodem通信
  */
 void UART_Init(void)
 {
-    GPIO_InitTypeDef  GPIO_InitStructure;
-    USART_InitTypeDef USART_InitStructure;
+//    GPIO_InitTypeDef  GPIO_InitStructure;
+//    USART_InitTypeDef USART_InitStructure;
 
-    /* 使能时钟 - F407: GPIO在AHB1上 */
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
+//    /* 使能时钟 - F407: GPIO在AHB1上 */
+//    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+//		RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+//    RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
+//    RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART4, ENABLE);
 
-    /* GPIO 复用映射（F407 必须） */
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource9,  GPIO_AF_USART1);
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_USART1);
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource2,  GPIO_AF_USART2);
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource3,  GPIO_AF_USART2);
+//    /* GPIO 复用映射（F407 必须） */
+//    GPIO_PinAFConfig(GPIOB, GPIO_PinSource10,  GPIO_AF_USART3);
+//    GPIO_PinAFConfig(GPIOB, GPIO_PinSource11, GPIO_AF_USART3);
+//    GPIO_PinAFConfig(GPIOA, GPIO_PinSource0,  GPIO_AF_UART4);
+//    GPIO_PinAFConfig(GPIOA, GPIO_PinSource1,  GPIO_AF_UART4);
 
-    /* USART1 引脚: PA9(TX), PA10(RX) */
-    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_9 | GPIO_Pin_10;
-    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF;
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_UP;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
+//    /* USART3 引脚: PB10(TX), PB11(RX) */
+//    GPIO_InitStructure.GPIO_Pin   = GPIO_Pin_10 | GPIO_Pin_11;
+//    GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_AF;
+//    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+//    GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_UP;
+//    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+//    GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-    /* USART2 引脚: PA2(TX), PA3(RX) */
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
+//    /* UART4 引脚: PA0(TX), PA1(RX) */
+//    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
+//    GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-    /* USART 参数配置 */
-    USART_InitStructure.USART_BaudRate            = 115200;
-    USART_InitStructure.USART_WordLength           = USART_WordLength_8b;
-    USART_InitStructure.USART_StopBits             = USART_StopBits_1;
-    USART_InitStructure.USART_Parity               = USART_Parity_No;
-    USART_InitStructure.USART_HardwareFlowControl  = USART_HardwareFlowControl_None;
-    USART_InitStructure.USART_Mode                 = USART_Mode_Rx | USART_Mode_Tx;
+//    /* USART 参数配置 */
+//    USART_InitStructure.USART_BaudRate            = 115200;
+//    USART_InitStructure.USART_WordLength           = USART_WordLength_8b;
+//    USART_InitStructure.USART_StopBits             = USART_StopBits_1;
+//    USART_InitStructure.USART_Parity               = USART_Parity_No;
+//    USART_InitStructure.USART_HardwareFlowControl  = USART_HardwareFlowControl_None;
+//    USART_InitStructure.USART_Mode                 = USART_Mode_Rx | USART_Mode_Tx;
 
-    USART_Init(USART1, &USART_InitStructure);
-    USART_Init(USART2, &USART_InitStructure);
+//    USART_Init(USART3, &USART_InitStructure);
+//    USART_Init(UART4, &USART_InitStructure);
 
-    USART_Cmd(USART1, ENABLE);
-    USART_Cmd(USART2, ENABLE);
+//    USART_Cmd(USART3, ENABLE);
+//    USART_Cmd(UART4, ENABLE);
+			USART1_Init(115200);
+			USART3_Init(115200);
+			UART4_Init(115200);
 }
 
 
 
+
+
 /**
-  * 函    数：使用UART1串口发送一个字节
+  * 函    数：使用UART4串口发送一个字节
   * 参    数：Byte 要发送的一个字节
   * 返 回 值：无
   */
 void Serial_SendByte(uint8_t Byte)
 {
-	while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+	  while (USART_GetFlagStatus(UART4, USART_FLAG_TXE) == RESET);
+    USART_SendData(UART4, Byte);
+    while (USART_GetFlagStatus(UART4, USART_FLAG_TC) == RESET);
+}
+
+void Debug_SendByte(uint8_t Byte)
+{
+	  while (USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
     USART_SendData(USART1, Byte);
     while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
 }
@@ -123,6 +271,15 @@ void Serial_SendString(char *String)
 	for (i = 0; String[i] != '\0'; i ++)//遍历字符数组（字符串），遇到字符串结束标志位后停止
 	{
 		Serial_SendByte(String[i]);		//依次调用Serial_SendByte发送每个字节数据
+	}
+}
+
+void Debug_SendString(char *String)
+{
+	uint8_t i;
+	for (i = 0; String[i] != '\0'; i ++)//遍历字符数组（字符串），遇到字符串结束标志位后停止
+	{
+		Debug_SendByte(String[i]);		//依次调用Serial_SendByte发送每个字节数据
 	}
 }
 

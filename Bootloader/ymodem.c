@@ -47,8 +47,8 @@ void Ymodem_IncTick(void)
  */
 void Ymodem_SendByte(uint8_t c)
 {
-    while (USART_GetFlagStatus(USART2, USART_FLAG_TXE) == RESET);
-    USART_SendData(USART2, c);
+    while (USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
+    USART_SendData(USART3, c);
 }
 
 /**
@@ -59,7 +59,7 @@ int32_t Ymodem_ReceiveByte(uint8_t *c, uint32_t timeout)
 {
     uint32_t start = GetTick();
     
-    while (USART_GetFlagStatus(USART2, USART_FLAG_RXNE) == RESET)
+    while (USART_GetFlagStatus(USART3, USART_FLAG_RXNE) == RESET)
     {
         if ((GetTick() - start) > timeout)
         {
@@ -67,7 +67,7 @@ int32_t Ymodem_ReceiveByte(uint8_t *c, uint32_t timeout)
         }
     }
     
-    *c = USART_ReceiveData(USART2);
+    *c = USART_ReceiveData(USART3);
     return 0;
 }
 
