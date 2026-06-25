@@ -1,4 +1,8 @@
 #include "boot_flag.h"
+#include "Serial.h"
+#include "Delay.h"
+
+#define BOOT_DIAG_FLASH_SAVE_IRQ_GUARD  1
 
 /**
  * @brief  擦除 Boot Flag 扇区 (Sector 1)
@@ -6,12 +10,26 @@
  */
 static FLASH_Status Flag_EraseSector(void)
 {
+    UART_SendString("Erasing Boot Flag sector...\r\n");
     FLASH_Status status;
+    UART_SendString("FLASH_SR before clear: ");
+    UART_SendHex(FLASH->SR);
+    UART_SendString("\r\n");
     FLASH_Unlock();
+    UART_SendString("Clearing FLASH flags...\r\n");
     FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR |
                     FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
+    UART_SendString("FLASH_SR after clear: ");
+    UART_SendHex(FLASH->SR);
+    UART_SendString("\r\n");
+    UART_SendString("Erasing sector...\r\n");
+    //Delay_ms(2000);
     status = FLASH_EraseSector(APP_FLAG_SECTOR, VoltageRange_3);
+    UART_SendString("Erase status: ");
+    UART_SendByte('0' + status);
+    UART_SendString("\r\n");
     FLASH_Lock();
+    UART_SendString("Boot Flag sector erase completed.\r\n");
     return status;
 }
 
@@ -22,6 +40,7 @@ static FLASH_Status Flag_EraseSector(void)
  */
 static FLASH_Status Flag_Write(BootFlag_t *flag)
 {
+    UART_SendString("Writing Boot Flag to Flash...\r\n");
     FLASH_Status status = FLASH_COMPLETE;
     uint32_t *src = (uint32_t *)flag;
     uint32_t addr = APP_FLAG_ADDR;
@@ -83,10 +102,38 @@ void BootFlag_Read(BootFlag_t *out)
  */
 int32_t BootFlag_Save(BootFlag_t *flag)
 {
+    uint32_t primask;
+
+    UART_SendString("Saving Boot Flag...\r\n");
+#if BOOT_DIAG_FLASH_SAVE_IRQ_GUARD
+    primask = __get_PRIMASK();
+    __disable_irq();
+#else
+    primask = 1;
+#endif
     if (Flag_EraseSector() != FLASH_COMPLETE)
+    {
+        if (primask == 0)
+        {
+            __enable_irq();
+        }
+        UART_SendString("Error: Failed to erase Boot Flag sector.\r\n");
         return -1;
+    }
     if (Flag_Write(flag) != FLASH_COMPLETE)
-        return -1;
+    {
+        if (primask == 0)
+        {
+            __enable_irq();
+        }
+        UART_SendString("Error: Failed to write Boot Flag.\r\n");
+        return -2;
+    }
+    if (primask == 0)
+    {
+        __enable_irq();
+    }
+    UART_SendString("Boot Flag saved successfully.\r\n");
     return 0;
 }
 

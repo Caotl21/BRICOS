@@ -191,9 +191,9 @@ void UART_Init(void)
 
 //    USART_Cmd(USART3, ENABLE);
 //    USART_Cmd(UART4, ENABLE);
-			USART1_Init(115200);
-			USART3_Init(115200);
-			UART4_Init(115200);
+			//USART1_Init(115200);
+    USART3_Init(115200);
+    UART4_Init(115200);
 }
 
 

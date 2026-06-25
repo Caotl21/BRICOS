@@ -41,10 +41,22 @@
 /******************************************************************************/
 
 static volatile uint32_t g_ms_tick = 0;
+static volatile uint32_t g_usart3_irq_count = 0;
+static volatile uint32_t g_uart4_irq_count = 0;
 
 uint32_t Timebase_GetTickMs(void)
 {
     return g_ms_tick;
+}
+
+uint32_t BootDiag_GetUSART3IrqCount(void)
+{
+    return g_usart3_irq_count;
+}
+
+uint32_t BootDiag_GetUART4IrqCount(void)
+{
+    return g_uart4_irq_count;
 }
 
 
@@ -162,6 +174,26 @@ void SysTick_Handler(void)
 /*void PPP_IRQHandler(void)
 {
 }*/
+
+void USART3_IRQHandler(void)
+{
+    g_usart3_irq_count++;
+
+    while ((USART3->SR & USART_SR_RXNE) != 0U)
+    {
+        (void)USART3->DR;
+    }
+}
+
+void UART4_IRQHandler(void)
+{
+    g_uart4_irq_count++;
+
+    while ((UART4->SR & USART_SR_RXNE) != 0U)
+    {
+        (void)UART4->DR;
+    }
+}
 
 
 /**

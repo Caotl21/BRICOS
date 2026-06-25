@@ -45,6 +45,8 @@ void PendSV_Handler(void);
 void SysTick_Handler(void);
 
 uint32_t Timebase_GetTickMs(void);
+uint32_t BootDiag_GetUSART3IrqCount(void);
+uint32_t BootDiag_GetUART4IrqCount(void);
 
 #ifdef __cplusplus
 }

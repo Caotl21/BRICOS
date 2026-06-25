@@ -309,13 +309,19 @@ void Bootloader_Run(void)
  */
 void Bootloader_IncrementBootAttempts(void)
 {
+    UART_SendString("Incrementing boot attempts...\r\n");
     BootFlag_t boot_flag;
     BootFlag_Read(&boot_flag);
+    UART_SendString("Read ok\r\n");
 
     boot_flag.boot_attempts++;
     boot_flag.boot_count++;
 
-    BootFlag_Save(&boot_flag);
+    int32_t res;
+    res = BootFlag_Save(&boot_flag);
+    UART_SendString("Result is ");
+    UART_SendByte('0' + res);
+    UART_SendString("\r\n");
 }
 
 
