@@ -111,7 +111,7 @@ int main(void)
         Main_EarlyPrint("BOOT: MS5837 failed\r\n");
     }
 
-    //Driver_DHT11_Init();
+    Driver_DHT11_Init();
     if (Driver_Power_Init()) {
         Main_EarlyPrint("BOOT: Power done\r\n");
     } else {

@@ -555,9 +555,9 @@ static shell_ret_t prv_thruster_mode_guard(shell_cmd_ctx_t *ctx)
 {
     bot_sys_mode_e mode = System_ModeManager_GetSysMode();
 
-    if ((mode != SYS_MODE_STANDBY) && (mode != SYS_MODE_ACTIVE_DISARMED)) {
+    if ((mode != SYS_MODE_STANDBY) && (mode != SYS_MODE_ACTIVE_DISARMED) && (mode != SYS_MODE_MOTION_ARMED)) {
         System_ShellCore_Printf(ctx,
-                                "blocked: mode=%u, allow standby/disarmed only",
+                                "blocked: mode=%u, allow standby/disarmed/armed only",
                                 (unsigned int)mode);
         return SHELL_RET_MODE_BLOCKED;
     }

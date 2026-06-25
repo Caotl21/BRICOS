@@ -572,6 +572,7 @@ static void prv_armed_enter(control_fsm_ctx_t *ctx)
     ctx->last_armed_motion_mode = ctx->current_motion_mode;
     Task_LED_SetMode(SYS_MODE_MOTION_ARMED);
     Driver_PSWITCH_ON();
+    Driver_Thruster_Init();
 
     LOG_INFO("ARMED entry spin start");
     prv_armed_entry_spin_once();
@@ -660,8 +661,8 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
             ctx->wrench_out.force_y = ctx->target.cmd.stab_cmd.sway;
             break;
 
-        case MOTION_STATE_AUTO:
-            /* 预留：自动模式控制逻辑 */
+        case MOTION_STATE_DEBUG:
+            /* 预留：调试模式控制逻辑 */
             break;
     }
 
