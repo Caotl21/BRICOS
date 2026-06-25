@@ -78,7 +78,9 @@ static led_effect_t prv_mode_to_base_effect(bot_sys_mode_e mode)
             effect.period_ms = LED_STANDBY_BREATH_MS;
             break;
         case SYS_MODE_ACTIVE_DISARMED:
-            effect.color = WS2812_COLOR_BLUE;
+            effect.type = LED_EFFECT_CHASE;
+            effect.color = WS2812_COLOR_PURPLE;
+            effect.period_ms = LED_DEFAULT_EFFECT_PERIOD;
             break;
         case SYS_MODE_MOTION_ARMED:
             effect.color = WS2812_COLOR_GREEN;
