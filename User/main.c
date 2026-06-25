@@ -103,7 +103,7 @@ int main(void)
     System_ModeManager_Init();
     Main_EarlyPrint("BOOT: Core services ready\r\n");
 	
-    //Driver_IMU_Init();
+    Driver_IMU_Init();
     Main_EarlyPrint("BOOT: MS5837 init...\r\n");
     if (Driver_Ms5837_Init()) {
         Main_EarlyPrint("BOOT: MS5837 done\r\n");

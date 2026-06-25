@@ -582,6 +582,7 @@ static void prv_armed_enter(control_fsm_ctx_t *ctx)
 static void prv_armed_run(control_fsm_ctx_t *ctx)
 {
     int i;
+    uint8_t motion_mode_changed = 0u;
 
     memset(&ctx->wrench_out, 0, sizeof(ctx->wrench_out));
     memset(ctx->thruster_pwm, 0, sizeof(ctx->thruster_pwm));
@@ -589,6 +590,14 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
     if (ctx->current_motion_mode != ctx->last_armed_motion_mode) {
         Reset_All_Controllers();
         ctx->last_armed_motion_mode = ctx->current_motion_mode;
+        motion_mode_changed = 1u;
+    }
+
+    if (ctx->current_motion_mode == MOTION_STATE_DEBUG) {
+        if (motion_mode_changed) {
+            prv_set_idle_output();
+        }
+        return;
     }
 
     // if (ctx->target.target_mode != (uint8_t)ctx->current_motion_mode) {
@@ -661,8 +670,8 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
             ctx->wrench_out.force_y = ctx->target.cmd.stab_cmd.sway;
             break;
 
-        case MOTION_STATE_DEBUG:
-            /* 预留：调试模式控制逻辑 */
+        case MOTION_STATE_AUTO:
+            /* 预留：自动模式控制逻辑 */
             break;
     }
 

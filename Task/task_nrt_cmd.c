@@ -248,7 +248,7 @@ static void On_Receive_Motion_Mode_Cmd(const uint8_t *payload, uint16_t len){
 
     bool res;
     bot_run_mode_e new_mode = (bot_run_mode_e)payload[0];
-    if(new_mode > MOTION_STATE_AUTO) {
+    if(new_mode > MOTION_STATE_DEBUG) {
         Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_CPU);
         return;
     }

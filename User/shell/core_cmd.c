@@ -59,6 +59,7 @@ static const char *prv_motion_mode_str(bot_run_mode_e mode)
         case MOTION_STATE_MANUAL:    return "MANUAL";
         case MOTION_STATE_STABILIZE: return "STABILIZE";
         case MOTION_STATE_AUTO:      return "AUTO";
+        case MOTION_STATE_DEBUG:     return "DEBUG";
         default:                     return "UNKNOWN";
     }
 }
@@ -106,6 +107,10 @@ static uint8_t prv_parse_motion_mode(const char *s, bot_run_mode_e *out_mode)
         *out_mode = MOTION_STATE_AUTO;
         return 1u;
     }
+    if (prv_streq_ignore_case(s, "debug")) {
+        *out_mode = MOTION_STATE_DEBUG;
+        return 1u;
+    }
     return 0u;
 }
 
@@ -118,7 +123,7 @@ static shell_ret_t prv_cmd_help(shell_cmd_ctx_t *ctx, int argc, char **argv)
                             "  help\r\n"
                             "  echo <text>\r\n"
                             "  sysmode request | sysmode set standby|disarmed|armed|failsafe\r\n"
-                            "  momode request | momode set manual|stabilize|auto\r\n"
+                            "  momode request | momode set manual|stabilize|auto|debug\r\n"
                             "  log clear\r\n"
                             "  persistlog clear\r\n"
                             "  persist_log clear\r\n"
@@ -196,7 +201,7 @@ static shell_ret_t prv_cmd_momode(shell_cmd_ctx_t *ctx, int argc, char **argv)
     if (argc == 1) {
         System_ShellCore_Printf(ctx,
                                 "usage: momode [request | set <target>]\r\n"
-                                "              <target>: manual | stabilize | auto");
+                                "              <target>: manual | stabilize | auto | debug");
         return SHELL_RET_OK;
     }
 
@@ -212,7 +217,7 @@ static shell_ret_t prv_cmd_momode(shell_cmd_ctx_t *ctx, int argc, char **argv)
             System_ShellCore_Printf(ctx, "invalid target: %s\r\n", argv[2]);
             System_ShellCore_Printf(ctx,
                                     "usage: momode [request | set <target>]\r\n"
-                                    "              <target>: manual | stabilize | auto");
+                                    "              <target>: manual | stabilize | auto | debug");
             return SHELL_RET_BAD_ARGS;
         }
 
@@ -225,7 +230,7 @@ static shell_ret_t prv_cmd_momode(shell_cmd_ctx_t *ctx, int argc, char **argv)
 
     System_ShellCore_Printf(ctx,
                             "usage: momode [request | set <target>]\r\n"
-                            "              <target>: manual | stabilize | auto");
+                            "              <target>: manual | stabilize | auto | debug");
     return SHELL_RET_BAD_ARGS;
 }
 
@@ -279,7 +284,7 @@ static shell_ret_t prv_cmd_reboot(shell_cmd_ctx_t *ctx, int argc, char **argv)
 EXPORT_SHELL_CMD("help", "show command list", prv_cmd_help, SHELL_PERM_READONLY, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("echo", "echo text", prv_cmd_echo, SHELL_PERM_READONLY, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("sysmode", "sysmode request | sysmode set standby|disarmed|armed|failsafe", prv_cmd_sysmode, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
-EXPORT_SHELL_CMD("momode", "momode request | momode set manual|stabilize|auto", prv_cmd_momode, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
+EXPORT_SHELL_CMD("momode", "momode request | momode set manual|stabilize|auto|debug", prv_cmd_momode, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("log", "log clear (clear persisted logs)", prv_cmd_log, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("persistlog", "persistlog clear", prv_cmd_log, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("persist_log", "persist_log clear", prv_cmd_log, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
