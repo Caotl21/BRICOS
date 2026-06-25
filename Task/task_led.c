@@ -10,7 +10,7 @@
 #define LED_FRAME_PERIOD_MS        50u
 #define LED_REFRESH_TIMEOUT_US     20000u
 #define LED_DEFAULT_EFFECT_PERIOD  1000u
-#define LED_STANDBY_BREATH_MS      2000u
+#define LED_BREATH_MS               2000u
 #define LED_FAILSAFE_STROBE_MS     200u
 
 typedef enum {
@@ -75,15 +75,15 @@ static led_effect_t prv_mode_to_base_effect(bot_sys_mode_e mode)
         case SYS_MODE_STANDBY:
             effect.type = LED_EFFECT_BREATH;
             effect.color = WS2812_COLOR_WHITE;
-            effect.period_ms = LED_STANDBY_BREATH_MS;
+            effect.period_ms = LED_BREATH_MS;
             break;
         case SYS_MODE_ACTIVE_DISARMED:
-            effect.type = LED_EFFECT_CHASE;
-            effect.color = WS2812_COLOR_PURPLE;
-            effect.period_ms = LED_DEFAULT_EFFECT_PERIOD;
+            effect.type = LED_EFFECT_BREATH;
+            effect.color = WS2812_COLOR_MAGENTA;
+            effect.period_ms = LED_BREATH_MS;
             break;
         case SYS_MODE_MOTION_ARMED:
-            effect.color = WS2812_COLOR_GREEN;
+            effect.color = WS2812_COLOR_CYAN;
             break;
         case SYS_MODE_FAILSAFE:
             effect.color = WS2812_COLOR_BLACK;

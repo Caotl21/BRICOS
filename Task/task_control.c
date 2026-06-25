@@ -12,6 +12,7 @@
 #include "driver_hydrocore.h"
 #include "driver_imu.h"
 #include "driver_thruster.h"
+#include "driver_pswitch.h"
 
 #include "task_comm.h"
 #include "task_control.h"
@@ -66,9 +67,9 @@ struct control_fsm_ctx_s {
 
     /* STANDBY 子状态数据 */
     uint8_t standby_tasks_paused;
-    uint8_t standby_kick_active;
-    uint16_t standby_cycle_counter;
-    uint16_t standby_kick_cycles_left;
+    // uint8_t standby_kick_active;
+    // uint16_t standby_cycle_counter;
+    // uint16_t standby_kick_cycles_left;
 
     Bot_Wrench_t wrench_out;
     float thruster_pwm[THRUSTER_COUNT];
@@ -483,47 +484,48 @@ static void prv_standby_enter(control_fsm_ctx_t *ctx)
     prv_set_idle_output();
     prv_pause_standby_tasks(ctx);
     Task_LED_SetMode(SYS_MODE_STANDBY);
+    Driver_PSWITCH_OFF();
 
-    ctx->standby_kick_active = 0u;
-    ctx->standby_cycle_counter = 0u;
-    ctx->standby_kick_cycles_left = 0u;
+    // ctx->standby_kick_active = 0u;
+    // ctx->standby_cycle_counter = 0u;
+    // ctx->standby_kick_cycles_left = 0u;
 }
 
 static void prv_standby_run(control_fsm_ctx_t *ctx)
 {
-    // 非脉冲状态下计数器递增，达到阈值时进入脉冲状态
-    if (!ctx->standby_kick_active) {
-        // 到达脉冲触发周期，进入脉冲状态  
-        if ((uint16_t)(ctx->standby_cycle_counter + 1u) >= (uint16_t)STANDBY_ESC_KICK_INTERVAL_CYCLES) {
-            uint16_t duration_cycles = (uint16_t)STANDBY_ESC_KICK_DURATION_CYCLES;
-            if (duration_cycles == 0u) {
-                duration_cycles = 1u;
-            }
-            ctx->standby_kick_active = 1u;                      ///< 进入脉冲状态
-            ctx->standby_kick_cycles_left = duration_cycles;    ///< 设置脉冲持续周期
-            ctx->standby_cycle_counter = 0u;                    ///< 重置循环计数器
-            LOG_INFO("STANDBY kick start");
-        } else {
-            ctx->standby_cycle_counter++;
-        }
-    }
+    // // 非脉冲状态下计数器递增，达到阈值时进入脉冲状态
+    // if (!ctx->standby_kick_active) {
+    //     // 到达脉冲触发周期，进入脉冲状态  
+    //     if ((uint16_t)(ctx->standby_cycle_counter + 1u) >= (uint16_t)STANDBY_ESC_KICK_INTERVAL_CYCLES) {
+    //         uint16_t duration_cycles = (uint16_t)STANDBY_ESC_KICK_DURATION_CYCLES;
+    //         if (duration_cycles == 0u) {
+    //             duration_cycles = 1u;
+    //         }
+    //         ctx->standby_kick_active = 1u;                      ///< 进入脉冲状态
+    //         ctx->standby_kick_cycles_left = duration_cycles;    ///< 设置脉冲持续周期
+    //         ctx->standby_cycle_counter = 0u;                    ///< 重置循环计数器
+    //         LOG_INFO("STANDBY kick start");
+    //     } else {
+    //         ctx->standby_cycle_counter++;
+    //     }
+    // }
     
-    // 根据当前是否处于脉冲状态，设置输出
-    if (ctx->standby_kick_active) {
-        prv_apply_standby_kick_output();
-        if (ctx->standby_kick_cycles_left > 0u) {
-            ctx->standby_kick_cycles_left--;
-        } 
+    // // 根据当前是否处于脉冲状态，设置输出
+    // if (ctx->standby_kick_active) {
+    //     prv_apply_standby_kick_output();
+    //     if (ctx->standby_kick_cycles_left > 0u) {
+    //         ctx->standby_kick_cycles_left--;
+    //     } 
 
-        // 脉冲持续周期为standby_kick_cycles_left，递减至0后退出脉冲状态
-        if (ctx->standby_kick_cycles_left == 0u) {
-            ctx->standby_kick_active = 0u;
-            prv_set_idle_output();
-            LOG_INFO("STANDBY kick end");
-        }
-    } else {
-        prv_set_idle_output();
-    }
+    //     // 脉冲持续周期为standby_kick_cycles_left，递减至0后退出脉冲状态
+    //     if (ctx->standby_kick_cycles_left == 0u) {
+    //         ctx->standby_kick_active = 0u;
+    //         prv_set_idle_output();
+    //         LOG_INFO("STANDBY kick end");
+    //     }
+    // } else {
+    //     prv_set_idle_output();
+    // }
 
     /* 进入睡眠，等待中断唤醒（UART/NVIC 等） */
     __WFI();
@@ -531,11 +533,12 @@ static void prv_standby_run(control_fsm_ctx_t *ctx)
 
 static void prv_standby_exit(control_fsm_ctx_t *ctx)
 {
-    ctx->standby_kick_active = 0u;
-    ctx->standby_kick_cycles_left = 0u;
-    ctx->standby_cycle_counter = 0u;
+    // ctx->standby_kick_active = 0u;
+    // ctx->standby_kick_cycles_left = 0u;
+    // ctx->standby_cycle_counter = 0u;
 
     prv_set_idle_output();
+    Driver_PSWITCH_OFF();
     prv_resume_standby_tasks(ctx);
 }
 
@@ -547,6 +550,7 @@ static void prv_disarmed_enter(control_fsm_ctx_t *ctx)
     Reset_All_Controllers();
     prv_set_idle_output();
     Task_LED_SetMode(SYS_MODE_ACTIVE_DISARMED);
+    Driver_PSWITCH_OFF();
 }
 
 static void prv_disarmed_run(control_fsm_ctx_t *ctx)
@@ -557,6 +561,7 @@ static void prv_disarmed_run(control_fsm_ctx_t *ctx)
 
 static void prv_disarmed_exit(control_fsm_ctx_t *ctx)
 {
+    Driver_PSWITCH_OFF();
     (void)ctx;
 }
 
@@ -566,6 +571,7 @@ static void prv_armed_enter(control_fsm_ctx_t *ctx)
     Reset_All_Controllers();
     ctx->last_armed_motion_mode = ctx->current_motion_mode;
     Task_LED_SetMode(SYS_MODE_MOTION_ARMED);
+    Driver_PSWITCH_ON();
 
     LOG_INFO("ARMED entry spin start");
     prv_armed_entry_spin_once();
@@ -674,6 +680,7 @@ static void prv_armed_exit(control_fsm_ctx_t *ctx)
 {
     Reset_All_Controllers();
     prv_set_idle_output();
+    Driver_PSWITCH_OFF();
     (void)ctx;
 }
 

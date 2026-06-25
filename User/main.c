@@ -14,6 +14,7 @@
 #include "driver_power.h"
 #include "driver_thruster.h"
 #include "driver_ws2812.h"
+#include "driver_pswitch.h"
 
 #include "shell/app_shell.h"
 #include "sys_boot_flag.h"
@@ -31,6 +32,23 @@
 #include "task_nrt_cmd.h"
 #include "task_rt_cmd.h"
 #include "task_sensor.h"
+
+static void Main_EarlyPrint(const char *text)
+{
+    uint16_t len = 0u;
+
+    if (text == NULL) {
+        return;
+    }
+
+    while ((text[len] != '\0') && (len < 255u)) {
+        len++;
+    }
+
+    if (len > 0u) {
+        bsp_uart_send_buffer(BSP_UART_DEBUG, (const uint8_t *)text, len);
+    }
+}
 
 static void Main_Log_ResetReason(void)
 {
@@ -63,22 +81,51 @@ int main(void)
 
     bsp_delay_init();
     bsp_uart_init_default();
+    Main_EarlyPrint("BRICOS System Booting...\r\n");
+    Main_EarlyPrint("BOOT: UART ready\r\n");
+
     bsp_gpio_init();
+    Main_EarlyPrint("BOOT: GPIO ready\r\n");
+
     bsp_pwm_init(0);
+    Main_EarlyPrint("BOOT: PWM ready\r\n");
+
+    Driver_PSWITCH_Init();
+    Main_EarlyPrint("BOOT: PSWITCH ready\r\n");
 
 	System_SysTick_Init(SYSCLK);
     Sys_BootFlag_MarkBootSuccess();
     System_Log_Init();
+    Main_EarlyPrint("BOOT: Log ready\r\n");
+
     Main_Log_ResetReason();
     Bot_Data_Pool_Init();
     System_ModeManager_Init();
+    Main_EarlyPrint("BOOT: Core services ready\r\n");
 	
-    Driver_IMU_Init();
-    Driver_Ms5837_Init();
-    Driver_DHT11_Init();
-    Driver_Power_Init();
+    //Driver_IMU_Init();
+    Main_EarlyPrint("BOOT: MS5837 init...\r\n");
+    if (Driver_Ms5837_Init()) {
+        Main_EarlyPrint("BOOT: MS5837 done\r\n");
+    } else {
+        Main_EarlyPrint("BOOT: MS5837 failed\r\n");
+    }
+
+    //Driver_DHT11_Init();
+    if (Driver_Power_Init()) {
+        Main_EarlyPrint("BOOT: Power done\r\n");
+    } else {
+        Main_EarlyPrint("BOOT: Power failed\r\n");
+    }
+
     Driver_Thruster_Init();
-    Driver_WS2812_Init();
+    Main_EarlyPrint("BOOT: Thruster done\r\n");
+
+    if (Driver_WS2812_Init()) {
+        Main_EarlyPrint("BOOT: WS2812 done\r\n");
+    } else {
+        Main_EarlyPrint("BOOT: WS2812 failed\r\n");
+    }
 	
 
     {
@@ -98,6 +145,7 @@ int main(void)
     Task_Monitor_Init();
 
     App_Shell_Init();
+    Main_EarlyPrint("BOOT: Tasks created, starting scheduler\r\n");
 
     LOG_INFO("======================================");
     LOG_INFO("   BRICOS System Booting...       ");
