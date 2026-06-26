@@ -257,6 +257,77 @@ static void prv_uart_tx_mutex_init(bsp_uart_port_t port)
 
 
 
+/* --- UART runtime helpers --- */
+static void prv_uart_fill_usart_config(const bsp_uart_config_t *config, USART_InitTypeDef *usart_config)
+{
+    usart_config->USART_BaudRate = config->baudrate;
+
+    if (config->data_bits == BSP_UART_DATA_9B) {
+        usart_config->USART_WordLength = USART_WordLength_9b;
+    } else {
+        usart_config->USART_WordLength = USART_WordLength_8b;
+    }
+
+    if (config->stop_bits == BSP_UART_STOP_2B) {
+        usart_config->USART_StopBits = USART_StopBits_2;
+    } else {
+        usart_config->USART_StopBits = USART_StopBits_1;
+    }
+
+    if (config->parity == BSP_UART_PARITY_EVEN) {
+        usart_config->USART_Parity = USART_Parity_Even;
+    } else if (config->parity == BSP_UART_PARITY_ODD) {
+        usart_config->USART_Parity = USART_Parity_Odd;
+    } else {
+        usart_config->USART_Parity = USART_Parity_No;
+    }
+
+    usart_config->USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    usart_config->USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+}
+
+void bsp_uart_clear_rx_pending(bsp_uart_port_t port)
+{
+    USART_TypeDef* uart;
+    volatile uint32_t temp;
+
+    if (port >= BSP_UART_MAX) {
+        return;
+    }
+
+    uart = s_uart_hw_info[port].uart_base;
+
+    while (USART_GetFlagStatus(uart, USART_FLAG_RXNE) != RESET) {
+        temp = uart->DR;
+        (void)temp;
+    }
+
+    temp = uart->SR;
+    temp = uart->DR;
+    (void)temp;
+}
+
+bool bsp_uart_reconfig(bsp_uart_port_t port, const bsp_uart_config_t *config)
+{
+    USART_InitTypeDef USART_InitStructure;
+    const uart_hw_info_t* hw;
+
+    if (port >= BSP_UART_MAX || config == NULL) {
+        return false;
+    }
+
+    hw = &s_uart_hw_info[port];
+
+    USART_DMACmd(hw->uart_base, USART_DMAReq_Rx, DISABLE);
+    USART_Cmd(hw->uart_base, DISABLE);
+    prv_uart_fill_usart_config(config, &USART_InitStructure);
+    USART_Init(hw->uart_base, &USART_InitStructure);
+    USART_Cmd(hw->uart_base, ENABLE);
+    bsp_uart_clear_rx_pending(port);
+
+    return true;
+}
+
 /* --- 注册回调函数 --- */
 void bsp_uart_register_rx_cb(bsp_uart_port_t port, bsp_uart_rx_cb_t cb) {
     if (port < BSP_UART_MAX) {

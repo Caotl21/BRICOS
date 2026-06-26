@@ -6,6 +6,7 @@
 #include "wit_c_sdk.h"
 #include "sys_log.h"
 #include <math.h>
+#include <string.h>
 
 #define IMU_FIFO_SIZE 256
 
@@ -266,6 +267,58 @@ bool Driver_IMU_JY901S_CalibrateAcc(void)
     return true;
 }
 
+
+bool Driver_IMU_JY901B_DefaultConfig(void)
+{
+    static const uint8_t unlock_cmd[5] = {0xFF, 0xAA, 0x69, 0x88, 0xB5};
+    static const uint8_t rsw_cmd[5]    = {0xFF, 0xAA, 0x02, 0x06, 0x02};
+    static const uint8_t rate_cmd[5]   = {0xFF, 0xAA, 0x03, 0x08, 0x00};
+    static const uint8_t baud_cmd[5]   = {0xFF, 0xAA, 0x04, 0x06, 0x00};
+    static const uint8_t save_cmd[5]   = {0xFF, 0xAA, 0x00, 0x00, 0x00};
+    bsp_uart_config_t config = {
+        .baudrate  = 9600,
+        .data_bits = BSP_UART_DATA_8B,
+        .stop_bits = BSP_UART_STOP_1B,
+        .parity    = BSP_UART_PARITY_NONE
+    };
+    //停止 DMA 接收，重新配置串口参数
+    bsp_uart_stop_dma_rx(BSP_UART_IMU2);
+
+    // 临时配置串口参数为 9600 波特率，8N1 模式，因为JY901B默认是9600波特率，8位数据，1位停止位，无校验
+    if (!bsp_uart_reconfig(BSP_UART_IMU2, &config)) {
+        return false;
+    }
+    //清空串口接收缓冲区，避免之前的数据干扰后续配置
+    bsp_uart_clear_rx_pending(BSP_UART_IMU2);
+
+    // 发送配置命令给 JY901B，使其切换到 115200 波特率，50Hz 输出频率，并输出加速度、陀螺仪和四元数数据
+    bsp_uart_send_buffer(BSP_UART_IMU2, unlock_cmd, sizeof(unlock_cmd));
+    bsp_delay_ms(20);
+    bsp_uart_send_buffer(BSP_UART_IMU2, rsw_cmd, sizeof(rsw_cmd));
+    bsp_delay_ms(20);
+    bsp_uart_send_buffer(BSP_UART_IMU2, rate_cmd, sizeof(rate_cmd));
+    bsp_delay_ms(20);
+    bsp_uart_send_buffer(BSP_UART_IMU2, baud_cmd, sizeof(baud_cmd));
+    bsp_delay_ms(20);
+    bsp_uart_send_buffer(BSP_UART_IMU2, save_cmd, sizeof(save_cmd));
+    bsp_delay_ms(100);
+    // 配置完成后，切换串口到 115200 波特率，以便后续通信使用新的波特率
+    config.baudrate = 115200;
+    if (!bsp_uart_reconfig(BSP_UART_IMU2, &config)) {
+        return false;
+    }
+    // 初始化接收缓冲区相关状态，准备 DMA 循环接收数据
+    memset(s_devs[IMU_JY901S].rx_buf, 0, sizeof(s_devs[IMU_JY901S].rx_buf));
+    s_devs[IMU_JY901S].In = 0;
+    s_devs[IMU_JY901S].Out = 0;
+    s_devs[IMU_JY901S].last_dma_cnt = 0;
+
+    bsp_uart_start_dma_rx_circular(BSP_UART_IMU2,
+                                   Driver_IMU_GetRxBuf(IMU_JY901S),
+                                   Driver_IMU_GetBufSize(IMU_JY901S));
+
+    return true;
+}
 
 // 统一的分发器：上层传地址进来，下层路由给具体的解析器去填空
 bool Driver_IMU_Process(imu_id_t id, imu_data_t *out_data) {

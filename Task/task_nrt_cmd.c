@@ -384,6 +384,25 @@ static void On_Receive_IMU_Calibrate_Acc_Cmd(const uint8_t *payload, uint16_t le
     bsp_cpu_reset();
 }
 
+static void On_Receive_IMU_Config_JY901B_Cmd(const uint8_t *payload, uint16_t len)
+{
+    (void)payload;
+
+    if (len != 0u) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CONFIG_IMU_JY901B, LENGTH_ERROR, 0, USE_CPU);
+        return;
+    }
+
+    if (!Driver_IMU_JY901B_DefaultConfig()) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CONFIG_IMU_JY901B, INVALID_PARAM, 0, USE_CPU);
+        return;
+    }
+
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CONFIG_IMU_JY901B, ACK_SUCCESS, 0, USE_CPU);
+
+    bsp_cpu_reset();
+}
+
 static void On_Receive_Clear_Persist_Log_Cmd(const uint8_t *payload, uint16_t len)
 {
     (void)payload;
@@ -429,6 +448,7 @@ void Task_NRT_Cmd_Init(void){
     Driver_Protocol_Register(DATA_TYPE_SET_TAM, On_Receive_TAM_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_WS2812_COLOR, On_Receive_WS2812_Color_Cmd);
     Driver_Protocol_Register(DATA_TYPE_CALIBRATE_IMU_ACC, On_Receive_IMU_Calibrate_Acc_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_CONFIG_IMU_JY901B, On_Receive_IMU_Config_JY901B_Cmd);
     Driver_Protocol_Register(DATA_TYPE_CLEAR_PERSIST_LOG, On_Receive_Clear_Persist_Log_Cmd);
     Driver_Protocol_Register(DATA_TYPE_CLEAR_OVERFLOW_SNAPSHOT, On_Receive_Clear_Overflow_Snapshot_Cmd);
 }

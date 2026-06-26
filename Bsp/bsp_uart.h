@@ -43,6 +43,8 @@ typedef void (*bsp_uart_rx_cb_t)(uint8_t *data, uint16_t len);
  * @note 该函数会根据配置结构体中的参数初始化对应的串口硬件。
  */
 bool bsp_uart_init(bsp_uart_port_t port, const bsp_uart_config_t *config);
+bool bsp_uart_reconfig(bsp_uart_port_t port, const bsp_uart_config_t *config);
+void bsp_uart_clear_rx_pending(bsp_uart_port_t port);
 
 /**
  * @brief  初始化系统中所有的串口设备
