@@ -56,6 +56,7 @@ typedef enum {
 typedef enum {
     BSP_GPIO_DHT11 = 0,
     BSP_GPIO_PSWITCH = 1,
+    BSP_GPIO_USERLED = 2,
     // BSP_GPIO_LEAK_DET, // 预留：漏水检测传感器
     // BSP_GPIO_RELAY_1,  // 预留：外部设备供电继电器
     BSP_GPIO_MAX

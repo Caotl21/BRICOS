@@ -12,6 +12,7 @@
 #define LED_DEFAULT_EFFECT_PERIOD  1000u
 #define LED_BREATH_MS               2000u
 #define LED_FAILSAFE_STROBE_MS     200u
+#define LED_ARMING_CHASE_MS         600u
 
 typedef enum {
     LED_CMD_SET_MODE = 0,
@@ -368,6 +369,19 @@ void Task_LED_SetMode(bot_sys_mode_e mode)
     cmd.type = LED_CMD_SET_MODE;
     cmd.data.mode = mode;
     (void)prv_post_cmd(&cmd);
+}
+
+void Task_LED_SetArmingEffect(void)
+{
+    led_effect_t effect;
+
+    memset(&effect, 0, sizeof(effect));
+    effect.enabled = 1u;
+    effect.type = LED_EFFECT_CHASE;
+    effect.color = WS2812_COLOR_CYAN;
+    effect.period_ms = LED_ARMING_CHASE_MS;
+
+    Task_LED_SetBaseEffect(&effect);
 }
 
 void Task_LED_SetBaseEffect(const led_effect_t *effect)

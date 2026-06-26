@@ -78,9 +78,10 @@ int main(void)
 {
 
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
-
+    
     bsp_delay_init();
     bsp_uart_init_default();
+    
     Main_EarlyPrint("BRICOS System Booting...\r\n");
     Main_EarlyPrint("BOOT: UART ready\r\n");
 

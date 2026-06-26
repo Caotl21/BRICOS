@@ -30,6 +30,7 @@ extern TaskHandle_t LED_Task_Handler;
 
 void Task_LED_Init(void);
 void Task_LED_SetMode(bot_sys_mode_e mode);
+void Task_LED_SetArmingEffect(void);
 void Task_LED_SetBaseEffect(const led_effect_t *effect);
 void Task_LED_SetWarningEffect(const led_effect_t *effect);
 void Task_LED_ClearWarningEffect(void);
