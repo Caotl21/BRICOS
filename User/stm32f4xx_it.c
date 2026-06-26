@@ -162,6 +162,7 @@ void DMA1_Stream4_IRQHandler(void)
 void DMA2_Stream3_IRQHandler(void)
 {
     /* DMA2_Stream1 is reserved for USART6_RX polling mode. */
+    bsp_pwm_dma_waveform_irq_handler(BSP_PWM_LED_1);
 }
 
 void DMA2_Stream2_IRQHandler(void)
