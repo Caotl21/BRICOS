@@ -11,6 +11,7 @@
 #include "im948_CMD.h"
 
 static IM948_TxFunc_t s_im948_tx_callback = NULL;
+static im948_ctx_t s_im948_default_ctx = {0};
 
 
 U8 targetDeviceAddress=255;
@@ -60,6 +61,8 @@ void Dbp_U8_buf(char *sBeginInfo, char *sEndInfo,
 
 
 static void Cmd_Write(U8 *pBuf, int Len);
+static void IM948_CtxWrite(im948_ctx_t *ctx, U8 *pBuf, int Len);
+static int IM948_CtxPackAndTx(im948_ctx_t *ctx, U8 *pDat, U8 DLen);
 static void Cmd_RxUnpack(uint8_t *buf, uint8_t DLen, float *acc, float *gyro, float *quat);
 /**
  * 发送CMD命令
@@ -93,6 +96,128 @@ int Cmd_PackAndTx(U8 *pDat, U8 DLen)
     Cmd_Write(buf, DLen+55);
     return 0;
 }
+
+static int IM948_CtxPackAndTx(im948_ctx_t *ctx, U8 *pDat, U8 DLen)
+{
+    U8 buf[50 + 5 + CmdPacketMaxDatSizeTx] =
+        {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x00, 0xff};
+
+    if((ctx == NULL) || (DLen == 0) || (DLen > CmdPacketMaxDatSizeTx) || (pDat==NULL))
+    {
+        return -1;
+    }
+
+    buf[50] = CmdPacket_Begin;
+    buf[51] = targetDeviceAddress;
+    buf[52] = DLen;
+    Memcpy(&buf[53], pDat, DLen);
+    buf[53+DLen] = CalcSum1(&buf[51], DLen+2);
+    buf[54+DLen] = CmdPacket_End;
+
+    IM948_CtxWrite(ctx, buf, DLen+55);
+    return 0;
+}
+
+void IM948_ContextInit(im948_ctx_t *ctx, IM948_TxFunc_t tx_func)
+{
+    if (ctx == NULL) {
+        return;
+    }
+
+    ctx->tx_func = tx_func;
+    ctx->CS = 0;
+    ctx->i = 0;
+    ctx->RxIndex = 0;
+    for (U16 idx = 0; idx < (5 + CmdPacketMaxDatSizeRx); idx++) {
+        ctx->buf[idx] = 0;
+    }
+}
+
+uint8_t IM948_CtxGetPkt(im948_ctx_t *ctx, uint8_t byte, float *acc, float *gyro, float *quat)
+{
+    U8 *buf;
+
+    if (ctx == NULL) {
+        return 0;
+    }
+
+    buf = ctx->buf;
+    ctx->CS += byte;
+
+    switch (ctx->RxIndex)
+    {
+    case 0:
+        if (byte == CmdPacket_Begin)
+        {
+            ctx->i = 0;
+            buf[ctx->i++] = CmdPacket_Begin;
+            ctx->CS = 0;
+            ctx->RxIndex = 1;
+        }
+        break;
+    case 1:
+        buf[ctx->i++] = byte;
+        if (byte == 255)
+        {
+            ctx->RxIndex = 0;
+            break;
+        }
+        ctx->RxIndex++;
+        break;
+    case 2:
+        buf[ctx->i++] = byte;
+        if ((byte > CmdPacketMaxDatSizeRx) || (byte == 0))
+        {
+            ctx->RxIndex = 0;
+            break;
+        }
+        ctx->RxIndex++;
+        break;
+    case 3:
+        buf[ctx->i++] = byte;
+        if (ctx->i >= (buf[2] + 3))
+        {
+            ctx->RxIndex++;
+        }
+        break;
+    case 4:
+        ctx->CS -= byte;
+        if (ctx->CS == byte)
+        {
+            buf[ctx->i++] = byte;
+            ctx->RxIndex++;
+        }
+        else
+        {
+            ctx->RxIndex = 0;
+        }
+        break;
+    case 5:
+        ctx->RxIndex = 0;
+        if (byte == CmdPacket_End)
+        {
+            buf[ctx->i++] = byte;
+
+            if ((targetDeviceAddress == buf[1]) || (targetDeviceAddress == 255))
+            {
+                Dbp_U8_buf("rx: ", "\r\n", "%02X ", buf, ctx->i);
+                Cmd_RxUnpack(&buf[3], ctx->i - 5, acc, gyro, quat);
+                return 1;
+            }
+        }
+        break;
+    default:
+        ctx->RxIndex = 0;
+        break;
+    }
+
+    return 0;
+}
+
 /**
  * 用于捕获数据包, 用户只需把接收到的每字节数据传入该函数即可
  * @param byte 传入接收到的每字节数据
@@ -101,90 +226,7 @@ int Cmd_PackAndTx(U8 *pDat, U8 DLen)
 // U8 Cmd_GetPkt(U8 byte)
 uint8_t Cmd_GetPkt(uint8_t byte, float *acc, float *gyro, float *quat)
 {
-    static U8 CS=0; // 校验和
-    static U8 i=0;
-    static U8 RxIndex=0;
-
-    static U8 buf[5+CmdPacketMaxDatSizeRx]; // 接收包缓存
-    #define cmdBegin    buf[0]  // 起始码
-    #define cmdAddress  buf[1]  // 通信地址
-    #define cmdLen      buf[2]  // 长度
-    #define cmdDat     &buf[3]  // 数据体
-    #define cmdCS       buf[3+cmdLen] // 校验和
-    #define cmdEnd      buf[4+cmdLen] // 结束码
-
-    CS += byte; // 边收数据边计算校验码，校验码为地址码开始(包含地址码)到校验码之前的数据的和
-    switch (RxIndex)
-    {
-    case 0: // 起始码
-        if (byte == CmdPacket_Begin)
-        {
-            i = 0;
-            buf[i++] = CmdPacket_Begin;
-            CS = 0; // 下个字节开始计算校验码
-            RxIndex = 1;
-        }
-        break;
-    case 1: // 数据体的地址码
-        buf[i++] = byte;
-        if (byte == 255)
-        { // 255是广播地址，模块作为从机，它的地址不可会出现255
-            RxIndex = 0;
-            break;
-        }
-        RxIndex++;
-        break;
-    case 2: // 数据体的长度
-        buf[i++] = byte;
-        if ((byte > CmdPacketMaxDatSizeRx) || (byte == 0))
-        { // 长度无效
-            RxIndex = 0;
-            break;
-        }
-        RxIndex++;
-        break;
-    case 3: // 获取数据体的数据
-        buf[i++] = byte;
-        if (i >= cmdLen+3)
-        { // 已收完数据体
-            RxIndex++;
-        }
-        break;
-    case 4: // 对比 效验码
-        CS -= byte;
-        if (CS == byte)
-        {// 校验正确
-            buf[i++] = byte;
-            RxIndex++;
-        }
-        else
-        {// 校验失败
-            RxIndex = 0;
-        }
-        break;
-    case 5: // 结束码
-        RxIndex = 0;
-        if (byte == CmdPacket_End)
-        {// 捕获到完整包
-            buf[i++] = byte;
-
-            if ((targetDeviceAddress == cmdAddress) || (targetDeviceAddress == 255))
-            {// 地址匹配，是目标设备发来的数据 才处理
-                Dbp_U8_buf("rx: ", "\r\n",
-                           "%02X ",
-                           buf, i);
-                //Cmd_RxUnpack(&buf[3], i-5); // 处理数据包的数据体
-                Cmd_RxUnpack(&buf[3], i-5, acc, gyro, quat);
-                return 1;
-            }
-        }
-        break;
-    default:
-        RxIndex = 0;
-        break;
-    }
-
-    return 0;
+    return IM948_CtxGetPkt(&s_im948_default_ctx, byte, acc, gyro, quat);
 }
 
 
@@ -642,6 +684,44 @@ void Cmd_43(U8 OnOff)
     Dbp("\r\nset HeightAutoFlag--\r\n");
     Cmd_PackAndTx(buf, 2);
 }
+void IM948_CtxCmd_03(im948_ctx_t *ctx)
+{
+    U8 buf[1] = {0x03};
+    Dbp("\r\nsensor on--\r\n");
+    IM948_CtxPackAndTx(ctx, buf, 1);
+}
+
+void IM948_CtxCmd_19(im948_ctx_t *ctx)
+{
+    U8 buf[1] = {0x19};
+    IM948_CtxPackAndTx(ctx, buf, 1);
+}
+
+void IM948_CtxCmd_12(im948_ctx_t *ctx, U8 accStill, U8 stillToZero, U8 moveToZero, U8 isCompassOn, U8 barometerFilter, U8 reportHz, U8 gyroFilter, U8 accFilter, U8 compassFilter, U16 Cmd_ReportTag)
+{
+    U8 buf[11] = {0x12};
+    buf[1] = accStill;
+    buf[2] = stillToZero;
+    buf[3] = moveToZero;
+    buf[4] = ((barometerFilter&3)<<1) | (isCompassOn&1);
+    buf[5] = reportHz;
+    buf[6] = gyroFilter;
+    buf[7] = accFilter;
+    buf[8] = compassFilter;
+    buf[9] = Cmd_ReportTag&0xff;
+    buf[10] = (Cmd_ReportTag>>8)&0xff;
+    Dbp("\r\nset parameters--\r\n");
+    IM948_CtxPackAndTx(ctx, buf, 11);
+}
+
+void IM948_CtxCmd_40(im948_ctx_t *ctx, U8 Flag)
+{
+    U8 buf[2] = {0x40};
+    buf[1] = Flag;
+    Dbp("\r\nset WorkMode--\r\n");
+    IM948_CtxPackAndTx(ctx, buf, 2);
+}
+
 // 读取 自动补偿高度标识
 void Cmd_44(void)
 {
@@ -1063,6 +1143,7 @@ static void Cmd_RxUnpack(uint8_t *buf, uint8_t DLen, float *acc, float *gyro, fl
 void IM948_RegisterTxCallback(IM948_TxFunc_t tx_func)
 {
     s_im948_tx_callback = tx_func;
+    IM948_ContextInit(&s_im948_default_ctx, tx_func);
 }
 
 /**
@@ -1086,6 +1167,18 @@ static void Cmd_Write(U8 *pBuf, int Len)
 }
 
 
+
+static void IM948_CtxWrite(im948_ctx_t *ctx, U8 *pBuf, int Len)
+{
+    if ((ctx != NULL) && (ctx->tx_func != NULL))
+    {
+        ctx->tx_func(pBuf, (uint16_t)Len);
+    }
+
+    Dbp_U8_buf("tx: ", "\r\n",
+               "%02X ",
+               pBuf, Len);
+}
 
 // ======================================测试示例==============================================
 U8 im948_ctl = 0; // 用户调试口发来的1字节操作指令 调试口收到的数据赋值给im948_ctl 主循环里调用 im948_test() 进行演示

@@ -66,6 +66,21 @@ typedef float                  F32;
     extern uint8_t Cmd_GetPkt(uint8_t byte, float *acc, float *gyro, float *quat);
     typedef void (*IM948_TxFunc_t)(uint8_t *pBuf, uint16_t Len);
 
+    typedef struct {
+        IM948_TxFunc_t tx_func;
+        U8 CS;
+        U8 i;
+        U8 RxIndex;
+        U8 buf[5 + CmdPacketMaxDatSizeRx];
+    } im948_ctx_t;
+
+    void IM948_ContextInit(im948_ctx_t *ctx, IM948_TxFunc_t tx_func);
+    uint8_t IM948_CtxGetPkt(im948_ctx_t *ctx, uint8_t byte, float *acc, float *gyro, float *quat);
+    void IM948_CtxCmd_03(im948_ctx_t *ctx);
+    void IM948_CtxCmd_12(im948_ctx_t *ctx, U8 accStill, U8 stillToZero, U8 moveToZero, U8 isCompassOn, U8 barometerFilter, U8 reportHz, U8 gyroFilter, U8 accFilter, U8 compassFilter, U16 Cmd_ReportTag);
+    void IM948_CtxCmd_19(im948_ctx_t *ctx);
+    void IM948_CtxCmd_40(im948_ctx_t *ctx, U8 Flag);
+
     // 【新增】：对外暴露的注册接口
     void IM948_RegisterTxCallback(IM948_TxFunc_t tx_func);
 
