@@ -29,7 +29,7 @@ static uint16_t s_cmd_count = 0u;
 static shell_session_t s_sessions[SHELL_MAX_SESSIONS];
 static uint8_t s_builtin_registered = 0u;
 
-#if defined(__CC_ARM) || defined(__ARMCC_VERSION)
+#if defined(__CC_ARM) || defined(__ARMCC_VERSION) || defined(__GNUC__)
 #define SHELL_CORE_SECTION_USED   __attribute__((used))
 #define SHELL_CORE_SECTION_BASE   __attribute__((section("ShellCmd$$Table$$A")))
 #define SHELL_CORE_SECTION_LIMIT  __attribute__((section("ShellCmd$$Table$$Z")))

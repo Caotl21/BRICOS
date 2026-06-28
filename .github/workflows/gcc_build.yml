@@ -1,0 +1,37 @@
+name: GCC_Build
+
+on:
+  push:
+    branches: ["dev_scons"]
+  pull_request:
+    branches: ["test_scons"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi python3-pip
+          python3 -m pip install scons
+
+      - name: Build APP1 Firmware
+        run: scons BUILD=release
+
+      - name: Show ELF Size
+        run: arm-none-eabi-size build/gcc/app1/release/app1
+
+      - name: Upload Firmware Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bricsbot-app1-gcc
+          path: |
+            build/gcc/app1/release/app1
+            build/gcc/app1/release/app1.bin
+            build/gcc/app1/release/app1.map
