@@ -7,6 +7,9 @@ on:
     branches: ["test_scons"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,3 +38,37 @@ jobs:
             build/gcc/app1/release/app1
             build/gcc/app1/release/app1.bin
             build/gcc/app1/release/app1.map
+
+      - name: Generate Release Metadata
+        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        id: meta
+        shell: bash
+        run: |
+          tag="gcc-v$(date +'%Y.%m.%d')-${{ github.run_number }}"
+          build_time="$(date +'%Y-%m-%d %H:%M:%S UTC')"
+          commit_sha="${{ github.sha }}"
+          commit_subject="$(git log -1 --pretty=%s)"
+          echo "tag_name=$tag" >> "$GITHUB_OUTPUT"
+          echo "build_time=$build_time" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
+          echo "commit_subject=$commit_subject" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag_name }}
+          name: Release ${{ steps.meta.outputs.tag_name }}
+          body: |
+            BRICOS GCC + SCons 自动构建发布
+            - Commit: ${{ steps.meta.outputs.commit_sha }}
+            - Message: ${{ steps.meta.outputs.commit_subject }}
+            - Build Time: ${{ steps.meta.outputs.build_time }}
+          draft: false
+          prerelease: false
+          files: |
+            build/gcc/app1/release/app1
+            build/gcc/app1/release/app1.bin
+            build/gcc/app1/release/app1.map
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
