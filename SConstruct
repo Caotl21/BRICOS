@@ -55,6 +55,7 @@ env.Replace(
     RANLIB=f"{TOOLCHAIN_PREFIX}ranlib",
     OBJCOPY=f"{TOOLCHAIN_PREFIX}objcopy",
     SIZE=f"{TOOLCHAIN_PREFIX}size",
+    ASCOM="$AS -o $TARGET -c $ASFLAGS $_CPPDEFFLAGS $_CPPINCFLAGS $SOURCE",
 )
 
 env.Append(
