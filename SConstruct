@@ -26,6 +26,7 @@ variant_root = build_root / "worktree"
 VariantDir(str(variant_root), ".", duplicate=0)
 
 source_nodes = [str((variant_root / rel_path).as_posix()) for rel_path in project["sources"]]
+source_nodes.append(str((variant_root / "tools/scons/runtime/gcc_runtime_stubs.c").as_posix()))
 linker_script = ROOT_DIR / "tools" / "scons" / "linker" / "app1.ld"
 
 common_arch_flags = [
@@ -81,6 +82,7 @@ env.Append(
         "-Wl,--print-memory-usage",
         "-Wl,-u,_printf_float",
     ],
+    LIBS=["m"],
 )
 
 program = env.Program(target=str((build_root / "app1").as_posix()), source=source_nodes)
