@@ -164,7 +164,7 @@ void DMA2_Stream3_IRQHandler(void)
     bsp_pwm_dma_waveform_irq_handler(BSP_PWM_LED_1);
 }
 
-void DMA2_Stream2_IRQHandler(void)s
+void DMA2_Stream2_IRQHandler(void)
 {
     bsp_pwm_dma_waveform_irq_handler(BSP_PWM_LED_2);
 }

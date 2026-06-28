@@ -83,49 +83,49 @@ int main(void)
     bsp_uart_init_default();
     
     Main_EarlyPrint("BRICOS System Booting...\r\n");
-    Main_EarlyPrint("BOOT: UART ready\r\n");
+    Main_EarlyPrint("[BOOT] UART ready\r\n");
 
     bsp_gpio_init();
-    Main_EarlyPrint("BOOT: GPIO ready\r\n");
+    Main_EarlyPrint("[BOOT] GPIO ready\r\n");
 
     bsp_pwm_init(0);
-    Main_EarlyPrint("BOOT: PWM ready\r\n");
+    Main_EarlyPrint("[BOOT] PWM ready\r\n");
 
     Driver_PSWITCH_Init();
-    Main_EarlyPrint("BOOT: PSWITCH ready\r\n");
+    Main_EarlyPrint("[BOOT] PSWITCH ready\r\n");
 
 	System_SysTick_Init(SYSCLK);
     Sys_BootFlag_MarkBootSuccess();
     System_Log_Init();
-    Main_EarlyPrint("BOOT: Log ready\r\n");
+    Main_EarlyPrint("[BOOT] Log ready\r\n");
 
     Main_Log_ResetReason();
     Bot_Data_Pool_Init();
     System_ModeManager_Init();
-    Main_EarlyPrint("BOOT: Core services ready\r\n");
+    Main_EarlyPrint("[BOOT] Core services ready\r\n");
 	
     Driver_IMU_Init();
-    Main_EarlyPrint("BOOT: MS5837 init...\r\n");
+    Main_EarlyPrint("[BOOT] MS5837 init...\r\n");
     if (Driver_Ms5837_Init()) {
-        Main_EarlyPrint("BOOT: MS5837 done\r\n");
+        Main_EarlyPrint("[BOOT] MS5837 done\r\n");
     } else {
-        Main_EarlyPrint("BOOT: MS5837 failed\r\n");
+        Main_EarlyPrint("[BOOT] MS5837 failed\r\n");
     }
 
     Driver_DHT11_Init();
     if (Driver_Power_Init()) {
-        Main_EarlyPrint("BOOT: Power done\r\n");
+        Main_EarlyPrint("[BOOT] Power done\r\n");
     } else {
-        Main_EarlyPrint("BOOT: Power failed\r\n");
+        Main_EarlyPrint("[BOOT] Power failed\r\n");
     }
 
     Driver_Thruster_Init();
-    Main_EarlyPrint("BOOT: Thruster done\r\n");
+    Main_EarlyPrint("[BOOT] Thruster done\r\n");
 
     if (Driver_WS2812_Init()) {
-        Main_EarlyPrint("BOOT: WS2812 done\r\n");
+        Main_EarlyPrint("[BOOT] WS2812 done\r\n");
     } else {
-        Main_EarlyPrint("BOOT: WS2812 failed\r\n");
+        Main_EarlyPrint("[BOOT] WS2812 failed\r\n");
     }
 	
 
@@ -146,7 +146,7 @@ int main(void)
     Task_Monitor_Init();
 
     App_Shell_Init();
-    Main_EarlyPrint("BOOT: Tasks created, starting scheduler\r\n");
+    Main_EarlyPrint("[BOOT] Tasks created, starting scheduler\r\n");
 
     LOG_INFO("======================================");
     LOG_INFO("   BRICOS System Booting...       ");
