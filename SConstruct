@@ -2,10 +2,10 @@ import os
 import sys
 from pathlib import Path
 
-from SCons.Script import ARGUMENTS, Alias, AlwaysBuild, Default, Environment, Exit, Help, VariantDir
+from SCons.Script import ARGUMENTS, Alias, AlwaysBuild, Default, Dir, Environment, Exit, Help, VariantDir
 
 
-ROOT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = Path(Dir("#").abspath)
 TOOLS_DIR = ROOT_DIR / "tools" / "scons"
 sys.path.insert(0, str(TOOLS_DIR))
 
