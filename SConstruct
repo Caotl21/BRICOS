@@ -15,11 +15,15 @@ from keil_project import load_keil_project
 BUILD_PROFILE = ARGUMENTS.get("BUILD", "release")
 TARGET_NAME = ARGUMENTS.get("TARGET", "Target 1")
 TOOLCHAIN_PREFIX = ARGUMENTS.get("CROSS_COMPILE", os.environ.get("CROSS_COMPILE", "arm-none-eabi-"))
+STARTUP_LED_PROBE = ARGUMENTS.get("STARTUP_LED_PROBE", "0").lower() in {"1", "true", "yes", "on"}
 
 if BUILD_PROFILE not in {"release", "debug"}:
     Exit(f"Unsupported BUILD profile: {BUILD_PROFILE}")
 
 project = load_keil_project(ROOT_DIR / "Project" / "project.uvprojx", target_name=TARGET_NAME)
+cpp_defines = list(project["defines"])
+if STARTUP_LED_PROBE:
+    cpp_defines.append("BRICOS_STARTUP_LED_PROBE")
 
 build_root = ROOT_DIR / "build" / "gcc" / "app1" / BUILD_PROFILE
 variant_root = build_root / "worktree"
@@ -64,7 +68,7 @@ env.Replace(
 )
 
 env.Append(
-    CPPDEFINES=project["defines"],
+    CPPDEFINES=cpp_defines,
     CPPPATH=[str((ROOT_DIR / include_path).as_posix()) for include_path in project["includes"]],
     CCFLAGS=common_compile_flags + [opt_flags],
     CFLAGS=[

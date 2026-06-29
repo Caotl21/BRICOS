@@ -23,6 +23,17 @@
   .weak Reset_Handler
   .type Reset_Handler, %function
 Reset_Handler:
+  ldr   r0, =0xE000ED88
+  ldr   r1, [r0]
+  orr   r1, r1, #(0xF << 20)
+  str   r1, [r0]
+  dsb
+  isb
+
+#ifdef BRICOS_STARTUP_LED_PROBE
+  bl    BricosStartupLedProbe
+#endif
+
   movs  r1, #0
   b     LoopCopyDataInit
 
@@ -55,6 +66,47 @@ LoopFillZerobss:
   bl    main
   bx    lr
   .size Reset_Handler, .-Reset_Handler
+
+#ifdef BRICOS_STARTUP_LED_PROBE
+  .type BricosStartupLedProbe, %function
+BricosStartupLedProbe:
+  push  {r0-r3, lr}
+
+  ldr   r0, =0x40023830
+  ldr   r1, [r0]
+  orr   r1, r1, #(1 << 4)
+  str   r1, [r0]
+  ldr   r1, [r0]
+
+  ldr   r0, =0x40021000
+  ldr   r1, [r0]
+  bic   r1, r1, #(3 << 4)
+  orr   r1, r1, #(1 << 4)
+  str   r1, [r0]
+
+  movs  r3, #3
+StartupLedBlinkLoop:
+  ldr   r0, =0x40021018
+  ldr   r1, =0x00040000
+  str   r1, [r0]
+  ldr   r2, =0x00100000
+StartupLedOnDelay:
+  subs  r2, r2, #1
+  bne   StartupLedOnDelay
+
+  ldr   r1, =0x00000004
+  str   r1, [r0]
+  ldr   r2, =0x00100000
+StartupLedOffDelay:
+  subs  r2, r2, #1
+  bne   StartupLedOffDelay
+
+  subs  r3, r3, #1
+  bne   StartupLedBlinkLoop
+
+  pop   {r0-r3, pc}
+  .size BricosStartupLedProbe, .-BricosStartupLedProbe
+#endif
 
   .section .text.Default_Handler,"ax",%progbits
 Default_Handler:
