@@ -31,12 +31,7 @@ jobs:
           python3 -m pip install scons
 
       - name: Build APP1 Firmware
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.startup_led_probe }}" = "true" ]; then
-            scons BUILD=release STARTUP_LED_PROBE=1
-          else
-            scons BUILD=release
-          fi
+        run: scons BUILD=release STARTUP_LED_PROBE=1
 
       - name: Show ELF Size
         run: arm-none-eabi-size build/gcc/app1/release/app1
