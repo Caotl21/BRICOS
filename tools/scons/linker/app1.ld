@@ -8,7 +8,10 @@ MEMORY
     RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 0x00020000
 }
 
-_estack = ORIGIN(RAM) + LENGTH(RAM);
+/* Keep MSP inside RAM, not exactly at the exclusive upper bound.
+ * Some bootloaders validate app vectors with sp < RAM_END.
+ */
+_estack = ORIGIN(RAM) + LENGTH(RAM) - 8;
 
 SECTIONS
 {

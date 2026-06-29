@@ -41,6 +41,19 @@ jobs:
       - name: Show ELF Size
         run: arm-none-eabi-size build/gcc/app1/release/app1
 
+      - name: Show APP1 Vector Header
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+
+          data = Path("build/gcc/app1/release/app1.bin").read_bytes()
+          print(f"app1.bin size: {len(data)} bytes")
+          for i in range(16):
+              word = struct.unpack_from("<I", data, i * 4)[0]
+              print(f"[{i:02d}] 0x{word:08X}")
+          PY
+
       - name: Show APP1 Usage
         run: cat build/gcc/app1/release/app1_usage.txt
 
