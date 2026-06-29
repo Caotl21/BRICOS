@@ -30,6 +30,9 @@ jobs:
       - name: Show ELF Size
         run: arm-none-eabi-size build/gcc/app1/release/app1
 
+      - name: Show APP1 Usage
+        run: cat build/gcc/app1/release/app1_usage.txt
+
       - name: Upload Firmware Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -38,12 +41,15 @@ jobs:
             build/gcc/app1/release/app1
             build/gcc/app1/release/app1.bin
             build/gcc/app1/release/app1.map
+            build/gcc/app1/release/app1_usage.txt
+            build/gcc/app1/release/app1_usage.env
 
       - name: Generate Release Metadata
         if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         id: meta
         shell: bash
         run: |
+          source build/gcc/app1/release/app1_usage.env
           tag="gcc-v$(date +'%Y.%m.%d')-${{ github.run_number }}"
           build_time="$(date +'%Y-%m-%d %H:%M:%S UTC')"
           commit_sha="${{ github.sha }}"
@@ -52,6 +58,14 @@ jobs:
           echo "build_time=$build_time" >> "$GITHUB_OUTPUT"
           echo "commit_sha=$commit_sha" >> "$GITHUB_OUTPUT"
           echo "commit_subject=$commit_subject" >> "$GITHUB_OUTPUT"
+          echo "flash_used_bytes=$APP1_FLASH_USED_BYTES" >> "$GITHUB_OUTPUT"
+          echo "flash_limit_bytes=$APP1_FLASH_LIMIT_BYTES" >> "$GITHUB_OUTPUT"
+          echo "flash_remaining_bytes=$APP1_FLASH_REMAINING_BYTES" >> "$GITHUB_OUTPUT"
+          echo "flash_used_percent=$APP1_FLASH_USED_PERCENT" >> "$GITHUB_OUTPUT"
+          echo "ram_used_bytes=$APP1_RAM_USED_BYTES" >> "$GITHUB_OUTPUT"
+          echo "ram_limit_bytes=$APP1_RAM_LIMIT_BYTES" >> "$GITHUB_OUTPUT"
+          echo "ram_remaining_bytes=$APP1_RAM_REMAINING_BYTES" >> "$GITHUB_OUTPUT"
+          echo "ram_used_percent=$APP1_RAM_USED_PERCENT" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -64,11 +78,14 @@ jobs:
             - Commit: ${{ steps.meta.outputs.commit_sha }}
             - Message: ${{ steps.meta.outputs.commit_subject }}
             - Build Time: ${{ steps.meta.outputs.build_time }}
+            - APP1 FLASH: ${{ steps.meta.outputs.flash_used_bytes }} / ${{ steps.meta.outputs.flash_limit_bytes }} bytes (${{ steps.meta.outputs.flash_used_percent }}%), remaining ${{ steps.meta.outputs.flash_remaining_bytes }} bytes
+            - APP1 RAM: ${{ steps.meta.outputs.ram_used_bytes }} / ${{ steps.meta.outputs.ram_limit_bytes }} bytes (${{ steps.meta.outputs.ram_used_percent }}%), remaining ${{ steps.meta.outputs.ram_remaining_bytes }} bytes
           draft: false
           prerelease: false
           files: |
             build/gcc/app1/release/app1
             build/gcc/app1/release/app1.bin
             build/gcc/app1/release/app1.map
+            build/gcc/app1/release/app1_usage.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

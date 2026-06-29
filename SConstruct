@@ -28,6 +28,9 @@ VariantDir(str(variant_root), ".", duplicate=0)
 source_nodes = [str((variant_root / rel_path).as_posix()) for rel_path in project["sources"]]
 source_nodes.append(str((variant_root / "tools/scons/runtime/gcc_runtime_stubs.c").as_posix()))
 linker_script = ROOT_DIR / "tools" / "scons" / "linker" / "app1.ld"
+usage_script = ROOT_DIR / "tools" / "scons" / "report_app1_usage.py"
+flash_limit = 0x00018000
+ram_limit = 0x00020000
 
 common_arch_flags = [
     "-mcpu=cortex-m4",
@@ -55,6 +58,7 @@ env.Replace(
     AR=f"{TOOLCHAIN_PREFIX}ar",
     RANLIB=f"{TOOLCHAIN_PREFIX}ranlib",
     OBJCOPY=f"{TOOLCHAIN_PREFIX}objcopy",
+    OBJDUMP=f"{TOOLCHAIN_PREFIX}objdump",
     SIZE=f"{TOOLCHAIN_PREFIX}size",
     ASCOM="$AS -o $TARGET -c $ASFLAGS $_CPPDEFFLAGS $_CPPINCFLAGS $SOURCE",
 )
@@ -91,12 +95,40 @@ binary = env.Command(
     program,
     "$OBJCOPY -O binary $SOURCE $TARGET",
 )
+usage_report = env.Command(
+    [
+        str((build_root / "app1_usage.txt").as_posix()),
+        str((build_root / "app1_usage.env").as_posix()),
+    ],
+    program,
+    [
+        sys.executable,
+        str(usage_script.as_posix()),
+        "--objdump",
+        "$OBJDUMP",
+        "--elf",
+        "$SOURCE",
+        "--flash-origin",
+        "0x08008000",
+        "--flash-limit",
+        hex(flash_limit),
+        "--ram-origin",
+        "0x20000000",
+        "--ram-limit",
+        hex(ram_limit),
+        "--report",
+        str((build_root / "app1_usage.txt").as_posix()),
+        "--env",
+        str((build_root / "app1_usage.env").as_posix()),
+    ],
+)
 
 AlwaysBuild(Alias("size", program, "$SIZE $SOURCE"))
 Alias("elf", program)
 Alias("bin", binary)
+Alias("usage", usage_report)
 
-Default(binary)
+Default([binary, usage_report])
 
 Help(
     "\n".join(
