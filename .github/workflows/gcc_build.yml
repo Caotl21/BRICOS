@@ -31,7 +31,7 @@ jobs:
           python3 -m pip install scons
 
       - name: Build APP1 Firmware
-        run: scons BUILD=release STARTUP_LED_PROBE=1
+        run: scons BUILD=release
 
       - name: Show ELF Size
         run: arm-none-eabi-size build/gcc/app1/release/app1
