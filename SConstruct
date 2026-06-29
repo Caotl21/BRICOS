@@ -101,26 +101,17 @@ usage_report = env.Command(
         str((build_root / "app1_usage.env").as_posix()),
     ],
     program,
-    [
-        sys.executable,
-        str(usage_script.as_posix()),
-        "--objdump",
-        "$OBJDUMP",
-        "--elf",
-        "$SOURCE",
-        "--flash-origin",
-        "0x08008000",
-        "--flash-limit",
-        hex(flash_limit),
-        "--ram-origin",
-        "0x20000000",
-        "--ram-limit",
-        hex(ram_limit),
-        "--report",
-        str((build_root / "app1_usage.txt").as_posix()),
-        "--env",
-        str((build_root / "app1_usage.env").as_posix()),
-    ],
+    (
+        f'"{sys.executable}" "{usage_script.as_posix()}" '
+        '--objdump "$OBJDUMP" '
+        '--elf "$SOURCE" '
+        "--flash-origin 0x08008000 "
+        f"--flash-limit {hex(flash_limit)} "
+        "--ram-origin 0x20000000 "
+        f"--ram-limit {hex(ram_limit)} "
+        f'--report "{(build_root / "app1_usage.txt").as_posix()}" '
+        f'--env "{(build_root / "app1_usage.env").as_posix()}"'
+    ),
 )
 
 AlwaysBuild(Alias("size", program, "$SIZE $SOURCE"))
