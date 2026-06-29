@@ -47,21 +47,36 @@ def collect_sections(objdump: str, elf_path: str) -> list[dict[str, int | str]]:
         text=True,
     )
     sections: list[dict[str, int | str]] = []
+    current: dict[str, int | str] | None = None
     for line in result.stdout.splitlines():
         match = SECTION_RE.match(line)
-        if not match:
-            continue
-        size = int(match.group("size"), 16)
-        if size == 0:
-            continue
-        sections.append(
-            {
+        if match:
+            if current is not None:
+                sections.append(current)
+            size = int(match.group("size"), 16)
+            current = None
+            if size == 0:
+                continue
+            current = {
                 "name": match.group("name"),
                 "size": size,
                 "vma": int(match.group("vma"), 16),
                 "lma": int(match.group("lma"), 16),
+                "flags": "",
             }
-        )
+            continue
+
+        if current is None:
+            continue
+
+        flags = line.strip()
+        if flags:
+            current["flags"] = flags
+            sections.append(current)
+            current = None
+
+    if current is not None:
+        sections.append(current)
     return sections
 
 
@@ -78,7 +93,16 @@ def summarize_usage(
         size = int(section["size"])
         vma = int(section["vma"])
         lma = int(section["lma"])
-        if overlaps(flash_origin, flash_limit, vma, size) or overlaps(flash_origin, flash_limit, lma, size):
+        flags = {flag.strip() for flag in str(section["flags"]).split(",")}
+        is_alloc = "ALLOC" in flags
+        has_file_contents = "CONTENTS" in flags
+
+        if not is_alloc:
+            continue
+
+        if overlaps(flash_origin, flash_limit, vma, size) or (
+            has_file_contents and overlaps(flash_origin, flash_limit, lma, size)
+        ):
             flash_used += size
         if overlaps(ram_origin, ram_limit, vma, size):
             ram_used += size
