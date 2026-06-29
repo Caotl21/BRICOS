@@ -43,7 +43,7 @@ I have moved the current bootloader-related source files into an STM32F407 proje
 ## 4. Remaining work (must do)
 
 ### A. Fix Ymodem integration consistency
-- Ensure `ymodem.c` TX/RX uses the same UART as OTA data path (currently expected: `USART2`)
+- Ensure `ymodem.c` TX/RX uses the same UART as OTA data path (currently: `USART3`)
 - Implement missing `Ymodem_Abort()` in `ymodem.c` (already declared in `ymodem.h`)
 - Confirm `Ymodem_ReceivePacket` signature matches all call sites
 - Remove any remaining F103 comments/references in Ymodem files
@@ -103,7 +103,7 @@ Minimum required drivers:
 ## 7. Suggested next action for Copilot
 
 1. Run compile error sweep and resolve all symbol/signature mismatches first.
-2. Lock Ymodem UART path to a single USART (recommended `USART2`) consistently.
+2. Lock Ymodem UART path to a single USART (recommended `USART3`) consistently.
 3. Run first serial smoke test:
    - banner
    - command loop

@@ -66,14 +66,14 @@ typedef struct
 int32_t Ymodem_Receive(uint8_t *buf, FileInfo_t *file_info);
 
 /**
- * @brief  发送单个字节到UART2
+ * @brief  发送单个字节到USART3
  * @param  c: 要发送的字节
  * @retval None
  */
 void Ymodem_SendByte(uint8_t c);
 
 /**
- * @brief  从UART2接收单个字节(带超时)
+ * @brief  从USART3接收单个字节(带超时)
  * @param  c: 接收字节的指针
  * @param  timeout: 超时时间(毫秒)
  * @retval 0:成功, -1:超时
@@ -118,4 +118,3 @@ void Ymodem_Abort(void);
 void Ymodem_IncTick(void);
 
 #endif /* __YMODEM_H */
-

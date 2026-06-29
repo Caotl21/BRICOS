@@ -97,20 +97,22 @@
 
 当前设计中两路串口的目标职责为：
 
-- USART1
+- UART4
   - 调试打印
-  - 用户命令输入
+  - 上电 100ms 内接收字符 `B`
 
-- USART2
+- USART3
+  - APP OTA 触发
+  - Bootloader 菜单命令输入
   - Ymodem OTA 数据收发
 
 当前实现上：
 
-- [Bootloader/main.c](Bootloader/main.c) 中进入 Bootloader 的触发键 `B` 只检查 USART1
-- [Bootloader/bootloader.c](Bootloader/bootloader.c) 中命令循环目前仍同时监听 USART1 和 USART2
-- [Bootloader/ymodem.c](Bootloader/ymodem.c) 的 Ymodem 收发已经使用 USART2
+- [Bootloader/main.c](Bootloader/main.c) 中进入 Bootloader 的触发键 `B` 只检查 UART4
+- [Bootloader/bootloader.c](Bootloader/bootloader.c) 中命令循环当前只监听 USART3
+- [Bootloader/ymodem.c](Bootloader/ymodem.c) 的 Ymodem 收发使用 USART3
 
-因此，从设计目标看，串口分工已经基本明确，但命令循环部分仍建议继续收口到 USART1。
+因此，当前实现中的串口分工已经固定为 UART4 负责调试/启动触发，USART3 负责命令和 OTA 数据。
 
 ---
 
@@ -122,7 +124,7 @@ Bootloader 在启动后会给用户一个有限时间窗口进入命令模式。
 
 - 记录当前系统时基
 - 在 `BOOTLOADER_TIMEOUT` 时间内循环检测串口输入
-- 如果 USART1 收到字符 `B`，则进入命令模式
+- 如果 UART4 收到字符 `B`，则进入命令模式
 - 如果超时未收到，则进入正常启动流程
 
 这一步的意义是：
@@ -266,7 +268,7 @@ OTA 下载逻辑主要在 [Bootloader/bootloader.c](Bootloader/bootloader.c) 的
 
 ### 8.3 Ymodem 握手
 
-Bootloader 会通过 USART2 发送字符 `C`，通知 PC 端开始以 CRC16 模式发送数据。
+Bootloader 会通过 USART3 发送字符 `C`，通知 PC 端开始以 CRC16 模式发送数据。
 
 ### 8.4 擦除 APP2
 
@@ -398,10 +400,10 @@ Boot Flag 是整个 Bootloader 状态机的核心状态区，定义见 [Bootload
 
 当前设计意图为：
 
-- USART1：调试与命令
-- USART2：Ymodem 数据
+- UART4：调试输出与上电触发字符 `B`
+- USART3：Bootloader 命令与 Ymodem 数据
 
-但 [Bootloader/bootloader.c](Bootloader/bootloader.c) 的命令循环目前仍同时监听 USART1 和 USART2，因此后续建议继续收口。
+当前 [Bootloader/bootloader.c](Bootloader/bootloader.c) 的命令循环已经固定监听 USART3，与 Ymodem 数据口一致。
 
 ### 12.2 APP 是否无感依赖 Bootloader
 

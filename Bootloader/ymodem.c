@@ -43,7 +43,7 @@ void Ymodem_IncTick(void)
 }
 
 /**
- * @brief  发送单个字节到UART2
+ * @brief  发送单个字节到USART3
  */
 void Ymodem_SendByte(uint8_t c)
 {
@@ -52,7 +52,7 @@ void Ymodem_SendByte(uint8_t c)
 }
 
 /**
- * @brief  从UART2接收单个字节(带超时)
+ * @brief  从USART3接收单个字节(带超时)
  * @retval 0:成功, -1:超时
  */
 int32_t Ymodem_ReceiveByte(uint8_t *c, uint32_t timeout)

@@ -5,6 +5,10 @@ Windows OTA helper for the current STM32F407 bootloader flow.
 Usage example:
     python ota_send.py --cmd-port COM5 --data-port COM6 --file app1.bin
 
+Current UART mapping in this project:
+    --cmd-port  -> UART4  (boot window 'B' + debug console)
+    --data-port -> USART3 (APP trigger + menu command + Ymodem data)
+
 Requirements:
     pip install pyserial
 """
@@ -163,7 +167,7 @@ def enter_bootloader_by_app_trigger(
     console: SerialConsole,
     seconds: float,
 ) -> None:
-    print("Sending OTA trigger to APP on USART2...")
+    print("Sending OTA trigger to APP on USART3...")
     data_port.write(OTA_TRIGGER)
     data_port.flush()
 
@@ -172,7 +176,7 @@ def enter_bootloader_by_app_trigger(
     cmd_port.reset_input_buffer()
     data_port.reset_input_buffer()
 
-    print("Waiting for bootloader menu on USART1...")
+    print("Waiting for bootloader menu on UART4...")
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         time.sleep(0.05)
@@ -193,7 +197,7 @@ def enter_bootloader_by_hw_reset(
 ) -> None:
     hardware_reset_stm32(gpiochip, line_offset)
 
-    print("Waiting for bootloader menu and sending 'B' repeatedly on USART1...")
+    print("Waiting for bootloader menu and sending 'B' repeatedly on UART4...")
     deadline = time.monotonic() + seconds
 
     while time.monotonic() < deadline:
@@ -244,7 +248,7 @@ def transfer_file(
     console: SerialConsole,
     retries: int,
 ) -> None:
-    print("Waiting for initial Ymodem 'C' from USART2...")
+    print("Waiting for initial Ymodem 'C' from USART3...")
     wait_for_data_byte(data_port, {CRC16}, timeout=15.0, console=console, ignored={CRC16})
 
     header_payload = build_header_payload(file_path)
@@ -295,10 +299,10 @@ def transfer_file(
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Send APP image to STM32 bootloader over two UARTs")
+    parser = argparse.ArgumentParser(description="Send APP image to STM32 bootloader over UART4 + USART3")
     parser.add_argument("--mode", choices=["app-trigger", "hw-reset"], default="app-trigger")
-    parser.add_argument("--cmd-port", required=True, help="Command/debug UART, typically USART1")
-    parser.add_argument("--data-port", required=True, help="Ymodem UART, typically USART2")
+    parser.add_argument("--cmd-port", required=True, help="Boot/debug UART, typically UART4")
+    parser.add_argument("--data-port", required=True, help="APP trigger + bootloader command + Ymodem UART, typically USART3")
     parser.add_argument("--file", required=True, help="APP image to send, usually the APP1 .bin file")
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate for both UARTs")
     parser.add_argument("--boot-window", type=float, default=4.0, help="Timeout for entering bootloader")
@@ -333,8 +337,8 @@ def main() -> int:
 
         enter_bootloader(args, cmd_port, data_port, console)
 
-        print("Bootloader menu detected, sending command '2'...")
-        send_command(cmd_port, b"2", console)
+        print("Bootloader menu detected, sending command '2' on USART3...")
+        send_command(data_port, b"2", console)
         transfer_file(data_port, file_path, console, args.retries)
 
         print("Waiting for final bootloader output...")
