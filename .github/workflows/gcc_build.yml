@@ -1,17 +1,8 @@
 name: GCC_Build
 
 on:
-  push:
-    branches: ["dev_scons"]
   pull_request:
-    branches: ["test_scons"]
-  workflow_dispatch:
-    inputs:
-      startup_led_probe:
-        description: "Enable GPIOE.2 blink probe at the beginning of Reset_Handler"
-        required: false
-        default: false
-        type: boolean
+    branches: ["master"]
 
 permissions:
   contents: write
