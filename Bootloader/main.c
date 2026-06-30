@@ -72,41 +72,18 @@ int main(void)
     Delay_Init();
     UART_Init();
     Bootloader_Init();
-    Serial_SendString("\r\nhello world!\r\n");
-		
-		
-
-    /* 显示当前 Boot Flag 状态 */
-    {
-        BootFlag_t *flag = (BootFlag_t *)APP_FLAG_ADDR;
-        Serial_SendString("Boot Flag: ");
-        Serial_SendString(flag->valid_flag == APP_VALID_FLAG ? "Valid" : "Invalid");
-        Serial_SendString("  need_copy=");
-        Serial_SendByte('0' + (flag->valid_flag == APP_VALID_FLAG ? flag->need_copy : 0));
-        Serial_SendString("  attempts=");
-        Serial_SendByte('0' + (flag->valid_flag == APP_VALID_FLAG ? flag->boot_attempts : 0));
-        Serial_SendString("\r\n");
-    }
-
     if(BootFlag_CheckAndClearEnterBootloader())
     {
-			  
-        Serial_SendString("\r\n>>> Enter Bootloader Requested <<<\r\n");
         Bootloader_CommandLoop();
     }
 
     /* 等待100ms检测是否进入Bootloader模式 */
-    Serial_SendString("Send 'B' to enter Bootloader mode...\r\n");
-
     if (Check_BootloaderMode())
     {
        Bootloader_CommandLoop();
     }
     else
     {
-        /* ========== 正常启动模式 ========== */
-        Serial_SendString("\r\n>>> Normal Boot Mode <<<\r\n");
-
         /*
          * Bootloader_Run 内部处理：
          * 1. 检查 need_copy → 复制APP2到APP1
@@ -120,7 +97,6 @@ int main(void)
         /* 如果 Bootloader_Run 返回，说明无法跳转APP */
         /* 自动进入命令模式，等待OTA */
         Serial_SendString("\r\nNo valid APP found.\r\n");
-        Serial_SendString("Entering Bootloader command mode...\r\n");
 
         Bootloader_CommandLoop();
     }

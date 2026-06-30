@@ -116,7 +116,7 @@ uint8_t Bootloader_CopyAPP2ToAPP1(void)
     // 检查APP2是否有效
     if (Bootloader_CheckApp(APP2_ADDR) == 0)
     {
-        UART_SendString("APP2 invalid!\r\n");
+        UART_SendString("APP2 invalid.\r\n");
         return 0;
     }
 
@@ -134,9 +134,7 @@ uint8_t Bootloader_CopyAPP2ToAPP1(void)
             FLASH_Lock();
             return 0;
         }
-        UART_SendByte('.');
     }
-    UART_SendString(" Done\r\n");
 
     UART_SendString("Copying APP2 to APP1...\r\n");
     
@@ -147,20 +145,11 @@ uint8_t Bootloader_CopyAPP2ToAPP1(void)
 
         if (FLASH_ProgramWord(APP1_ADDR + (i * 4), data) != FLASH_COMPLETE)
         {
-            UART_SendString("Write failed at offset: ");
-            UART_SendInt(i * 4);
-            UART_SendString("\r\n");
+            UART_SendString("APP1 write failed.\r\n");
             FLASH_Lock();
             return 0;
         }
-
-        /* 每4KB显示进度 */
-        if ((i % 1024) == 0)
-        {
-            UART_SendByte('.');
-        }
     }
-    UART_SendString(" Done\r\n");
 
     FLASH_Lock();
 
@@ -171,9 +160,7 @@ uint8_t Bootloader_CopyAPP2ToAPP1(void)
     {
         if (*(uint32_t *)(APP1_ADDR + (i * 4)) != *(uint32_t *)(APP2_ADDR + (i * 4)))
         {
-            UART_SendString("Verify failed at offset: ");
-            UART_SendInt(i * 4);
-            UART_SendString("\r\n");
+            UART_SendString("APP1 verify failed.\r\n");
             return 0;
         }
     }
@@ -189,12 +176,10 @@ void Bootloader_RecoverFromAPP2(void)
 {
     BootFlag_t boot_flag;
 
-    UART_SendString("\r\n========== Copying APP2 to APP1 ==========\r\n");
+    UART_SendString("\r\nApplying update...\r\n");
 
     if (Bootloader_CopyAPP2ToAPP1())
     {
-        UART_SendString("Copy successful!\r\n");
-
         /* 更新标志 */
         BootFlag_Read(&boot_flag);
         boot_flag.boot_attempts = 0;
@@ -203,13 +188,11 @@ void Bootloader_RecoverFromAPP2(void)
 
         BootFlag_Save(&boot_flag);
 
-        UART_SendString("Boot flags updated.\r\n");
-        UART_SendString("===========================================\r\n");
+        UART_SendString("Update applied.\r\n");
     }
     else
     {
-        UART_SendString("Copy failed! APP2 may be invalid.\r\n");
-        UART_SendString("===========================================\r\n");
+        UART_SendString("Update apply failed.\r\n");
     }
 }
 
@@ -221,87 +204,56 @@ void Bootloader_Run(void)
     BootFlag_t *boot_flag = (BootFlag_t*)APP_FLAG_ADDR;
     uint8_t boot_attempts;
 
-    UART_SendString("\r\n>>> Bootloader_Run Started <<<\r\n");
     Delay_ms(100);
-
-    /* 显示Boot Flag状态 */
-    UART_SendString("Boot Flag Status:\r\n");
-    UART_SendString("  valid_flag: ");
-    UART_SendString(boot_flag->valid_flag == APP_VALID_FLAG ? "Valid" : "Invalid");
-    UART_SendString("\r\n");
-    UART_SendString("  need_copy: ");
-    UART_SendString(boot_flag->need_copy ? "Yes" : "No");
-    UART_SendString("\r\n");
-    UART_SendString("  boot_attempts: ");
-    UART_SendByte('0' + boot_flag->boot_attempts);
-    UART_SendString("\r\n");
 
     /* 检查是否需要从APP2复制到APP1 */
     if (boot_flag->valid_flag == APP_VALID_FLAG && boot_flag->need_copy == 1)
     {
-        UART_SendString("\r\n>>> OTA Update Detected - need_copy=1 <<<\r\n");
         Bootloader_RecoverFromAPP2();
     }
 
     /* 获取启动尝试次数 */
     boot_attempts = Bootloader_GetBootAttempts();
-    UART_SendString("Current boot attempts: ");
-    UART_SendByte('0' + boot_attempts);
-    UART_SendString("\r\n");
 
     /* 超过最大尝试次数 */
     if (boot_attempts >= MAX_BOOT_ATTEMPTS)
     {
-        UART_SendString("\r\n>>> Boot Attempts Exceeded <<<\r\n");
+        UART_SendString("Boot retry limit reached. Recovering...\r\n");
         Bootloader_RecoverFromAPP2();
         boot_attempts = 0;
     }
 
     /* 增加启动尝试计数 */
     Bootloader_IncrementBootAttempts();
-    UART_SendString("Boot attempts incremented\r\n");
 
     // 检查APP1有效性
-    UART_SendString("Checking APP1 at 0x08008000...\r\n");
     if (Bootloader_CheckApp(APP1_ADDR))
     {
-        UART_SendString("APP1 is VALID - Jumping...\r\n");
         Delay_ms(100);
         Bootloader_JumpToApp(APP1_ADDR);
         // 如果跳转成功，不会返回到这里
     }
-    else
-    {
-        UART_SendString("APP1 is INVALID\r\n");
-    }
 
     // 如果APP1无效，尝试从APP2恢复
-    UART_SendString("\r\n>>> APP1 Invalid, trying recovery <<<\r\n");
-    UART_SendString("Checking APP2 at 0x08020000...\r\n");
-
     if (Bootloader_CheckApp(APP2_ADDR))
     {
-        UART_SendString("APP2 is VALID - Starting recovery...\r\n");
+        UART_SendString("APP1 invalid. Trying recovery...\r\n");
         Bootloader_RecoverFromAPP2();
 
-        UART_SendString("Checking APP1 after recovery...\r\n");
         if (Bootloader_CheckApp(APP1_ADDR))
         {
-            UART_SendString("APP1 recovered - Jumping...\r\n");
             Delay_ms(100);
             Bootloader_JumpToApp(APP1_ADDR);
         }
         else
         {
-            UART_SendString("Recovery FAILED - APP1 still invalid\r\n");
+            UART_SendString("Recovery failed.\r\n");
         }
     }
     else
     {
-        UART_SendString("APP2 is INVALID - No recovery possible\r\n");
+        UART_SendString("APP1 and APP2 are both invalid.\r\n");
     }
-
-    UART_SendString("\r\n>>> All attempts failed - Staying in Bootloader <<<\r\n");
 }
 
 /**
@@ -309,19 +261,13 @@ void Bootloader_Run(void)
  */
 void Bootloader_IncrementBootAttempts(void)
 {
-    UART_SendString("Incrementing boot attempts...\r\n");
     BootFlag_t boot_flag;
     BootFlag_Read(&boot_flag);
-    UART_SendString("Read ok\r\n");
 
     boot_flag.boot_attempts++;
     boot_flag.boot_count++;
 
-    int32_t res;
-    res = BootFlag_Save(&boot_flag);
-    UART_SendString("Result is ");
-    UART_SendByte('0' + res);
-    UART_SendString("\r\n");
+    (void)BootFlag_Save(&boot_flag);
 }
 
 
