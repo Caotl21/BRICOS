@@ -140,19 +140,23 @@ static shell_ret_t prv_cmd_task_stack(shell_cmd_ctx_t *ctx, int argc, char **arg
 
     if ((argc == 2) && prv_streq_ignore_case(argv[1], "request")) {
         Bot_StackWatermark_Pull(&stack_wm);
-        System_ShellCore_Printf(ctx, "stack watermark (words):");
         System_ShellCore_Printf(ctx,
-                                "monitor=%u control=%u rt_comm=%u",
+                                "stack watermark (words):\r\n"
+                                "  monitor  = %u\r\n"
+                                "  control  = %u\r\n"
+                                "  rt_comm  = %u\r\n"
+                                "  nrt_comm = %u\r\n"
+                                "  imu      = %u\r\n"
+                                "  ms5837   = %u\r\n"
+                                "  power    = %u\r\n"
+                                "  dht11    = %u\r\n"
+                                "  log      = %u",
                                 (unsigned)stack_wm.monitor_task,
                                 (unsigned)stack_wm.control_task,
-                                (unsigned)stack_wm.rt_comm_task);
-        System_ShellCore_Printf(ctx,
-                                "nrt_comm=%u imu=%u ms5837=%u",
+                                (unsigned)stack_wm.rt_comm_task,
                                 (unsigned)stack_wm.nrt_comm_task,
                                 (unsigned)stack_wm.imu_task,
-                                (unsigned)stack_wm.ms5837_task);
-        System_ShellCore_Printf(ctx,
-                                "power=%u dht11=%u log=%u",
+                                (unsigned)stack_wm.ms5837_task,
                                 (unsigned)stack_wm.power_task,
                                 (unsigned)stack_wm.dht11_task,
                                 (unsigned)stack_wm.log_task);
