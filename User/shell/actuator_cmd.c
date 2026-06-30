@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "bsp_delay.h"
 #include "bsp_pwm.h"

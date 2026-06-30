@@ -32,11 +32,16 @@ static void JY901S_Hardware_Tx(uint8_t *pBuf, uint32_t len)
     bsp_uart_send_buffer(BSP_UART_IMU2, pBuf, (uint16_t)len);
 }
 // --- JY901S：初始化以及解析 ---
+static void JY901S_DelayMs(uint16_t ms)
+{
+    bsp_delay_ms((uint32_t)ms);
+}
+
 static void Init_JY901S(void)
 {
     WitInit(WIT_PROTOCOL_NORMAL, 0x50);
     WitSerialWriteRegister(JY901S_Hardware_Tx);
-    WitDelayMsRegister(bsp_delay_ms);
+    WitDelayMsRegister(JY901S_DelayMs);
 
     //因为上电JY901S会发送数据，要清空，不然就算中断不开，CPU 不会被通知；但 USART 硬件照样会接收，照样会置位 RXNE，甚至照样会溢出 ORE
     //又因为DMA 不是主动去 USART 里抢数据，它是被 USART 的 RX DMA 请求触发的；ORE 不清，USART 不再正常发请求，所以 DMA 开了也看起来不搬运。
