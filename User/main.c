@@ -33,6 +33,30 @@
 #include "task_rt_cmd.h"
 #include "task_sensor.h"
 
+static void Main_DebugLedMark(uint32_t count)
+{
+    uint32_t i;
+    uint32_t j;
+
+    bsp_gpio_set_direction(BSP_GPIO_USERLED, true);
+
+    for (i = 0; i < count; i++) {
+        bsp_gpio_write(BSP_GPIO_USERLED, true);
+        for (j = 0; j < 3000000; j++) {
+            __NOP();
+        }
+
+        bsp_gpio_write(BSP_GPIO_USERLED, false);
+        for (j = 0; j < 3000000; j++) {
+            __NOP();
+        }
+    }
+
+    for (j = 0; j < 8000000; j++) {
+        __NOP();
+    }
+}
+
 static void Main_EarlyPrint(const char *text)
 {
     uint16_t len = 0u;
@@ -76,16 +100,23 @@ static void Main_Log_ResetReason(void)
 
 int main(void)
 {
+    bsp_gpio_init();
+    //Main_DebugLedMark(1);
 
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
+    //Main_DebugLedMark(2);
     
     bsp_delay_init();
+    //Main_DebugLedMark(3);
+
     bsp_uart_init_default();
+    //Main_DebugLedMark(4);
     
     Main_EarlyPrint("BRICOS System Booting...\r\n");
     Main_EarlyPrint("[BOOT] UART ready\r\n");
 
-    bsp_gpio_init();
+    
+    //Main_DebugLedMark(5);
     Main_EarlyPrint("[BOOT] GPIO ready\r\n");
 
     bsp_pwm_init(0);

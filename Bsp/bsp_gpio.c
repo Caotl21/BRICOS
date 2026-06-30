@@ -22,7 +22,12 @@ static const gpio_hw_info_t s_gpio_hw_info[BSP_GPIO_MAX] = {
         .port= GPIOC,
         .pin = GPIO_Pin_1,
         .rcc = RCC_AHB1Periph_GPIOC
-    }
+    },
+    [BSP_GPIO_USERLED] = {
+        .port= GPIOE,
+        .pin = GPIO_Pin_2,
+        .rcc = RCC_AHB1Periph_GPIOE
+    },
 
 };
 

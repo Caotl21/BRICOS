@@ -31,3 +31,4 @@ Boot/
 **/__pycache__/
 
 Build/
+build/gcc/

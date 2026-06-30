@@ -6,7 +6,7 @@
 #define SHELL_EXPORT_CONCAT_INNER(a, b) a##b
 #define SHELL_EXPORT_CONCAT(a, b) SHELL_EXPORT_CONCAT_INNER(a, b)
 
-#if defined(__CC_ARM) || defined(__ARMCC_VERSION)
+#if defined(__CC_ARM) || defined(__ARMCC_VERSION) || defined(__GNUC__)
 #define SHELL_CMD_EXPORT_USED       __attribute__((used))
 #define SHELL_CMD_EXPORT_SECTION    __attribute__((section("ShellCmd$$Table$$M")))
 #else

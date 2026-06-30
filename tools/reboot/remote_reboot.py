@@ -11,17 +11,11 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-ROOT_DIR = SCRIPT_DIR.parent.parent
-DEFAULT_BUILD_DIR = ROOT_DIR / "Build"
-DEFAULT_HOSTS_FILE = SCRIPT_DIR / "ota_hosts.yaml"
-DEFAULT_REMOTE_DIR = "~/BRICOS_OTA/test"
-DEFAULT_CMD_PORT = "/dev/ttyS7"
-DEFAULT_DATA_PORT = "/dev/ttyS6"
+DEFAULT_HOSTS_FILE = SCRIPT_DIR / "reboot_hosts.yaml"
+DEFAULT_REMOTE_DIR = "~/BRICOS_REBOOT/test"
 DEFAULT_RESET_GPIOCHIP = "/dev/gpiochip1"
 DEFAULT_RESET_LINE = 27
-DEFAULT_REMOTE_PYTHON = "~/miniconda3/envs/OTA_Test/bin/python"
-DEFAULT_BAUD = 115200
-DEFAULT_MODE = "hw-reset"
+DEFAULT_REMOTE_PYTHON = "/usr/bin/python3"
 
 
 def _parse_scalar(value: str) -> object:
@@ -136,17 +130,6 @@ def load_hosts(path: Path) -> dict[str, dict[str, object]]:
         }
 
 
-def find_latest_bin(build_dir: Path) -> Path:
-    if not build_dir.is_dir():
-        raise FileNotFoundError(f"Build directory not found: {build_dir}")
-
-    candidates = [p for p in build_dir.rglob("*.bin") if p.is_file()]
-    if not candidates:
-        raise FileNotFoundError(f"No .bin found under: {build_dir}")
-
-    return max(candidates, key=lambda p: p.stat().st_mtime)
-
-
 def run_cmd(cmd: list[str]) -> None:
     print("+", " ".join(shlex.quote(x) for x in cmd))
     subprocess.run(cmd, check=True)
@@ -159,8 +142,6 @@ def resolve_tool(name: str, override: str | None = None) -> str:
         if p.is_file():
             return str(p)
 
-        # 32-bit Python on Windows can redirect System32 -> SysWOW64.
-        # If user passes System32 explicitly, try Sysnative fallback.
         if os.name == "nt":
             low = raw.lower()
             mark = "\\system32\\"
@@ -193,7 +174,6 @@ def resolve_tool(name: str, override: str | None = None) -> str:
         if p.is_file():
             return str(p)
 
-    # Final fallback: ask Windows command resolver.
     if os.name == "nt":
         try:
             out = subprocess.check_output(
@@ -215,19 +195,6 @@ def resolve_tool(name: str, override: str | None = None) -> str:
     )
 
 
-def resolve_ota_send_path() -> Path:
-    candidates = [
-        SCRIPT_DIR / "ota_send.py",
-        SCRIPT_DIR.parent / "ota_send.py",
-    ]
-    for p in candidates:
-        if p.is_file():
-            return p.resolve()
-    raise FileNotFoundError(
-        f"ota_send.py not found. Checked: {', '.join(str(x) for x in candidates)}"
-    )
-
-
 def resolve_host_option(
     cli_value: object,
     host_cfg: dict[str, object],
@@ -241,73 +208,51 @@ def resolve_host_option(
     return default
 
 
+def resolve_reboot_path() -> Path:
+    path = SCRIPT_DIR / "reboot.py"
+    if not path.is_file():
+        raise FileNotFoundError(f"reboot.py not found: {path}")
+    return path.resolve()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Upload latest firmware to OrangePi and run ota_send.py remotely."
+        description="Upload reboot.py to the RDK and pulse the reset GPIO remotely."
     )
-    parser.add_argument("user", help="Target username key in yaml, for example: bricsbot1")
-    parser.add_argument(
-        "--bin",
-        help="Optional explicit local .bin file to OTA. If omitted, the latest .bin under --build-dir is used.",
-    )
+    parser.add_argument("user", help="Target username key in yaml, for example: bricsbot2")
     parser.add_argument(
         "--hosts-file",
         default=str(DEFAULT_HOSTS_FILE),
-        help=f"YAML file mapping user to IP. Default: {DEFAULT_HOSTS_FILE}",
-    )
-    parser.add_argument(
-        "--build-dir",
-        default=str(DEFAULT_BUILD_DIR),
-        help=f"Build directory to scan for latest .bin. Default: {DEFAULT_BUILD_DIR}",
+        help=f"YAML file mapping user to reboot settings. Default: {DEFAULT_HOSTS_FILE}",
     )
     parser.add_argument(
         "--remote-dir",
         help=f"Remote directory to upload and execute from. Default: {DEFAULT_REMOTE_DIR}",
     )
-    parser.add_argument(
-        "--mode",
-        choices=["app-trigger", "hw-reset"],
-        help=f"Bootloader entry mode. Default: {DEFAULT_MODE}",
-    )
-    parser.add_argument("--cmd-port", help=f"Remote command/debug UART. Default: {DEFAULT_CMD_PORT}")
-    parser.add_argument("--data-port", help=f"Remote Ymodem UART. Default: {DEFAULT_DATA_PORT}")
-    parser.add_argument("--baud", type=int, help=f"UART baud rate for both ports. Default: {DEFAULT_BAUD}")
-    parser.add_argument("--reset-gpiochip", help=f"Remote GPIO chip for reset. Default: {DEFAULT_RESET_GPIOCHIP}")
-    parser.add_argument("--reset-line", type=int, help=f"Remote reset GPIO line offset. Default: {DEFAULT_RESET_LINE}")
-    parser.add_argument(
-        "--reset-hold-ms",
-        type=float,
-        help="Reset pulse width in milliseconds for hw-reset mode.",
-    )
+    parser.add_argument("--remote-python", help=f"Remote Python executable. Default: {DEFAULT_REMOTE_PYTHON}")
+    parser.add_argument("--reset-gpiochip", help=f"Remote GPIO chip path. Default: {DEFAULT_RESET_GPIOCHIP}")
+    parser.add_argument("--reset-line", type=int, help=f"Remote GPIO line offset. Default: {DEFAULT_RESET_LINE}")
+    parser.add_argument("--reset-hold-ms", type=float, help="Reset pulse width in milliseconds.")
+    parser.add_argument("--settle-ms", type=float, help="Delay after releasing reset in milliseconds.")
     parser.add_argument(
         "--reset-active-low",
         dest="reset_active_low",
         action="store_true",
         default=None,
-        help="Drive reset line active-low during hw-reset mode.",
+        help="Drive reset line active-low.",
     )
     parser.add_argument(
         "--reset-active-high",
         dest="reset_active_low",
         action="store_false",
-        help="Drive reset line active-high during hw-reset mode.",
-    )
-    parser.add_argument(
-        "--remote-python",
-        help=(
-            "Python executable on the remote host. "
-            f"Default: {DEFAULT_REMOTE_PYTHON}"
-        ),
+        help="Drive reset line active-high.",
     )
     parser.add_argument("--ssh-bin", help="Optional absolute path to ssh executable")
     parser.add_argument("--scp-bin", help="Optional absolute path to scp executable")
     parser.add_argument(
         "--ssh-key",
         default="~/.ssh/id_ed25519_bricsbot_ota",
-        help=(
-            "Private key path for SSH/SCP. "
-            "Default: ~/.ssh/id_ed25519_bricsbot_ota"
-        ),
+        help="Private key path for SSH/SCP. Default: ~/.ssh/id_ed25519_bricsbot_ota",
     )
     parser.add_argument(
         "--use-ssh-key",
@@ -333,53 +278,32 @@ def main() -> int:
     if not host_cfg:
         print(f"User '{args.user}' not found in hosts file: {args.hosts_file}", file=sys.stderr)
         return 1
+
     ip = str(host_cfg["host"])
-
-    if args.bin:
-        local_bin = Path(args.bin).expanduser().resolve()
-        if not local_bin.is_file():
-            print(f"BIN file not found: {local_bin}", file=sys.stderr)
-            return 1
-    else:
-        local_bin = find_latest_bin(Path(args.build_dir).resolve())
-    local_ota_send = resolve_ota_send_path()
-
     remote_dir = str(resolve_host_option(args.remote_dir, host_cfg, "remote_dir", DEFAULT_REMOTE_DIR)).rstrip("/")
-    mode = str(resolve_host_option(args.mode, host_cfg, "mode", DEFAULT_MODE))
-    cmd_port = str(resolve_host_option(args.cmd_port, host_cfg, "cmd_port", DEFAULT_CMD_PORT))
-    data_port = str(resolve_host_option(args.data_port, host_cfg, "data_port", DEFAULT_DATA_PORT))
-    baud = int(resolve_host_option(args.baud, host_cfg, "baud", DEFAULT_BAUD))
+    remote_python = str(resolve_host_option(args.remote_python, host_cfg, "remote_python", DEFAULT_REMOTE_PYTHON))
     reset_gpiochip = str(resolve_host_option(args.reset_gpiochip, host_cfg, "reset_gpiochip", DEFAULT_RESET_GPIOCHIP))
     reset_line = int(resolve_host_option(args.reset_line, host_cfg, "reset_line", DEFAULT_RESET_LINE))
     reset_hold_ms = float(resolve_host_option(args.reset_hold_ms, host_cfg, "reset_hold_ms", 80.0))
+    settle_ms = float(resolve_host_option(args.settle_ms, host_cfg, "settle_ms", 50.0))
     reset_active_low = bool(resolve_host_option(args.reset_active_low, host_cfg, "reset_active_low", True))
-    remote_python = str(resolve_host_option(args.remote_python, host_cfg, "remote_python", DEFAULT_REMOTE_PYTHON))
 
+    local_reboot = resolve_reboot_path()
     ssh_bin = resolve_tool("ssh", args.ssh_bin)
     scp_bin = resolve_tool("scp", args.scp_bin)
+
     key_path = Path(os.path.expanduser(args.ssh_key))
     if args.use_ssh_key and (not key_path.is_file()):
         raise RuntimeError(f"SSH private key not found: {key_path}")
 
     target = f"{args.user}@{ip}"
-    remote_bin_name = local_bin.name
-    remote_ota_send = f"{target}:{remote_dir}/ota_send.py"
-    remote_bin = f"{target}:{remote_dir}/{remote_bin_name}"
+    remote_reboot = f"{target}:{remote_dir}/reboot.py"
 
     print(f"User: {args.user}")
     print(f"IP: {ip}")
-    if args.bin:
-        print(f"Selected BIN: {local_bin}")
-    else:
-        print(f"Latest BIN: {local_bin}")
     print(f"Remote Python: {remote_python}")
-    print(f"Mode: {mode}")
-    print(f"Baud: {baud}")
-    print(f"CMD Port: {cmd_port}")
-    print(f"DATA Port: {data_port}")
     print(f"Reset GPIO: {reset_gpiochip} line {reset_line}")
-    print(f"Reset Mode: {'active-low' if reset_active_low else 'active-high'}, hold={reset_hold_ms:.1f} ms")
-
+    print(f"Reset Mode: {'active-low' if reset_active_low else 'active-high'}, hold={reset_hold_ms:.1f} ms, settle={settle_ms:.1f} ms")
     print(f"ssh: {ssh_bin}")
     print(f"scp: {scp_bin}")
 
@@ -396,25 +320,20 @@ def main() -> int:
         print("ssh key: disabled")
 
     run_cmd([ssh_bin, *auth_opts, target, f"mkdir -p {remote_dir}"])
-    run_cmd([scp_bin, *auth_opts, str(local_ota_send), remote_ota_send])
-    run_cmd([scp_bin, *auth_opts, str(local_bin), remote_bin])
+    run_cmd([scp_bin, *auth_opts, str(local_reboot), remote_reboot])
 
     remote_cmd = (
         f"cd {remote_dir} && "
-        f"{remote_python} ota_send.py "
-        f"--mode {mode} "
-        f"--cmd-port {shlex.quote(cmd_port)} "
-        f"--data-port {shlex.quote(data_port)} "
-        f"--baud {baud} "
-        f"--file {shlex.quote(remote_bin_name)} "
-        f"--reset-gpiochip {shlex.quote(reset_gpiochip)} "
-        f"--reset-line {reset_line} "
-        f"--reset-hold-ms {reset_hold_ms} "
-        f"{'--reset-active-low' if reset_active_low else '--reset-active-high'}"
+        f"{remote_python} reboot.py "
+        f"--gpiochip {shlex.quote(reset_gpiochip)} "
+        f"--line {reset_line} "
+        f"--hold-ms {reset_hold_ms} "
+        f"--settle-ms {settle_ms} "
+        f"{'--active-low' if reset_active_low else '--active-high'}"
     )
     run_cmd([ssh_bin, *auth_opts, target, remote_cmd])
 
-    print("OTA completed.")
+    print("Remote reboot completed.")
     return 0
 
 
