@@ -363,7 +363,7 @@ static void vTask_Power_Core(void *pvParameters)
 
         Bot_State_Push_Power(v_val, c_val);
 
-        LOG_INFO("Power - Vol: %.2fV, Cur: %.2fA", v_val, c_val);
+        LOG_INFO("Power - Vol: %.5fV, Cur: %.2fA", v_val, c_val);
 
         Bot_Task_CheckIn_Monitor(TASK_ID_POWER);
         vTaskDelayUntil(&xLastWakeTime, xFrequency); 
