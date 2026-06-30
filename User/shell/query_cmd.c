@@ -129,8 +129,43 @@ static shell_ret_t prv_cmd_chip(shell_cmd_ctx_t *ctx, int argc, char **argv)
     return SHELL_RET_BAD_ARGS;
 }
 
+static shell_ret_t prv_cmd_task_stack(shell_cmd_ctx_t *ctx, int argc, char **argv)
+{
+    bot_stack_watermark_t stack_wm;
+
+    if (argc == 1) {
+        System_ShellCore_Printf(ctx, "usage: task_stack request");
+        return SHELL_RET_OK;
+    }
+
+    if ((argc == 2) && prv_streq_ignore_case(argv[1], "request")) {
+        Bot_StackWatermark_Pull(&stack_wm);
+        System_ShellCore_Printf(ctx, "stack watermark (words):");
+        System_ShellCore_Printf(ctx,
+                                "monitor=%u control=%u rt_comm=%u",
+                                (unsigned)stack_wm.monitor_task,
+                                (unsigned)stack_wm.control_task,
+                                (unsigned)stack_wm.rt_comm_task);
+        System_ShellCore_Printf(ctx,
+                                "nrt_comm=%u imu=%u ms5837=%u",
+                                (unsigned)stack_wm.nrt_comm_task,
+                                (unsigned)stack_wm.imu_task,
+                                (unsigned)stack_wm.ms5837_task);
+        System_ShellCore_Printf(ctx,
+                                "power=%u dht11=%u log=%u",
+                                (unsigned)stack_wm.power_task,
+                                (unsigned)stack_wm.dht11_task,
+                                (unsigned)stack_wm.log_task);
+        return SHELL_RET_OK;
+    }
+
+    System_ShellCore_Printf(ctx, "usage: task_stack request");
+    return SHELL_RET_BAD_ARGS;
+}
+
 EXPORT_SHELL_CMD("euler", "euler request", prv_cmd_euler, SHELL_PERM_READONLY, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("depthtemp", "depthtemp request", prv_cmd_depthtemp, SHELL_PERM_READONLY, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("power", "power request", prv_cmd_power, SHELL_PERM_READONLY, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("cabin", "cabin request", prv_cmd_cabin, SHELL_PERM_READONLY, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("chip", "chip request", prv_cmd_chip, SHELL_PERM_READONLY, SHELL_MODE_ANY);
+EXPORT_SHELL_CMD("task_stack", "task_stack request", prv_cmd_task_stack, SHELL_PERM_READONLY, SHELL_MODE_ANY);

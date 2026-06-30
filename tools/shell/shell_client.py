@@ -77,8 +77,9 @@ class ShellClient:
         "power",
         "cabin",
         "chip",
+        "task_stack",
     ]
-    QUERY_COMMANDS = ["euler", "depthtemp", "power", "cabin", "chip"]
+    QUERY_COMMANDS = ["euler", "depthtemp", "power", "cabin", "chip", "task_stack"]
     SYSMODE_TARGETS = ["standby", "disarmed", "armed", "failsafe"]
     MOMODE_TARGETS = ["manual", "stabilize", "auto"]
     THRUSTER_ACTIONS = ["request", "idle", "stop", "all", "set", "pulse"]
@@ -665,4 +666,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-gi

@@ -24,11 +24,11 @@
 
 /* 2. MS5837 深度与水温任务 (高频 I2C 时序调度) */
 #define MS5837_TASK_PRIO    3
-#define MS5837_STK_SIZE     256  
+#define MS5837_STK_SIZE     512  
 
 /* 3. Power 电源监控任务 (低频 ADC 采样) */
 #define POWER_TASK_PRIO     2
-#define POWER_STK_SIZE      256  
+#define POWER_STK_SIZE      512  
 
 /* 4. DHT11 舱内温湿度与漏水辅助监控任务 (单总线时序) */
 #define DHT11_TASK_PRIO     2

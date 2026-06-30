@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -86,6 +87,23 @@ class SerialConsole:
         return token in self.text_buffer
 
 
+def wait_for_console_tokens(
+    console: SerialConsole,
+    tokens: tuple[str, ...],
+    timeout: float,
+) -> str | None:
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        time.sleep(0.02)
+        console.poll()
+        for token in tokens:
+            if console.contains(token):
+                return token
+
+    return None
+
+
 def crc16_ccitt(data: bytes) -> int:
     crc = 0
     for byte in data:
@@ -109,7 +127,7 @@ def wait_for_data_byte(
     ignored = ignored or set()
 
     while time.monotonic() < deadline:
-        if console is not None:
+        if console is not None and console.port is not port:
             console.poll()
 
         value = port.read(1)
@@ -122,13 +140,40 @@ def wait_for_data_byte(
         if byte in ignored:
             continue
 
-        if 32 <= byte <= 126:
-            sys.stdout.write(f"\n[data] unexpected byte: {chr(byte)!r}\n")
-        else:
-            sys.stdout.write(f"\n[data] unexpected byte: 0x{byte:02X}\n")
-        sys.stdout.flush()
-
     raise TimeoutError(f"Timed out waiting for bytes: {sorted(expected)}")
+
+
+def append_console_byte(console: SerialConsole, byte: int) -> None:
+    text = bytes([byte]).decode("utf-8", errors="replace")
+    console.text_buffer += text
+    if len(console.text_buffer) > 8192:
+        console.text_buffer = console.text_buffer[-4096:]
+
+
+def select_transfer_port(
+    cmd_port: serial.Serial,
+    data_port: serial.Serial,
+    console: SerialConsole,
+    timeout: float,
+) -> tuple[serial.Serial, str]:
+    print("Waiting for initial Ymodem 'C' on cmd/data ports...")
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        cmd_value = cmd_port.read(1)
+        if cmd_value:
+            cmd_byte = cmd_value[0]
+            if cmd_byte == CRC16:
+                return cmd_port, "cmd_port"
+            append_console_byte(console, cmd_byte)
+
+        data_value = data_port.read(1)
+        if data_value:
+            data_byte = data_value[0]
+            if data_byte == CRC16:
+                return data_port, "data_port"
+
+    raise TimeoutError("Timed out waiting for initial Ymodem 'C' on both ports")
 
 
 def send_packet(port: serial.Serial, seq: int, payload: bytes) -> None:
@@ -157,7 +202,11 @@ def pulse_reset_gpio(
     hold_ms: float,
     active_low: bool = True,
 ) -> None:
-    print(f"Pulsing reset GPIO: {gpiochip} line {line_offset}")
+    polarity = "active-low" if active_low else "active-high"
+    print(
+        f"Pulsing reset GPIO: {gpiochip} line {line_offset} "
+        f"({polarity}, hold={hold_ms:.1f} ms)"
+    )
 
     active_value = (
         gpiod.line.Value.INACTIVE if active_low else gpiod.line.Value.ACTIVE
@@ -181,7 +230,7 @@ def pulse_reset_gpio(
         request.set_value(line_offset, active_value)
         time.sleep(hold_ms / 1000.0)
         request.set_value(line_offset, inactive_value)
-        time.sleep(0.05)
+        print("Reset released.")
 
 def hardware_reset_stm32(chip_path, line_offset):
     # 使用新版 v2.x 语法
@@ -204,6 +253,14 @@ def hardware_reset_stm32(chip_path, line_offset):
         # 2. 拉高电平释放复位
         request.set_value(line_offset, Value.ACTIVE)
         print("Reset released.")
+
+def perform_reset_gpio(
+    gpiochip: str,
+    line_offset: int,
+    hold_ms: float,
+    active_low: bool,
+) -> None:
+    pulse_reset_gpio(gpiochip, line_offset, hold_ms, active_low)
 
 
 def build_header_payload(file_path: Path) -> bytes:
@@ -229,12 +286,11 @@ def enter_bootloader_by_app_trigger(
     cmd_port.reset_input_buffer()
     data_port.reset_input_buffer()
 
-    print("Waiting for bootloader menu on USART4...")
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         time.sleep(0.05)
         console.poll()
-        if console.contains("READY") or console.contains("Commands:"):
+        if console.contains("READY"):
             return
 
     raise TimeoutError("Bootloader menu was not detected after APP trigger")
@@ -248,18 +304,41 @@ def enter_bootloader_by_hw_reset(
     hold_ms: float,
     active_low: bool,
 ) -> None:
-    hardware_reset_stm32(gpiochip, line_offset)
+    cmd_port.reset_input_buffer()
+    cmd_port.reset_output_buffer()
 
-    print("Waiting for bootloader menu and sending 'B' repeatedly on USART1...")
     deadline = time.monotonic() + seconds
+    prompt_seen = False
+    stop_sender = threading.Event()
 
-    while time.monotonic() < deadline:
-        cmd_port.write(b"B")
-        cmd_port.flush()
-        time.sleep(0.08)
-        console.poll()
-        if console.contains("READY") or console.contains("Commands:"):
-            return
+    def spam_boot_key() -> None:
+        while not stop_sender.is_set():
+            try:
+                cmd_port.write(b"B")
+                cmd_port.flush()
+            except Exception:
+                return
+            time.sleep(0.005)
+
+    sender = threading.Thread(target=spam_boot_key, name="ota-boot-key", daemon=True)
+    sender.start()
+
+    try:
+        time.sleep(0.02)
+        perform_reset_gpio(gpiochip, line_offset, hold_ms, active_low)
+
+        while time.monotonic() < deadline:
+            time.sleep(0.02)
+            console.poll()
+            if console.contains("READY"):
+                return
+            if console.contains("Send 'B' to enter Bootloader mode..."):
+                prompt_seen = True
+            if prompt_seen and console.contains("Normal Boot Mode"):
+                raise RuntimeError("STM32 fell through to normal boot")
+    finally:
+        stop_sender.set()
+        sender.join(timeout=0.2)
 
     raise TimeoutError("Bootloader menu was not detected after hardware reset")
 
@@ -288,28 +367,58 @@ def enter_bootloader(
     
     raise RuntimeError(f"Unsupported bootloader entry mode: {args.mode}")
 
-def send_command(cmd_port: serial.Serial, command: bytes, console: SerialConsole) -> None:
-    cmd_port.write(command)
-    cmd_port.flush()
-    time.sleep(0.1)
-    console.poll()
+def send_command(port: serial.Serial, command: bytes, console: SerialConsole | None = None) -> None:
+    payload = command if command.endswith((b"\r", b"\n")) else (command + b"\r")
+    port.write(payload)
+    port.flush()
+    time.sleep(0.15)
+    if console is not None:
+        console.poll()
+
+
+def wait_for_download_mode_ack(console: SerialConsole, timeout: float) -> None:
+    token = wait_for_console_tokens(
+        console,
+        (
+            ">>> Download to APP2 (Ymodem) <<<",
+            "Waiting for file (Ymodem)...",
+            "Erasing APP2...",
+        ),
+        timeout,
+    )
+    if token is None:
+        raise RuntimeError("Download command '2' was not acknowledged")
+
+
+def wait_for_download_ready(console: SerialConsole, timeout: float) -> None:
+    token = wait_for_console_tokens(
+        console,
+        (
+            "Erase APP2 done.",
+            "Erase APP2 failed!",
+            "Too many errors waiting for header!",
+        ),
+        timeout,
+    )
+    if token == "Erase APP2 done.":
+        return
+    if token is None:
+        raise RuntimeError("Bootloader did not reach Ymodem-ready state")
+    raise RuntimeError(f"Bootloader failed before Ymodem start: {token}")
 
 
 def transfer_file(
-    data_port: serial.Serial,
+    transfer_port: serial.Serial,
     file_path: Path,
     console: SerialConsole,
     retries: int,
 ) -> None:
-    print("Waiting for initial Ymodem 'C' from USART2...")
-    wait_for_data_byte(data_port, {CRC16}, timeout=15.0, console=console, ignored={CRC16})
-
     header_payload = build_header_payload(file_path)
     print(f"Sending header packet for {file_path.name} ({file_path.stat().st_size} bytes)...")
-    send_packet(data_port, 0, header_payload)
+    send_packet(transfer_port, 0, header_payload)
 
-    wait_for_data_byte(data_port, {ACK}, timeout=10.0, console=console, ignored={CRC16})
-    wait_for_data_byte(data_port, {CRC16}, timeout=10.0, console=console, ignored={ACK, CRC16})
+    wait_for_data_byte(transfer_port, {ACK}, timeout=10.0, console=console, ignored={CRC16})
+    wait_for_data_byte(transfer_port, {CRC16}, timeout=10.0, console=console, ignored={ACK, CRC16})
 
     file_data = file_path.read_bytes()
     total_blocks = (len(file_data) + PACKET_1K_SIZE - 1) // PACKET_1K_SIZE
@@ -320,9 +429,9 @@ def transfer_file(
         block_no = index + 1
 
         for attempt in range(1, retries + 1):
-            send_packet(data_port, block_no, payload)
+            send_packet(transfer_port, block_no, payload)
             response = wait_for_data_byte(
-                data_port,
+                transfer_port,
                 {ACK, NAK, CA},
                 timeout=10.0,
                 console=console,
@@ -338,13 +447,13 @@ def transfer_file(
             print(f"Block {block_no} NAK, retry {attempt}/{retries}")
 
     print("Sending EOT...")
-    data_port.write(bytes([EOT]))
-    data_port.flush()
-    response = wait_for_data_byte(data_port, {ACK, NAK, CA}, timeout=10.0, console=console)
+    transfer_port.write(bytes([EOT]))
+    transfer_port.flush()
+    response = wait_for_data_byte(transfer_port, {ACK, NAK, CA}, timeout=10.0, console=console)
     if response == NAK:
-        data_port.write(bytes([EOT]))
-        data_port.flush()
-        response = wait_for_data_byte(data_port, {ACK, CA}, timeout=10.0, console=console)
+        transfer_port.write(bytes([EOT]))
+        transfer_port.flush()
+        response = wait_for_data_byte(transfer_port, {ACK, CA}, timeout=10.0, console=console)
     if response == CA:
         raise RuntimeError("Transfer aborted by STM32 at EOT")
 
@@ -354,8 +463,8 @@ def transfer_file(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Send APP image to STM32 bootloader over two UARTs")
     parser.add_argument("--mode", choices=["app-trigger", "hw-reset"], default="app-trigger")
-    parser.add_argument("--cmd-port", required=True, help="Command/debug UART, typically USART1")
-    parser.add_argument("--data-port", required=True, help="Ymodem UART, typically USART2")
+    parser.add_argument("--cmd-port", required=True, help="Boot key / menu output UART, typically UART4")
+    parser.add_argument("--data-port", required=True, help="Bootloader command + Ymodem UART, typically USART3")
     parser.add_argument("--file", required=True, help="APP image to send, usually the APP1 .bin file")
     parser.add_argument("--baud", type=int, default=115200, help="Baud rate for both UARTs")
     parser.add_argument("--boot-window", type=float, default=6.0, help="Timeout for entering bootloader")
@@ -391,8 +500,15 @@ def main() -> int:
         enter_bootloader(args, cmd_port, data_port, console)
 
         print("Bootloader menu detected, sending command '2'...")
-        send_command(cmd_port, b"2", console)
-        transfer_file(data_port, file_path, console, args.retries)
+        send_command(data_port, b"2")
+        wait_for_download_mode_ack(console, timeout=3.0)
+        wait_for_download_ready(console, timeout=10.0)
+        cmd_port.reset_input_buffer()
+        data_port.reset_input_buffer()
+        transfer_port, transfer_name = select_transfer_port(
+            cmd_port, data_port, console, timeout=20.0
+        )
+        transfer_file(transfer_port, file_path, console, args.retries)
 
         print("Waiting for final bootloader output...")
         time.sleep(1.0)
