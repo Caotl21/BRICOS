@@ -1,0 +1,22 @@
+[Unit]
+Description=BRICOS UART Shell Bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bricsbot2
+Group=bricsbot2
+SupplementaryGroups=dialout
+WorkingDirectory=/home/bricsbot2/shell
+ExecStart=/usr/bin/python3 /home/bricsbot2/shell/bot_shelld.py --serial-port /dev/bot_logbridge --baud 1500000 --listen-host 0.0.0.0 --listen-port 8765
+Restart=always
+RestartSec=2
+KillSignal=SIGTERM
+TimeoutStopSec=5
+NoNewPrivileges=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

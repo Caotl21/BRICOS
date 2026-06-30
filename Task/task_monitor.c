@@ -225,7 +225,7 @@ static void vTask_Monitor_Core(void *pvParameters)
                 (current_sys_mode == SYS_MODE_ACTIVE_DISARMED)) {
                 mode_switch_tick = current_tick;
                 mode_switch_guard_active = 1u;
-                LOG_WARNING("Mode switch guard active: %u->%u",
+                LOG_INFO("Mode switch guard active: %u->%u",
                             (uint32_t)last_sys_mode,
                             (uint32_t)current_sys_mode);
             } else {

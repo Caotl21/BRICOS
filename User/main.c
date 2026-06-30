@@ -101,22 +101,22 @@ static void Main_Log_ResetReason(void)
 int main(void)
 {
     bsp_gpio_init();
-    Main_DebugLedMark(1);
+    //Main_DebugLedMark(1);
 
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
-    Main_DebugLedMark(2);
+    //Main_DebugLedMark(2);
     
     bsp_delay_init();
-    Main_DebugLedMark(3);
+    //Main_DebugLedMark(3);
 
     bsp_uart_init_default();
-    Main_DebugLedMark(4);
+    //Main_DebugLedMark(4);
     
     Main_EarlyPrint("BRICOS System Booting...\r\n");
     Main_EarlyPrint("[BOOT] UART ready\r\n");
 
     
-    Main_DebugLedMark(5);
+    //Main_DebugLedMark(5);
     Main_EarlyPrint("[BOOT] GPIO ready\r\n");
 
     bsp_pwm_init(0);
