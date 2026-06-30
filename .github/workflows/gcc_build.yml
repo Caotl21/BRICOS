@@ -3,6 +3,8 @@ name: GCC_Build
 on:
   pull_request:
     branches: ["master"]
+    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,6 +16,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
 
       - name: Install Toolchain
         run: |
@@ -55,14 +59,14 @@ jobs:
             build/gcc/app1/release/app1_usage.env
 
       - name: Generate Release Metadata
-        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        if: success() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true))
         id: meta
         shell: bash
         run: |
           source build/gcc/app1/release/app1_usage.env
           tag="gcc-v$(date +'%Y.%m.%d')-${{ github.run_number }}"
           build_time="$(date +'%Y-%m-%d %H:%M:%S UTC')"
-          commit_sha="${{ github.sha }}"
+          commit_sha="${{ github.event.pull_request.merge_commit_sha || github.sha }}"
           commit_subject="$(git log -1 --pretty=%s)"
           echo "tag_name=$tag" >> "$GITHUB_OUTPUT"
           echo "build_time=$build_time" >> "$GITHUB_OUTPUT"
@@ -78,7 +82,7 @@ jobs:
           echo "ram_used_percent=$APP1_RAM_USED_PERCENT" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
-        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        if: success() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true))
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag_name }}
