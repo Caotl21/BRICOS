@@ -17,7 +17,7 @@ static uint8_t prv_is_sys_mode_valid(bot_sys_mode_e mode)
 /* 校验运动模式枚举是否合法 */
 static uint8_t prv_is_motion_mode_valid(bot_run_mode_e mode)
 {
-    return (mode >= MOTION_STATE_MANUAL) && (mode <= MOTION_STATE_AUTO);
+    return (mode >= MOTION_STATE_MANUAL) && (mode <= MOTION_STATE_DEBUG);
 }
 
 /* 从数据池快照提取“动态故障”（实时故障，不等同于锁存故障） */

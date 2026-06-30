@@ -106,7 +106,8 @@ static uint16_t Serialize_Sys_Report(uint8_t *buf,
 
     buf[offset++] = sys_state->is_leak_detected ? 1u : 0u;
     buf[offset++] = sys_state->is_imu_error ? 1u : 0u;
-    buf[offset++] = (sys_state->bat_voltage_v < params->failsafe_low_voltage) ? 1u : 0u;
+    buf[offset++] = ((sys_state->bat_voltage_v > 1.0f) &&
+                     (sys_state->bat_voltage_v < params->failsafe_low_voltage)) ? 1u : 0u;
 
     return offset;
 }
@@ -224,7 +225,7 @@ static void vTask_Monitor_Core(void *pvParameters)
                 (current_sys_mode == SYS_MODE_ACTIVE_DISARMED)) {
                 mode_switch_tick = current_tick;
                 mode_switch_guard_active = 1u;
-                LOG_WARNING("Mode switch guard active: %u->%u",
+                LOG_INFO("Mode switch guard active: %u->%u",
                             (uint32_t)last_sys_mode,
                             (uint32_t)current_sys_mode);
             } else {
@@ -233,7 +234,7 @@ static void vTask_Monitor_Core(void *pvParameters)
             last_sys_mode = current_sys_mode;
         }
 
-        if (sys_state.bat_voltage_v < MONITOR_LOW_VOLTAGE_WARN_V) {
+        if ((sys_state.bat_voltage_v < MONITOR_LOW_VOLTAGE_WARN_V) && (sys_state.bat_voltage_v > 1.0f)) {
             if (low_voltage_alarm_reported == 0u) {
                 LOG_ERROR("Voltage alarm: bat_voltage=%.2fV < %.2fV",
                           sys_state.bat_voltage_v,

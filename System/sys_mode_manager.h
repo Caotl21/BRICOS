@@ -19,9 +19,10 @@ typedef enum {
 } bot_sys_mode_e;
 
 typedef enum {
-    MOTION_STATE_MANUAL    = 0, /* 手动控制 */
-    MOTION_STATE_STABILIZE = 1, /* 自稳控制（定深/定向） */
-    MOTION_STATE_AUTO      = 2  /* 自动控制（上位机策略） */
+    MOTION_STATE_MANUAL     = 0, /* 手动控制 */
+    MOTION_STATE_STABILIZE  = 1, /* 自稳控制（定深/定向） */
+    MOTION_STATE_AUTO       = 2, /* 自动控制（航点/航线） */
+    MOTION_STATE_DEBUG      = 3  /* 无上位机调试用 */
 } bot_run_mode_e;
 
 /* ============================================================================

@@ -7,6 +7,7 @@
 typedef enum {
     IMU_JY901S = 0,
     IMU_IM948,
+    IMU_IM948_2,
     IMU_MAX_NUM
 } imu_id_t;
 
@@ -20,6 +21,7 @@ typedef struct {
 //初始化
 void Driver_IMU_Init(void);
 bool Driver_IMU_JY901S_CalibrateAcc(void);
+bool Driver_IMU_JY901B_DefaultConfig(void);
 
 // --- 统一 API ---
 uint8_t* Driver_IMU_GetRxBuf(imu_id_t id);

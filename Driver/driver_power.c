@@ -40,7 +40,7 @@ float Driver_Power_GetVoltage(void)
     // s_adc_raw_values[0] 对应 BSP_ADC_VOLTAGE
     // 满量程 4096 对应 3.3V 内部基准，分压系数为 11
     
-    return ((float)s_adc_raw_values[0] / 4096.0f) * 3.3f * 11.0f;
+    return (((float)s_adc_raw_values[0] / 4096.0f) * 3.3f * 11.667f + 0.2);
 }
 
 float Driver_Power_GetCurrent(void)
@@ -51,5 +51,5 @@ float Driver_Power_GetCurrent(void)
     float voltage_i = ((float)s_adc_raw_values[1] / 4096.0f) * 3.3f;
     
     // 电流解算公式：10 * (测量电压 - 2.5V 偏移)
-    return 10.0f * (voltage_i);
+    return 500.0f * (voltage_i);
 }

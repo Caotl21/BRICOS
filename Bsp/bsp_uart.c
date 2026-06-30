@@ -120,6 +120,35 @@ static const uart_hw_info_t s_uart_hw_info[BSP_UART_MAX] = {
         .dma_tx_nvic_priority = 0
     },
 
+    [BSP_UART_IMU3] = {
+        .uart_base = USART6,
+        .gpio_rcc = RCC_AHB1Periph_GPIOC,
+        .uart_rcc = RCC_APB2Periph_USART6,
+        .dma_rcc = RCC_AHB1Periph_DMA2,
+        .uart_rcc_cmd = RCC_APB2PeriphClockCmd,
+        .gpio_tx_port = GPIOC,
+        .gpio_pin_tx = GPIO_Pin_6,
+        .gpio_pin_tx_src = GPIO_PinSource6,
+        .gpio_rx_port = GPIOC,
+        .gpio_pin_rx = GPIO_Pin_7,
+        .gpio_pin_rx_src = GPIO_PinSource7,
+        .gpio_af = GPIO_AF_USART6,
+        .irqn = 0,
+        .nvic_priority = 0,
+        .dma_rx_stream = DMA2_Stream1,
+        .dma_tx_stream = NULL,
+        .dma_channel = DMA_Channel_5,
+        .dma_priority = DMA_Priority_High,
+        .dma_rx_clear_flags = DMA_FLAG_TCIF1 | DMA_FLAG_HTIF1 | DMA_FLAG_TEIF1 | DMA_FLAG_DMEIF1 | DMA_FLAG_FEIF1,
+        .dma_tx_clear_flags = 0,
+        .dma_tx_it_tc = 0,
+        .dma_tx_it_te = 0,
+        .dma_tx_it_dme = 0,
+        .dma_tx_it_fe = 0,
+        .dma_tx_irqn = 0,
+        .dma_tx_nvic_priority = 0
+    },
+
     [BSP_UART_OPI_RT] = {
         .uart_base = USART3,
         .gpio_rcc = RCC_AHB1Periph_GPIOB,
@@ -227,6 +256,77 @@ static void prv_uart_tx_mutex_init(bsp_uart_port_t port)
 }
 
 
+
+/* --- UART runtime helpers --- */
+static void prv_uart_fill_usart_config(const bsp_uart_config_t *config, USART_InitTypeDef *usart_config)
+{
+    usart_config->USART_BaudRate = config->baudrate;
+
+    if (config->data_bits == BSP_UART_DATA_9B) {
+        usart_config->USART_WordLength = USART_WordLength_9b;
+    } else {
+        usart_config->USART_WordLength = USART_WordLength_8b;
+    }
+
+    if (config->stop_bits == BSP_UART_STOP_2B) {
+        usart_config->USART_StopBits = USART_StopBits_2;
+    } else {
+        usart_config->USART_StopBits = USART_StopBits_1;
+    }
+
+    if (config->parity == BSP_UART_PARITY_EVEN) {
+        usart_config->USART_Parity = USART_Parity_Even;
+    } else if (config->parity == BSP_UART_PARITY_ODD) {
+        usart_config->USART_Parity = USART_Parity_Odd;
+    } else {
+        usart_config->USART_Parity = USART_Parity_No;
+    }
+
+    usart_config->USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    usart_config->USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
+}
+
+void bsp_uart_clear_rx_pending(bsp_uart_port_t port)
+{
+    USART_TypeDef* uart;
+    volatile uint32_t temp;
+
+    if (port >= BSP_UART_MAX) {
+        return;
+    }
+
+    uart = s_uart_hw_info[port].uart_base;
+
+    while (USART_GetFlagStatus(uart, USART_FLAG_RXNE) != RESET) {
+        temp = uart->DR;
+        (void)temp;
+    }
+
+    temp = uart->SR;
+    temp = uart->DR;
+    (void)temp;
+}
+
+bool bsp_uart_reconfig(bsp_uart_port_t port, const bsp_uart_config_t *config)
+{
+    USART_InitTypeDef USART_InitStructure;
+    const uart_hw_info_t* hw;
+
+    if (port >= BSP_UART_MAX || config == NULL) {
+        return false;
+    }
+
+    hw = &s_uart_hw_info[port];
+
+    USART_DMACmd(hw->uart_base, USART_DMAReq_Rx, DISABLE);
+    USART_Cmd(hw->uart_base, DISABLE);
+    prv_uart_fill_usart_config(config, &USART_InitStructure);
+    USART_Init(hw->uart_base, &USART_InitStructure);
+    USART_Cmd(hw->uart_base, ENABLE);
+    bsp_uart_clear_rx_pending(port);
+
+    return true;
+}
 
 /* --- 注册回调函数 --- */
 void bsp_uart_register_rx_cb(bsp_uart_port_t port, bsp_uart_rx_cb_t cb) {
@@ -425,6 +525,9 @@ void bsp_uart_init_default(void)
     
     // 初始化 IMU2 (USART2)
     bsp_uart_init(BSP_UART_IMU2, &default_config);
+
+    // Initialize IMU3 (USART6)
+    bsp_uart_init(BSP_UART_IMU3, &default_config);
 
     default_config.baudrate  = 1500000;
     // 初始化 shell/log 调试接口（UART5）

@@ -1,2 +1,16 @@
 hosts:
-  bricsbot1: 192.168.1.107
+  bricsbot1:
+    host: 192.168.13.11
+    remote_python: ~/miniconda3/envs/OTA_Test/bin/python
+    cmd_port: /dev/ttyS7
+    data_port: /dev/ttyS6
+    reset_gpiochip: /dev/gpiochip1
+    reset_line: 27
+
+  bricsbot2:
+    host: 192.168.13.12
+    remote_python: ~/miniconda3/envs/test/bin/python
+    cmd_port: /dev/bot_ota_cmdport
+    data_port: /dev/bot_ota_dataport
+    reset_gpiochip: /dev/gpiochip4
+    reset_line: 9

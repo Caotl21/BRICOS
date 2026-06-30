@@ -38,12 +38,16 @@ typedef enum {
 #define DATA_TYPE_READ_TAM          0x17
 #define DATA_TYPE_SET_WS2812_COLOR  0x18
 #define DATA_TYPE_CALIBRATE_IMU_ACC 0x19
+#define DATA_TYPE_CLEAR_PERSIST_LOG 0x1A
+#define DATA_TYPE_CLEAR_OVERFLOW_SNAPSHOT 0x1B
+#define DATA_TYPE_CONFIG_IMU_JY901B 0x1C
 
 // SERVICE ACK状态码定义
 #define ACK_SUCCESS                 0x01
 #define INVALID_PARAM               0x02
 #define UNKNOWN_CMD                 0x03  
 #define LENGTH_ERROR                0x04
+#define EXECUTION_FAILED            0x05
 
 
 typedef void (*protocol_cmd_handler_t)(const uint8_t *payload, uint16_t len);

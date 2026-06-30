@@ -6,6 +6,7 @@
 #include "wit_c_sdk.h"
 #include "sys_log.h"
 #include <math.h>
+#include <string.h>
 
 #define IMU_FIFO_SIZE 256
 
@@ -20,6 +21,8 @@ typedef struct {
 } imu_dev_t;
 
 static imu_dev_t s_devs[IMU_MAX_NUM] = {0};
+static im948_ctx_t s_im948_ctx_1 = {0};
+static im948_ctx_t s_im948_ctx_2 = {0};
 
 /* ===================================================================
  * 各个 IMU 专属的解析逻辑 (未来添加新 IMU 就在这里加)
@@ -29,72 +32,76 @@ static void JY901S_Hardware_Tx(uint8_t *pBuf, uint32_t len)
     bsp_uart_send_buffer(BSP_UART_IMU2, pBuf, (uint16_t)len);
 }
 // --- JY901S：初始化以及解析 ---
-static void Init_JY901S(void) 
+static void Init_JY901S(void)
 {
     WitInit(WIT_PROTOCOL_NORMAL, 0x50);
     WitSerialWriteRegister(JY901S_Hardware_Tx);
     WitDelayMsRegister(bsp_delay_ms);
 
+    //因为上电JY901S会发送数据，要清空，不然就算中断不开，CPU 不会被通知；但 USART 硬件照样会接收，照样会置位 RXNE，甚至照样会溢出 ORE
+    //又因为DMA 不是主动去 USART 里抢数据，它是被 USART 的 RX DMA 请求触发的；ORE 不清，USART 不再正常发请求，所以 DMA 开了也看起来不搬运。
+    bsp_uart_clear_rx_pending(BSP_UART_IMU2);
+
     bsp_uart_start_dma_rx_circular(BSP_UART_IMU2,
                                    Driver_IMU_GetRxBuf(IMU_JY901S),
                                    Driver_IMU_GetBufSize(IMU_JY901S));
-                                   
+
 }
 
 static bool JY901S_Parse_Payload(const uint8_t *frame, imu_data_t *out_data)
 {
     bool is_frame_completed = false;
 
-    switch (frame[1]) 
+    switch (frame[1])
     {
         case 0x51: /* 解析加速度数据 (量程: ±16g) */
             out_data->acc[0] = (float)((int16_t)(frame[3] << 8 | frame[2])) / 32768.0f * 16.0f;
             out_data->acc[1] = (float)((int16_t)(frame[5] << 8 | frame[4])) / 32768.0f * 16.0f;
             out_data->acc[2] = (float)((int16_t)(frame[7] << 8 | frame[6])) / 32768.0f * 16.0f;
             break;
-            
+
         case 0x52: /* 解析角速度数据 (量程: ±2000°/s) */
             out_data->gyro[0] = (float)((int16_t)(frame[3] << 8 | frame[2])) / 32768.0f * 2000.0f;
             out_data->gyro[1] = (float)((int16_t)(frame[5] << 8 | frame[4])) / 32768.0f * 2000.0f;
             out_data->gyro[2] = (float)((int16_t)(frame[7] << 8 | frame[6])) / 32768.0f * 2000.0f;
             break;
-            
+
         case 0x59: /* 解析四元数数据 (归一化数值) */
             out_data->quat[0] = (float)((int16_t)(frame[3] << 8 | frame[2])) / 32768.0f;
             out_data->quat[1] = (float)((int16_t)(frame[5] << 8 | frame[4])) / 32768.0f;
             out_data->quat[2] = (float)((int16_t)(frame[7] << 8 | frame[6])) / 32768.0f;
             out_data->quat[3] = (float)((int16_t)(frame[9] << 8 | frame[8])) / 32768.0f;
-            
+
             /* 接收到四元数数据包，标志着当前周期内的传感器状态已全部更新完毕 */
-            is_frame_completed = true; 
+            is_frame_completed = true;
             break;
-            
+
         default:
             /* 预留接口：可在此处拓展磁场(0x54)、气压(0x56)等其他协议的解析 */
             break;
     }
-    
+
     return is_frame_completed;
 }
 
-static bool Parse_JY901S(imu_dev_t *dev, imu_data_t *out_data) 
+static bool Parse_JY901S(imu_dev_t *dev, imu_data_t *out_data)
 {
     bool has_new_data = false;
-    
+
     /* 1. 将 volatile 全局指针提取到 CPU 局部寄存器中 */
     uint16_t head = dev->In;
     uint16_t tail = dev->Out;
-    
+
     /* 计算积压的待处理数据量 */
     uint16_t cnt = (head >= tail) ? (head - tail) : (IMU_FIFO_SIZE + head - tail);
 
     /* 2. 在局部空间内疯狂试探与解包 */
-    while (cnt >= 11) 
+    while (cnt >= 11)
     {
         /* A. 寻找帧头 (使用 tail) */
         if (dev->rx_buf[tail] != 0x55) {
             tail = (tail + 1) % IMU_FIFO_SIZE;
-            cnt--; 
+            cnt--;
             continue;
         }
 
@@ -107,10 +114,10 @@ static bool Parse_JY901S(imu_dev_t *dev, imu_data_t *out_data)
         /* C. 校验和计算 */
         uint8_t sum = 0;
         for (int i = 0; i < 10; i++) sum += frame[i];
-        
+
         if (sum != frame[10]) {
             tail = (tail + 1) % IMU_FIFO_SIZE;
-            cnt--; 
+            cnt--;
             continue;
         }
 
@@ -123,10 +130,10 @@ static bool Parse_JY901S(imu_dev_t *dev, imu_data_t *out_data)
         tail = (tail + 11) % IMU_FIFO_SIZE;
         cnt -= 11;
     }
-    
+
     /* 3. 循环彻底结束后，将最终进度一次性原子提交回结构体 */
     dev->Out = tail;
-    
+
     return has_new_data;
 }
 
@@ -139,18 +146,23 @@ static void IM948_Hardware_Tx(uint8_t *pBuf, uint16_t len)
     bsp_uart_send_buffer(BSP_UART_IMU1, pBuf, len);
 }
 
-static void Init_IM948(void) 
+static void IM948_2_Hardware_Tx(uint8_t *pBuf, uint16_t len)
 {
-    IM948_RegisterTxCallback(IM948_Hardware_Tx);
-    
+    bsp_uart_send_buffer(BSP_UART_IMU3, pBuf, len);
+}
+
+static void Init_IM948(void)
+{
+    IM948_ContextInit(&s_im948_ctx_1, IM948_Hardware_Tx);
+
     bsp_delay_ms(200);// 延时一下让传感器上电准备完毕，传感器上电后需要初始化完毕后才会接收指令的
 
-    Cmd_03(); // 唤醒传感器
+    IM948_CtxCmd_03(&s_im948_ctx_1); // 唤醒传感器
     // 设置设备参数
-    Cmd_12(5, 255, 0, 0, 3, 25, 2, 4, 9, 0x35); 
-    Cmd_19(); // 开启数据主动上报
+    IM948_CtxCmd_12(&s_im948_ctx_1, 5, 255, 0, 0, 3, 25, 2, 4, 9, 0x35);
+    IM948_CtxCmd_19(&s_im948_ctx_1); // 开启数据主动上报
     bsp_delay_ms(100);
-    Cmd_40(2);
+    IM948_CtxCmd_40(&s_im948_ctx_1, 2);
     bsp_uart_start_dma_rx_circular(BSP_UART_IMU1,
                                    Driver_IMU_GetRxBuf(IMU_IM948),
                                    Driver_IMU_GetBufSize(IMU_IM948));
@@ -159,10 +171,27 @@ static void Init_IM948(void)
 
 // --- 专属解析器 2：IM948 (变长状态机) ---
 // 你的 Cmd_GetPkt 状态机内部逻辑可以放这里面，或者调用外部函数
-static bool Parse_IM948(imu_dev_t *dev, imu_data_t *out_data) 
+
+static void Init_IM948_2(void)
+{
+    IM948_ContextInit(&s_im948_ctx_2, IM948_2_Hardware_Tx);
+
+    bsp_delay_ms(200);
+
+    IM948_CtxCmd_03(&s_im948_ctx_2);
+    IM948_CtxCmd_12(&s_im948_ctx_2, 5, 255, 0, 0, 3, 25, 2, 4, 9, 0x35);
+    IM948_CtxCmd_19(&s_im948_ctx_2);
+    bsp_delay_ms(100);
+    IM948_CtxCmd_40(&s_im948_ctx_2, 2);
+    bsp_uart_start_dma_rx_circular(BSP_UART_IMU3,
+                                   Driver_IMU_GetRxBuf(IMU_IM948_2),
+                                   Driver_IMU_GetBufSize(IMU_IM948_2));
+}
+
+static bool Parse_IM948(im948_ctx_t *ctx, imu_dev_t *dev, imu_data_t *out_data)
 {
     bool has_new_data = false;
-    
+
     //使用局部变量接管读写指针，提高 CPU 寄存器寻址速度 (你的原版思路)
     uint16_t head = dev->In;
     uint16_t tail = dev->Out;
@@ -173,7 +202,7 @@ static bool Parse_IM948(imu_dev_t *dev, imu_data_t *out_data)
     uint16_t cnt = (head >= tail) ? (head - tail) : (IMU_FIFO_SIZE + head - tail);
 
     //贪婪吞噬循环：吃干榨净缓冲区里的所有数据
-    while (cnt > 0) 
+    while (cnt > 0)
     {
         // 提取字节，推进局部读指针
         uint8_t rx_byte = dev->rx_buf[tail];
@@ -181,15 +210,15 @@ static bool Parse_IM948(imu_dev_t *dev, imu_data_t *out_data)
         cnt--;
 
         // 将字节喂给专属的状态机
-        if (Cmd_GetPkt(rx_byte, out_data->acc, out_data->gyro, out_data->quat) == 1) 
+        if (IM948_CtxGetPkt(ctx, rx_byte, out_data->acc, out_data->gyro, out_data->quat) == 1)
             {
-                has_new_data = true; 
+                has_new_data = true;
             }
         }
 
     //循环结束，把最终的读进度同步回真实的驱动设备结构体中
     dev->Out = tail;
-    
+
     return has_new_data;
 }
 
@@ -210,16 +239,17 @@ void Driver_IMU_Poll_DMA_Update(imu_id_t id, uint16_t current_dma_cnt) {
 }
 
 // 对外暴露的大一统初始化接口
-void Driver_IMU_Init(void) 
+void Driver_IMU_Init(void)
 {
     Init_JY901S();
     Init_IM948();
+    Init_IM948_2();
 }
 
 bool Driver_IMU_JY901S_CalibrateAcc(void)
 {
 
-    // LOG_INFO("WitStartAccCali:%d", WitStartAccCali()); 
+    // LOG_INFO("WitStartAccCali:%d", WitStartAccCali());
 
     if (WitStartAccCali() != WIT_HAL_OK) {
         return false;
@@ -240,15 +270,68 @@ bool Driver_IMU_JY901S_CalibrateAcc(void)
 
     return true;
 }
-    
+
+
+bool Driver_IMU_JY901B_DefaultConfig(void)
+{
+    static const uint8_t unlock_cmd[5] = {0xFF, 0xAA, 0x69, 0x88, 0xB5};
+    static const uint8_t rsw_cmd[5]    = {0xFF, 0xAA, 0x02, 0x06, 0x02};
+    static const uint8_t rate_cmd[5]   = {0xFF, 0xAA, 0x03, 0x08, 0x00};
+    static const uint8_t baud_cmd[5]   = {0xFF, 0xAA, 0x04, 0x06, 0x00};
+    static const uint8_t save_cmd[5]   = {0xFF, 0xAA, 0x00, 0x00, 0x00};
+    bsp_uart_config_t config = {
+        .baudrate  = 9600,
+        .data_bits = BSP_UART_DATA_8B,
+        .stop_bits = BSP_UART_STOP_1B,
+        .parity    = BSP_UART_PARITY_NONE
+    };
+    //停止 DMA 接收，重新配置串口参数
+    bsp_uart_stop_dma_rx(BSP_UART_IMU2);
+
+    // 临时配置串口参数为 9600 波特率，8N1 模式，因为JY901B默认是9600波特率，8位数据，1位停止位，无校验
+    if (!bsp_uart_reconfig(BSP_UART_IMU2, &config)) {
+        return false;
+    }
+    //清空串口接收缓冲区，避免之前的数据干扰后续配置
+    bsp_uart_clear_rx_pending(BSP_UART_IMU2);
+
+    // 发送配置命令给 JY901B，使其切换到 115200 波特率，50Hz 输出频率，并输出加速度、陀螺仪和四元数数据
+    bsp_uart_send_buffer(BSP_UART_IMU2, unlock_cmd, sizeof(unlock_cmd));
+    bsp_delay_ms(20);
+    bsp_uart_send_buffer(BSP_UART_IMU2, rsw_cmd, sizeof(rsw_cmd));
+    bsp_delay_ms(20);
+    bsp_uart_send_buffer(BSP_UART_IMU2, rate_cmd, sizeof(rate_cmd));
+    bsp_delay_ms(20);
+    bsp_uart_send_buffer(BSP_UART_IMU2, baud_cmd, sizeof(baud_cmd));
+    bsp_delay_ms(20);
+    bsp_uart_send_buffer(BSP_UART_IMU2, save_cmd, sizeof(save_cmd));
+    bsp_delay_ms(100);
+    // 配置完成后，切换串口到 115200 波特率，以便后续通信使用新的波特率
+    config.baudrate = 115200;
+    if (!bsp_uart_reconfig(BSP_UART_IMU2, &config)) {
+        return false;
+    }
+    // 初始化接收缓冲区相关状态，准备 DMA 循环接收数据
+    memset(s_devs[IMU_JY901S].rx_buf, 0, sizeof(s_devs[IMU_JY901S].rx_buf));
+    s_devs[IMU_JY901S].In = 0;
+    s_devs[IMU_JY901S].Out = 0;
+    s_devs[IMU_JY901S].last_dma_cnt = 0;
+
+    bsp_uart_start_dma_rx_circular(BSP_UART_IMU2,
+                                   Driver_IMU_GetRxBuf(IMU_JY901S),
+                                   Driver_IMU_GetBufSize(IMU_JY901S));
+
+    return true;
+}
 
 // 统一的分发器：上层传地址进来，下层路由给具体的解析器去填空
 bool Driver_IMU_Process(imu_id_t id, imu_data_t *out_data) {
     if (out_data == NULL) return false;
-    
+
     switch (id) {
         case IMU_JY901S: return Parse_JY901S(&s_devs[id], out_data);
-        case IMU_IM948:  return Parse_IM948(&s_devs[id], out_data);
+        case IMU_IM948:  return Parse_IM948(&s_im948_ctx_1, &s_devs[id], out_data);
+        case IMU_IM948_2: return Parse_IM948(&s_im948_ctx_2, &s_devs[id], out_data);
         default:         return false;
     }
 }

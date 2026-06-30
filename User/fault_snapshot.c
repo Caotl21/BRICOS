@@ -111,3 +111,8 @@ bool System_FaultSnapshot_LoadLastStackOverflowTask(char *task_name, uint32_t ta
     task_name[copy_len] = '\0';
     return true;
 }
+
+bool System_FaultSnapshot_ClearStackOverflowTask(void)
+{
+    return bsp_flash_erase(FAULT_SNAPSHOT_FLASH_ADDR, FAULT_SNAPSHOT_FLASH_SIZE);
+}

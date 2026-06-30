@@ -1,0 +1,18 @@
+hosts:
+  bricsbot1:
+    host: 192.168.13.11
+    remote_python: ~/miniconda3/envs/OTA_Test/bin/python
+    reset_gpiochip: /dev/gpiochip1
+    reset_line: 27
+    reset_hold_ms: 80.0
+    settle_ms: 50.0
+    reset_active_low: true
+
+  bricsbot2:
+    host: 192.168.13.12
+    remote_python: ~/miniconda3/envs/test/bin/python
+    reset_gpiochip: /dev/gpiochip4
+    reset_line: 9
+    reset_hold_ms: 80.0
+    settle_ms: 50.0
+    reset_active_low: true

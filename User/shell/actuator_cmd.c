@@ -10,6 +10,7 @@
 
 #include "sys_mode_manager.h"
 #include "sys_shell_export.h"
+#include "task_led.h"
 
 static int prv_streq_ignore_case(const char *a, const char *b)
 {
@@ -89,6 +90,8 @@ static int prv_parse_u8(const char *s, uint8_t *out)
 #define WS2812_SHELL_STRIP_2_MASK  (1U << WS2812_STRIP_2)
 #define WS2812_SHELL_STRIP_ALL_MASK (WS2812_SHELL_STRIP_1_MASK | WS2812_SHELL_STRIP_2_MASK)
 #define WS2812_SHELL_WAIT_TIMEOUT_MS 20U
+#define LED_EFFECT_PERIOD_MS_MIN 50U
+#define LED_EFFECT_PERIOD_MS_MAX 10000U
 
 static int prv_parse_ws2812_strip_mask(const char *s, uint8_t *out_mask)
 {
@@ -183,6 +186,24 @@ static int prv_parse_ws2812_color_name(const char *s, ws2812_rgb_t *out_color)
     return 0;
 }
 
+static int prv_parse_led_period_ms(const char *s, uint16_t *out_period_ms)
+{
+    int value;
+
+    if ((s == NULL) || (out_period_ms == NULL)) {
+        return 0;
+    }
+
+    if (!prv_parse_int(s, &value) ||
+        (value < (int)LED_EFFECT_PERIOD_MS_MIN) ||
+        (value > (int)LED_EFFECT_PERIOD_MS_MAX)) {
+        return 0;
+    }
+
+    *out_period_ms = (uint16_t)value;
+    return 1;
+}
+
 // 当前两路 WS2812 共用 TIM1，这里按顺序等待每一路发送完成，
 // 避免第二路启动时把第一路还没发完的波形打断。
 static int prv_ws2812_wait_strip_idle(ws2812_strip_t strip, uint32_t timeout_ms)
@@ -240,6 +261,97 @@ static void prv_ws2812_print_state(shell_cmd_ctx_t *ctx)
                             (unsigned int)(Driver_WS2812_IsBusy(WS2812_STRIP_2) ? 1U : 0U));
     System_ShellCore_Printf(ctx,
                             "colors: black/off white red green blue yellow cyan magenta/pink orange purple/violet");
+}
+
+static void prv_led_print_usage(shell_cmd_ctx_t *ctx)
+{
+    System_ShellCore_Printf(ctx,
+                            "usage: led auto | solid <color> | breath <color> [period_ms] | chase <color> [period_ms] | warn <color> [period_ms] | clearwarn");
+    System_ShellCore_Printf(ctx,
+                            "colors: black/off white red green blue yellow cyan magenta/pink orange purple/violet");
+    System_ShellCore_Printf(ctx,
+                            "period_ms range: %u..%u",
+                            (unsigned int)LED_EFFECT_PERIOD_MS_MIN,
+                            (unsigned int)LED_EFFECT_PERIOD_MS_MAX);
+}
+
+static shell_ret_t prv_cmd_led(shell_cmd_ctx_t *ctx, int argc, char **argv)
+{
+    led_effect_t effect;
+    ws2812_rgb_t color;
+    uint16_t period_ms = 1000u;
+    bot_sys_mode_e mode;
+
+    if (argc == 1) {
+        prv_led_print_usage(ctx);
+        return SHELL_RET_OK;
+    }
+
+    if ((argc == 2) && prv_streq_ignore_case(argv[1], "auto")) {
+        mode = System_ModeManager_GetSysMode();
+        Task_LED_SetMode(mode);
+        System_ShellCore_Printf(ctx, "led auto mode restored for sysmode=%u", (unsigned int)mode);
+        return SHELL_RET_OK;
+    }
+
+    if ((argc == 2) && prv_streq_ignore_case(argv[1], "clearwarn")) {
+        Task_LED_ClearWarningEffect();
+        System_ShellCore_Printf(ctx, "led warning effect cleared");
+        return SHELL_RET_OK;
+    }
+
+    if ((argc == 3) || (argc == 4)) {
+        if (!prv_parse_ws2812_color_name(argv[2], &color)) {
+            System_ShellCore_Printf(ctx, "invalid color: %s", argv[2]);
+            return SHELL_RET_BAD_ARGS;
+        }
+
+        if ((argc == 4) && (!prv_parse_led_period_ms(argv[3], &period_ms))) {
+            System_ShellCore_Printf(ctx,
+                                    "invalid period_ms: %s (range %u..%u)",
+                                    argv[3],
+                                    (unsigned int)LED_EFFECT_PERIOD_MS_MIN,
+                                    (unsigned int)LED_EFFECT_PERIOD_MS_MAX);
+            return SHELL_RET_BAD_ARGS;
+        }
+
+        memset(&effect, 0, sizeof(effect));
+        effect.enabled = 1u;
+        effect.color = color;
+        effect.period_ms = period_ms;
+
+        if (prv_streq_ignore_case(argv[1], "solid")) {
+            effect.type = LED_EFFECT_SOLID;
+            Task_LED_SetBaseEffect(&effect);
+            Task_LED_ClearWarningEffect();
+            System_ShellCore_Printf(ctx, "led solid color=%s", argv[2]);
+            return SHELL_RET_OK;
+        }
+
+        if (prv_streq_ignore_case(argv[1], "breath")) {
+            effect.type = LED_EFFECT_BREATH;
+            Task_LED_SetBaseEffect(&effect);
+            System_ShellCore_Printf(ctx, "led breath color=%s period_ms=%u", argv[2], (unsigned int)period_ms);
+            return SHELL_RET_OK;
+        }
+
+        if (prv_streq_ignore_case(argv[1], "chase")) {
+            effect.type = LED_EFFECT_CHASE;
+            Task_LED_SetBaseEffect(&effect);
+            System_ShellCore_Printf(ctx, "led chase color=%s period_ms=%u", argv[2], (unsigned int)period_ms);
+            return SHELL_RET_OK;
+        }
+
+        if (prv_streq_ignore_case(argv[1], "warn")) {
+            effect.type = LED_EFFECT_STROBE;
+            Task_LED_SetWarningEffect(&effect);
+            System_ShellCore_Printf(ctx, "led warning color=%s period_ms=%u", argv[2], (unsigned int)period_ms);
+            return SHELL_RET_OK;
+        }
+    }
+
+    prv_led_print_usage(ctx);
+    return SHELL_RET_BAD_ARGS;
 }
 
 static shell_ret_t prv_cmd_ws2812(shell_cmd_ctx_t *ctx, int argc, char **argv)
@@ -443,9 +555,9 @@ static shell_ret_t prv_thruster_mode_guard(shell_cmd_ctx_t *ctx)
 {
     bot_sys_mode_e mode = System_ModeManager_GetSysMode();
 
-    if ((mode != SYS_MODE_STANDBY) && (mode != SYS_MODE_ACTIVE_DISARMED)) {
+    if ((mode != SYS_MODE_STANDBY) && (mode != SYS_MODE_ACTIVE_DISARMED) && (mode != SYS_MODE_MOTION_ARMED)) {
         System_ShellCore_Printf(ctx,
-                                "blocked: mode=%u, allow standby/disarmed only",
+                                "blocked: mode=%u, allow standby/disarmed/armed only",
                                 (unsigned int)mode);
         return SHELL_RET_MODE_BLOCKED;
     }
@@ -583,3 +695,4 @@ static shell_ret_t prv_cmd_servo(shell_cmd_ctx_t *ctx, int argc, char **argv)
 EXPORT_SHELL_CMD("thruster", "thruster request|idle|all|set|pulse", prv_cmd_thruster, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("servo", "control servo angle", prv_cmd_servo, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("ws2812", "ws2812 request|clear|all|color|set|pixel|refresh", prv_cmd_ws2812, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
+EXPORT_SHELL_CMD("led", "led auto|solid|breath|chase|warn|clearwarn", prv_cmd_led, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);

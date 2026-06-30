@@ -311,7 +311,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>4</Optim>
+            <Optim>2</Optim>
             <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -868,6 +868,16 @@
               <FileType>5</FileType>
               <FilePath>..\Driver\driver_ws2812.h</FilePath>
             </File>
+            <File>
+              <FileName>driver_pswitch.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Driver\driver_pswitch.c</FilePath>
+            </File>
+            <File>
+              <FileName>driver_pswitch.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Driver\driver_pswitch.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -912,6 +922,16 @@
               <FileName>task_shell_transport_nrt.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Task\task_shell_transport_nrt.h</FilePath>
+            </File>
+            <File>
+              <FileName>task_led.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Task\task_led.c</FilePath>
+            </File>
+            <File>
+              <FileName>task_led.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Task\task_led.h</FilePath>
             </File>
           </Files>
         </Group>

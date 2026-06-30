@@ -8,6 +8,7 @@
 #include "driver_param.h"
 #include "driver_servo.h"
 #include "driver_ws2812.h"
+#include "fault_snapshot.h"
 
 #include "sys_data_pool.h"
 #include "sys_mode_manager.h"
@@ -247,7 +248,7 @@ static void On_Receive_Motion_Mode_Cmd(const uint8_t *payload, uint16_t len){
 
     bool res;
     bot_run_mode_e new_mode = (bot_run_mode_e)payload[0];
-    if(new_mode > MOTION_STATE_AUTO) {
+    if(new_mode > MOTION_STATE_DEBUG) {
         Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_MOTION_MODE, INVALID_PARAM, 0, USE_CPU);
         return;
     }
@@ -285,8 +286,18 @@ static void On_Receive_WS2812_Color_Cmd(const uint8_t *payload, uint16_t len){
     uint8_t g =     payload[2];
     uint8_t b =     payload[3];
 
+    if(strip >= WS2812_STRIP_COUNT) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_WS2812_COLOR, INVALID_PARAM, 0, USE_CPU);
+        return;
+    }
+
     Driver_WS2812_SetAllRGB((ws2812_strip_t)strip, r, g, b);
-    Driver_WS2812_Refresh((ws2812_strip_t)strip);
+
+    if(!Driver_WS2812_Refresh((ws2812_strip_t)strip)) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_WS2812_COLOR, INVALID_PARAM, 0, USE_CPU);
+        return;
+    }
+    
     Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_SET_WS2812_COLOR, ACK_SUCCESS, 0, USE_CPU);
 }
 
@@ -373,6 +384,59 @@ static void On_Receive_IMU_Calibrate_Acc_Cmd(const uint8_t *payload, uint16_t le
     bsp_cpu_reset();
 }
 
+static void On_Receive_IMU_Config_JY901B_Cmd(const uint8_t *payload, uint16_t len)
+{
+    (void)payload;
+
+    if (len != 0u) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CONFIG_IMU_JY901B, LENGTH_ERROR, 0, USE_CPU);
+        return;
+    }
+
+    if (!Driver_IMU_JY901B_DefaultConfig()) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CONFIG_IMU_JY901B, INVALID_PARAM, 0, USE_CPU);
+        return;
+    }
+
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CONFIG_IMU_JY901B, ACK_SUCCESS, 0, USE_CPU);
+
+    bsp_cpu_reset();
+}
+
+static void On_Receive_Clear_Persist_Log_Cmd(const uint8_t *payload, uint16_t len)
+{
+    (void)payload;
+
+    if (len != 0u) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CLEAR_PERSIST_LOG, LENGTH_ERROR, 0, USE_CPU);
+        return;
+    }
+
+    if (!System_Log_PersistClear()) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CLEAR_PERSIST_LOG, EXECUTION_FAILED, 0, USE_CPU);
+        return;
+    }
+
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CLEAR_PERSIST_LOG, ACK_SUCCESS, 0, USE_CPU);
+}
+
+static void On_Receive_Clear_Overflow_Snapshot_Cmd(const uint8_t *payload, uint16_t len)
+{
+    (void)payload;
+
+    if (len != 0u) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CLEAR_OVERFLOW_SNAPSHOT, LENGTH_ERROR, 0, USE_CPU);
+        return;
+    }
+
+    if (!System_FaultSnapshot_ClearStackOverflowTask()) {
+        Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CLEAR_OVERFLOW_SNAPSHOT, EXECUTION_FAILED, 0, USE_CPU);
+        return;
+    }
+
+    Driver_Protocol_SendAck(BSP_UART_OPI_NRT, DATA_TYPE_CLEAR_OVERFLOW_SNAPSHOT, ACK_SUCCESS, 0, USE_CPU);
+}
+
 void Task_NRT_Cmd_Init(void){
     Driver_Protocol_Register(DATA_TYPE_OTA, On_Receive_OTA_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_PID_PARAM, On_Receive_Set_PID_Param_Cmd);
@@ -384,5 +448,8 @@ void Task_NRT_Cmd_Init(void){
     Driver_Protocol_Register(DATA_TYPE_SET_TAM, On_Receive_TAM_Cmd);
     Driver_Protocol_Register(DATA_TYPE_SET_WS2812_COLOR, On_Receive_WS2812_Color_Cmd);
     Driver_Protocol_Register(DATA_TYPE_CALIBRATE_IMU_ACC, On_Receive_IMU_Calibrate_Acc_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_CONFIG_IMU_JY901B, On_Receive_IMU_Config_JY901B_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_CLEAR_PERSIST_LOG, On_Receive_Clear_Persist_Log_Cmd);
+    Driver_Protocol_Register(DATA_TYPE_CLEAR_OVERFLOW_SNAPSHOT, On_Receive_Clear_Overflow_Snapshot_Cmd);
 }
 

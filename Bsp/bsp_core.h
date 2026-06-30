@@ -11,12 +11,13 @@
 
 /* --- 串口端口枚举 --- */
 typedef enum {
-    BSP_UART_IMU1 = 0,  // 对应 USART1: IMU1 数据接收，IM948
-    BSP_UART_IMU2,      // 对应 USART2: IMU2 数据接收，JY901
-    BSP_UART_OPI_RT,    // 对应 USART3: 实时信号传递
-    BSP_UART_OPI_NRT,   // 对应 UART4:  非实时信号传递
-    BSP_UART_DEBUG,     // 对应 UART5:  Shell/Log 调试接口
-    BSP_UART_MAX        // 端口数量上限，用于数组越界保护
+    BSP_UART_IMU1 = 0,  // USART1: IMU1 data receive, IM948
+    BSP_UART_IMU2,      // USART2: IMU2 data receive, JY901
+    BSP_UART_IMU3,      // USART6: IMU3 data receive, IM948_2
+    BSP_UART_OPI_RT,    // USART3: realtime communication
+    BSP_UART_OPI_NRT,   // UART4: non-realtime communication
+    BSP_UART_DEBUG,     // UART5: Shell/Log debug port
+    BSP_UART_MAX
 } bsp_uart_port_t;
 
 /* --- PWM 通道枚举 --- */
@@ -55,6 +56,8 @@ typedef enum {
 /* --- GPIO 引脚枚举 --- */
 typedef enum {
     BSP_GPIO_DHT11 = 0,
+    BSP_GPIO_PSWITCH = 1,
+    BSP_GPIO_USERLED = 2,
     // BSP_GPIO_LEAK_DET, // 预留：漏水检测传感器
     // BSP_GPIO_RELAY_1,  // 预留：外部设备供电继电器
     BSP_GPIO_MAX

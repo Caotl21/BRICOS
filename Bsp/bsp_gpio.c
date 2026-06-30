@@ -14,11 +14,21 @@ typedef struct {
 /* --- 实例化 GPIO 硬件字典 (存入 Flash) --- */
 static const gpio_hw_info_t s_gpio_hw_info[BSP_GPIO_MAX] = {
     [BSP_GPIO_DHT11] = {
-        .port= GPIOB,
-        .pin = GPIO_Pin_9,
-        .rcc = RCC_AHB1Periph_GPIOB
+        .port= GPIOC,
+        .pin = GPIO_Pin_3,
+        .rcc = RCC_AHB1Periph_GPIOC
+    },
+    [BSP_GPIO_PSWITCH] = {
+        .port= GPIOC,
+        .pin = GPIO_Pin_1,
+        .rcc = RCC_AHB1Periph_GPIOC
+    },
+    [BSP_GPIO_USERLED] = {
+        .port= GPIOE,
+        .pin = GPIO_Pin_2,
+        .rcc = RCC_AHB1Periph_GPIOE
+    },
 
-    }
 };
 
 bool bsp_gpio_init(void) {

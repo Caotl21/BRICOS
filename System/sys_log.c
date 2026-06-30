@@ -281,6 +281,7 @@ static uint8_t Persist_Log_Append(log_level_t level, const char *text, uint16_t 
 
 static void Persist_Log_ReplayOneBank(uint32_t base_addr, uint16_t *remain)
 {
+    static const uint8_t replay_prefix[] = "[PERSIST] ";
     uint32_t offset = 0u;
 
     if ((remain == NULL) || (*remain == 0u)) {
@@ -318,6 +319,7 @@ static void Persist_Log_ReplayOneBank(uint32_t base_addr, uint16_t *remain)
 
         bsp_flash_read(rec_addr + (uint32_t)sizeof(persist_log_record_hdr_t), msg_buf, hdr.len);
         msg_buf[hdr.len] = '\0';
+        bsp_uart_send_buffer(BSP_UART_DEBUG, replay_prefix, (uint16_t)(sizeof(replay_prefix) - 1u));
         bsp_uart_send_buffer(BSP_UART_DEBUG, msg_buf, hdr.len);
 
         offset += rec_size;
@@ -359,19 +361,36 @@ void System_Log_PersistReplay(uint16_t max_count)
 
 bool System_Log_PersistClear(void)
 {
+    BaseType_t mutex_taken = pdFALSE;
+    bool ok = true;
+
+    if (s_log_mutex != NULL) {
+        if (xSemaphoreTake(s_log_mutex, portMAX_DELAY) == pdTRUE) {
+            mutex_taken = pdTRUE;
+        }
+    }
+
     if (!bsp_flash_erase(SYS_FLASH_PERSIST_LOG_BANK0_ADDR, SYS_FLASH_PERSIST_LOG_BANK_SIZE)) {
-        return false;
+        ok = false;
+        goto exit_unlock;
     }
 
     if (!bsp_flash_erase(SYS_FLASH_PERSIST_LOG_BANK1_ADDR, SYS_FLASH_PERSIST_LOG_BANK_SIZE)) {
-        return false;
+        ok = false;
+        goto exit_unlock;
     }
 
     s_plog_active_base = SYS_FLASH_PERSIST_LOG_BANK0_ADDR;
     s_plog_write_offset = 0u;
     s_plog_next_seq = 1u;
     s_plog_ready = 1u;
-    return true;
+
+exit_unlock:
+    if ((s_log_mutex != NULL) && (mutex_taken == pdTRUE)) {
+        xSemaphoreGive(s_log_mutex);
+    }
+
+    return ok;
 }
 
 static void Log_Task_Core(void *pvParameters)
