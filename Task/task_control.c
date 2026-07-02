@@ -570,9 +570,9 @@ static void prv_armed_enter(control_fsm_ctx_t *ctx)
 {
     Reset_All_Controllers();
     ctx->last_armed_motion_mode = ctx->current_motion_mode;
-    //Task_LED_SetArmingEffect();
+    Task_LED_SetArmingEffect();
     Driver_PSWITCH_ON();
-    //Driver_Thruster_Init();
+    Driver_Thruster_Init();
 
 //    LOG_INFO("ARMED entry spin start");
 //    prv_armed_entry_spin_once();
