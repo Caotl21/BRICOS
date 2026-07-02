@@ -8,7 +8,7 @@ void Driver_Thruster_Init(void){
     for(int i=0;i<THRUSTER_COUNT;i++){
         bsp_pwm_set_pulse_us((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), THRUSTER_PWM_STOP);
     }
-    //bsp_delay_ms(100); // 等待 500ms 确保电调解锁
+    bsp_delay_ms(100); // 等待 100ms 确保电调解锁
 }
 
 // 设置单路推力
