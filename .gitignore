@@ -32,3 +32,4 @@ Boot/
 
 Build/
 build/gcc/
+.sconsign.dblite
