@@ -37,6 +37,8 @@
 #define ARMED_ENTRY_SPIN_DURATION_MS     (200u)
 #define ARMED_ENTRY_SPIN_SLICE_MS  (50u)
 #define ARMED_ENTRY_SPIN_SPEED           (8.0f)
+#define THRUSTER_INIT_SETTLE_MS          (1000u)
+#define CONTROL_CHECKIN_SLICE_MS         (50u)
 
 /* 控制器实例 */
 Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
@@ -361,6 +363,28 @@ static void prv_set_idle_output(void)
     Driver_Thruster_Set_Idle();
 }
 
+static void prv_control_delay_with_checkin(uint32_t delay_ms)
+{
+    TickType_t remain = pdMS_TO_TICKS(delay_ms);
+    TickType_t slice_ticks = pdMS_TO_TICKS(CONTROL_CHECKIN_SLICE_MS);
+
+    if (remain == 0u) {
+        remain = 1u;
+    }
+    if (slice_ticks == 0u) {
+        slice_ticks = 1u;
+    }
+
+    while (remain > 0u) {
+        TickType_t step = (remain > slice_ticks) ? slice_ticks : remain;
+        Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
+        vTaskDelay(step);
+        remain -= step;
+    }
+
+    Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
+}
+
 static void prv_armed_entry_spin_once(void)
 {
     TickType_t total_ticks = pdMS_TO_TICKS(ARMED_ENTRY_SPIN_DURATION_MS);
@@ -573,6 +597,10 @@ static void prv_armed_enter(control_fsm_ctx_t *ctx)
     Task_LED_SetArmingEffect();
     Driver_PSWITCH_ON();
     Driver_Thruster_Init();
+    prv_control_delay_with_checkin(THRUSTER_INIT_SETTLE_MS);
+    bsp_pwm_set_pulse_us((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + 4), THRUSTER_PWM_STOP);
+    bsp_pwm_set_pulse_us((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + 5), THRUSTER_PWM_STOP);
+    prv_control_delay_with_checkin(THRUSTER_INIT_SETTLE_MS);
 
 //    LOG_INFO("ARMED entry spin start");
 //    prv_armed_entry_spin_once();
