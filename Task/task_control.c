@@ -39,6 +39,7 @@
 #define ARMED_ENTRY_SPIN_SPEED           (8.0f)
 #define THRUSTER_INIT_SETTLE_MS          (1000u)
 #define CONTROL_CHECKIN_SLICE_MS         (50u)
+#define DEPTH_CONTROL_MIN_TARGET         (20.0f)
 
 /* 控制器实例 */
 Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
@@ -180,6 +181,34 @@ static float PID_Update(PID_Controller_t *pid, float target, float measurement, 
 
     pid->error_last = error;
     return output;
+}
+
+static float Depth_Control_Update(control_fsm_ctx_t *ctx)
+{
+    float target_depth;
+
+    if ((ctx == NULL) || (ctx->params == NULL)) {
+        return 0.0f;
+    }
+
+    target_depth = ctx->target.depth_target_m;
+    if (target_depth < 0.0f) {
+        target_depth = 0.0f;
+    }
+    if (target_depth > ctx->params->failsafe_max_depth) {
+        target_depth = ctx->params->failsafe_max_depth;
+    }
+
+    if (target_depth < DEPTH_CONTROL_MIN_TARGET) {
+        Reset_PID(&pid_depth);
+        return 0.0f;
+    }
+
+    return PID_Update(&pid_depth,
+                      target_depth,
+                      ctx->state.depth_m,
+                      TASK_CONTROL_PERIOD_S,
+                      0u);
 }
 
 static float Cascade_PID_Update(Cascade_PID_t *pid,
@@ -643,7 +672,7 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
         case MOTION_STATE_MANUAL:
             ctx->wrench_out.force_x = ctx->target.cmd.manual_cmd.surge;
             ctx->wrench_out.force_y = ctx->target.cmd.manual_cmd.sway;
-            ctx->wrench_out.force_z = ctx->target.cmd.manual_cmd.heave;
+            ctx->wrench_out.force_z = Depth_Control_Update(ctx);
             // ctx->wrench_out.torque_z = ctx->target.cmd.manual_cmd.yaw_cmd;
             ctx->wrench_out.torque_z = PID_Update(&pid_yaw.inner,
                                       ctx->target.cmd.manual_cmd.yaw_cmd,
@@ -683,21 +712,7 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
                                                 ctx->state.gyro_z,
                                                 TASK_CONTROL_PERIOD_S,
                                                 0u);
-            {
-                float target_depth = ctx->target.cmd.stab_cmd.target_depth;
-                if (target_depth < 0.0f) {
-                    target_depth = 0.0f;
-                }
-                if (target_depth > ctx->params->failsafe_max_depth) {
-                    target_depth = ctx->params->failsafe_max_depth;
-                }
-
-                ctx->wrench_out.force_z = PID_Update(&pid_depth,
-                                                     target_depth,
-                                                     ctx->state.depth_m,
-                                                     TASK_CONTROL_PERIOD_S,
-                                                     0u);
-            }
+            ctx->wrench_out.force_z = Depth_Control_Update(ctx);
 
             ctx->wrench_out.force_x = ctx->target.cmd.stab_cmd.surge;
             ctx->wrench_out.force_y = ctx->target.cmd.stab_cmd.sway;

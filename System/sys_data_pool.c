@@ -14,6 +14,19 @@ static bot_stack_watermark_t s_bricsbot_stack_wm;
 static bot_target_t s_bricsbot_target;
 static bot_params_t s_bricsbot_params;
 
+static float prv_clamp_depth_target(float target_depth)
+{
+    if (target_depth < 0.0f) {
+        target_depth = 0.0f;
+    }
+
+    if (target_depth > s_bricsbot_params.failsafe_max_depth) {
+        target_depth = s_bricsbot_params.failsafe_max_depth;
+    }
+
+    return target_depth;
+}
+
 void Bot_Data_Pool_Init(void)
 {
     memset(&s_bricsbot_state, 0, sizeof(s_bricsbot_state));
@@ -159,6 +172,33 @@ void Bot_Target_Push(const bot_target_t *new_target)
 
     SYS_ENTER_CRITICAL();
     memcpy(&s_bricsbot_target, new_target, sizeof(bot_target_t));
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_Target_Push_Manual(const bot_target_t *new_target)
+{
+    float depth_target;
+
+    if (new_target == NULL) return;
+
+    SYS_ENTER_CRITICAL();
+    depth_target = s_bricsbot_target.depth_target_m + new_target->cmd.manual_cmd.heave;
+    depth_target = prv_clamp_depth_target(depth_target);
+    memcpy(&s_bricsbot_target, new_target, sizeof(bot_target_t));
+    s_bricsbot_target.depth_target_m = depth_target;
+    SYS_EXIT_CRITICAL();
+}
+
+void Bot_Target_Push_Stabilize(const bot_target_t *new_target)
+{
+    float depth_target;
+
+    if (new_target == NULL) return;
+
+    SYS_ENTER_CRITICAL();
+    depth_target = prv_clamp_depth_target(new_target->cmd.stab_cmd.target_depth);
+    memcpy(&s_bricsbot_target, new_target, sizeof(bot_target_t));
+    s_bricsbot_target.depth_target_m = depth_target;
     SYS_EXIT_CRITICAL();
 }
 

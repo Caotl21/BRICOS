@@ -49,7 +49,7 @@ static void On_Motion_Ctrl_Received(const uint8_t *payload, uint16_t len)
             target.cmd.manual_cmd.sway = motion.b;
             target.cmd.manual_cmd.heave = motion.c;
             target.cmd.manual_cmd.yaw_cmd = motion.d;
-            Bot_Target_Push(&target);
+            Bot_Target_Push_Manual(&target);
             break;
 
         case MOTION_STATE_STABILIZE:
@@ -58,7 +58,7 @@ static void On_Motion_Ctrl_Received(const uint8_t *payload, uint16_t len)
             target.cmd.stab_cmd.sway = motion.b;
             target.cmd.stab_cmd.target_depth = motion.c;
             target.cmd.stab_cmd.target_yaw = motion.d;
-            Bot_Target_Push(&target);
+            Bot_Target_Push_Stabilize(&target);
             break;
 
         default:
