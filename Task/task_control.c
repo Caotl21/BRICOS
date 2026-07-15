@@ -666,19 +666,23 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
                                                           ctx->state.gyro_x,
                                                           TASK_CONTROL_PERIOD_S,
                                                           0u);
-            ctx->wrench_out.torque_y = Cascade_PID_Update(&pid_pitch,
-                                                          0.0f,
-                                                          ctx->euler_pitch,
-                                                          ctx->state.gyro_y,
-                                                          TASK_CONTROL_PERIOD_S,
-                                                          0u);
-            ctx->wrench_out.torque_z = Cascade_PID_Update(&pid_yaw,
-                                                          ctx->target.cmd.stab_cmd.target_yaw,
-                                                          ctx->euler_yaw,
-                                                          ctx->state.gyro_z,
-                                                          TASK_CONTROL_PERIOD_S,
-                                                          1u);
-
+            // ctx->wrench_out.torque_y = Cascade_PID_Update(&pid_pitch,
+            //                                               0.0f,
+            //                                               ctx->euler_pitch,
+            //                                               ctx->state.gyro_y,
+            //                                               TASK_CONTROL_PERIOD_S,
+            //                                               0u);
+            // ctx->wrench_out.torque_z = Cascade_PID_Update(&pid_yaw,
+            //                                               ctx->target.cmd.stab_cmd.target_yaw,
+            //                                               ctx->euler_yaw,
+            //                                               ctx->state.gyro_z,
+            //                                               TASK_CONTROL_PERIOD_S,
+            //                                               1u);
+            ctx->wrench_out.torque_z = PID_Update(&pid_yaw.inner,
+                                                ctx->target.cmd.stab_cmd.target_yaw,
+                                                ctx->state.gyro_z,
+                                                TASK_CONTROL_PERIOD_S,
+                                                0u);
             {
                 float target_depth = ctx->target.cmd.stab_cmd.target_depth;
                 if (target_depth < 0.0f) {
