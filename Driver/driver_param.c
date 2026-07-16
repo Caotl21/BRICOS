@@ -158,7 +158,7 @@ bool Driver_PidParam_Load(bot_params_t *out_params)
     return true;
 }
 
-bool Driver_PidParam_Save(const bot_params_t *in_params)
+bool Driver_PidParam_SaveNoReset(const bot_params_t *in_params)
 {
     pid_param_blob_t blob;
 
@@ -180,6 +180,16 @@ bool Driver_PidParam_Save(const bot_params_t *in_params)
     {
         return false;
     }
+
+    return true;
+}
+
+bool Driver_PidParam_Save(const bot_params_t *in_params)
+{
+    if (!Driver_PidParam_SaveNoReset(in_params)) {
+        return false;
+    }
+
     bsp_cpu_reset();
     return true;
 }
