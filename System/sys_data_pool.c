@@ -182,7 +182,7 @@ void Bot_Target_Push_Manual(const bot_target_t *new_target)
     if (new_target == NULL) return;
 
     SYS_ENTER_CRITICAL();
-    depth_target = s_bricsbot_target.depth_target_m + new_target->cmd.manual_cmd.heave;
+    depth_target = new_target->cmd.manual_cmd.heave;
     depth_target = prv_clamp_depth_target(depth_target);
     memcpy(&s_bricsbot_target, new_target, sizeof(bot_target_t));
     s_bricsbot_target.depth_target_m = depth_target;
