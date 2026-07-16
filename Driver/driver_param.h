@@ -11,7 +11,8 @@
 
 bool Driver_PidParam_Load(bot_params_t *out_params);
 bool Driver_PidParam_Save(const bot_params_t *in_params);
+/* 保存完整参数包但不复位，供需要先回传结果再重启的调用方使用。 */
+bool Driver_PidParam_SaveNoReset(const bot_params_t *in_params);
 void Driver_PidParam_FillDefault(bot_params_t *params);
 
 #endif // __DRIVER_PID_PARAM_H
-

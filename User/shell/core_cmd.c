@@ -1,13 +1,22 @@
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "bsp_delay.h"
 #include "bsp_cpu.h"
 
+#include "driver_param.h"
 #include "fault_snapshot.h"
+#include "sys_data_pool.h"
 #include "sys_log.h"
 #include "sys_mode_manager.h"
 #include "sys_shell_export.h"
+
+#define SHELL_FAILSAFE_MAX_DEPTH_MIN_M       0.01
+#define SHELL_FAILSAFE_MAX_DEPTH_MAX_M    10000.0
+#define SHELL_FAILSAFE_LOW_VOLTAGE_MIN_V      1.01
+#define SHELL_FAILSAFE_LOW_VOLTAGE_MAX_V    100.0
+#define SHELL_FAILSAFE_REBOOT_DELAY_MS       50u
 
 /* ModeManager 状态码映射到 Shell 返回码 */
 static shell_ret_t prv_mode_mgr_status_to_shell_ret(sys_mode_mgr_status_t st)
@@ -38,6 +47,25 @@ static int prv_streq_ignore_case(const char *a, const char *b)
         b++;
     }
     return ((*a == '\0') && (*b == '\0')) ? 1 : 0;
+}
+
+static int prv_parse_failsafe_value(const char *s, double min, double max, float *out)
+{
+    char *end = NULL;
+    double value;
+
+    if ((s == NULL) || (out == NULL)) {
+        return 0;
+    }
+
+    value = strtod(s, &end);
+    if ((end == s) || (end == NULL) || (*end != '\0') ||
+        !(value >= min) || !(value <= max)) {
+        return 0;
+    }
+
+    *out = (float)value;
+    return 1;
 }
 
 /* 系统模式枚举转字符串 */
@@ -124,6 +152,7 @@ static shell_ret_t prv_cmd_help(shell_cmd_ctx_t *ctx, int argc, char **argv)
                             "  echo <text>\r\n"
                             "  sysmode request | sysmode set standby|disarmed|armed|failsafe\r\n"
                             "  momode request | momode set manual|stabilize|auto|debug\r\n"
+                            "  params failsafe request | params failsafe depth_max <depth_max_m> | params failsafe voltage_low <voltage_low_v>\r\n"
                             "  log clear\r\n"
                             "  persistlog clear\r\n"
                             "  persist_log clear\r\n"
@@ -234,6 +263,84 @@ static shell_ret_t prv_cmd_momode(shell_cmd_ctx_t *ctx, int argc, char **argv)
     return SHELL_RET_BAD_ARGS;
 }
 
+static shell_ret_t prv_cmd_params(shell_cmd_ctx_t *ctx, int argc, char **argv)
+{
+    bot_params_t params;
+    float value;
+
+    if ((argc == 3) && prv_streq_ignore_case(argv[1], "failsafe") &&
+        prv_streq_ignore_case(argv[2], "request")) {
+        Bot_Params_Pull(&params);
+        System_ShellCore_Printf(ctx,
+                                "failsafe depth_max=%.2f m voltage_low=%.2f V",
+                                params.failsafe_max_depth,
+                                params.failsafe_low_voltage);
+        return SHELL_RET_OK;
+    }
+
+    if ((argc == 4) && prv_streq_ignore_case(argv[1], "failsafe") &&
+        prv_streq_ignore_case(argv[2], "depth_max")) {
+        if (!prv_parse_failsafe_value(argv[3],
+                                      SHELL_FAILSAFE_MAX_DEPTH_MIN_M,
+                                      SHELL_FAILSAFE_MAX_DEPTH_MAX_M,
+                                      &value)) {
+            System_ShellCore_Printf(ctx,
+                                    "invalid depth_max: %.2f..%.2f m",
+                                    SHELL_FAILSAFE_MAX_DEPTH_MIN_M,
+                                    SHELL_FAILSAFE_MAX_DEPTH_MAX_M);
+            return SHELL_RET_BAD_ARGS;
+        }
+
+        Bot_Params_Pull(&params);
+        params.failsafe_max_depth = value;
+
+        if (!Driver_PidParam_SaveNoReset(&params)) {
+            System_ShellCore_Printf(ctx, "failsafe depth_max was not saved to flash");
+            return SHELL_RET_INTERNAL;
+        }
+
+        (void)System_ShellCore_SendText(&ctx->peer,
+                                        SHELL_RET_OK,
+                                        "failsafe depth_max saved; rebooting");
+        bsp_delay_ms(SHELL_FAILSAFE_REBOOT_DELAY_MS);
+        bsp_cpu_reset();
+        return SHELL_RET_OK;
+    }
+
+    if ((argc == 4) && prv_streq_ignore_case(argv[1], "failsafe") &&
+        prv_streq_ignore_case(argv[2], "voltage_low")) {
+        if (!prv_parse_failsafe_value(argv[3],
+                                      SHELL_FAILSAFE_LOW_VOLTAGE_MIN_V,
+                                      SHELL_FAILSAFE_LOW_VOLTAGE_MAX_V,
+                                      &value)) {
+            System_ShellCore_Printf(ctx,
+                                    "invalid voltage_low: %.2f..%.2f V",
+                                    SHELL_FAILSAFE_LOW_VOLTAGE_MIN_V,
+                                    SHELL_FAILSAFE_LOW_VOLTAGE_MAX_V);
+            return SHELL_RET_BAD_ARGS;
+        }
+
+        Bot_Params_Pull(&params);
+        params.failsafe_low_voltage = value;
+
+        if (!Driver_PidParam_SaveNoReset(&params)) {
+            System_ShellCore_Printf(ctx, "failsafe voltage_low was not saved to flash");
+            return SHELL_RET_INTERNAL;
+        }
+
+        (void)System_ShellCore_SendText(&ctx->peer,
+                                        SHELL_RET_OK,
+                                        "failsafe voltage_low saved; rebooting");
+        bsp_delay_ms(SHELL_FAILSAFE_REBOOT_DELAY_MS);
+        bsp_cpu_reset();
+        return SHELL_RET_OK;
+    }
+
+    System_ShellCore_Printf(ctx,
+                            "usage: params failsafe request | params failsafe depth_max <depth_max_m> | params failsafe voltage_low <voltage_low_v>");
+    return SHELL_RET_BAD_ARGS;
+}
+
 static shell_ret_t prv_cmd_fault(shell_cmd_ctx_t *ctx, int argc, char **argv)
 {
     if ((argc == 2) && prv_streq_ignore_case(argv[1], "clear_overflow")) {
@@ -285,6 +392,7 @@ EXPORT_SHELL_CMD("help", "show command list", prv_cmd_help, SHELL_PERM_READONLY,
 EXPORT_SHELL_CMD("echo", "echo text", prv_cmd_echo, SHELL_PERM_READONLY, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("sysmode", "sysmode request | sysmode set standby|disarmed|armed|failsafe", prv_cmd_sysmode, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("momode", "momode request | momode set manual|stabilize|auto|debug", prv_cmd_momode, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
+EXPORT_SHELL_CMD("params", "params failsafe request|depth_max <m>|voltage_low <V>", prv_cmd_params, SHELL_PERM_SAFE_CTRL, SHELL_MODE_MASK(SYS_MODE_STANDBY));
 EXPORT_SHELL_CMD("log", "log clear (clear persisted logs)", prv_cmd_log, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("persistlog", "persistlog clear", prv_cmd_log, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
 EXPORT_SHELL_CMD("persist_log", "persist_log clear", prv_cmd_log, SHELL_PERM_SAFE_CTRL, SHELL_MODE_ANY);
