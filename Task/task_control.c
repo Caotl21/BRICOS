@@ -221,21 +221,59 @@ static void Normalize_Thruster_Outputs(float *thruster_pwm, uint8_t count, float
 
 static float Thruster_Map(float total_thrust)
 {
+    /* 26V calibration, thrust magnitudes in kgf; each step is 25us (6.25 PWM). */
+    /* Forward: 1525us (zero thrust), then 1550us through 1900us. */
+    static const float forward_thrust[] = {
+        0.0f, 0.2f, 0.4f, 0.8f, 1.2f, 1.7f, 2.1f, 2.7f,
+        3.3f, 3.8f, 4.5f, 4.9f, 5.5f, 5.9f, 6.5f, 6.6f
+    };
+    /* Reverse: 1450us (zero thrust), then 1425us through 1100us. */
+    static const float reverse_thrust[] = {
+        0.0f, 0.1f, 0.3f, 0.5f, 0.8f, 1.1f, 1.5f, 1.9f,
+        2.4f, 2.9f, 3.5f, 3.9f, 4.4f, 4.9f, 5.6f
+    };
+    const float thrust_scale = 1.0f; /* 1.0f: input in kgf; 9.8f: input in N. */
+    const float *thrust_table;
+    float thrust;
+    float direction;
+    float pwm_start;
     float pwm;
+    int point_count;
+    int i;
 
-    if (total_thrust < 0.0f) {
-        pwm = total_thrust * 10.0f;
+    /* Zero demand stays at 1500us, inside the 1450us-1525us deadband. */
+    if (total_thrust == 0.0f) {
+        return 0.0f;
+    }
+
+    thrust = total_thrust / thrust_scale;
+    if (thrust > 0.0f) {
+        thrust_table = forward_thrust;
+        point_count = (int)(sizeof(forward_thrust) / sizeof(forward_thrust[0]));
+        direction = 1.0f;
+        pwm_start = 6.25f;
     } else {
-        pwm = total_thrust * 8.0f;
+        thrust = -thrust;
+        thrust_table = reverse_thrust;
+        point_count = (int)(sizeof(reverse_thrust) / sizeof(reverse_thrust[0]));
+        direction = -1.0f;
+        pwm_start = 12.5f;
     }
 
-    if (pwm > 100.0f) {
-        pwm = 100.0f;
+    if (thrust >= thrust_table[point_count - 1]) {
+        return direction * 100.0f;
     }
-    if (pwm < -100.0f) {
-        pwm = -100.0f;
+
+    for (i = 1; i < point_count; i++) {
+        if (thrust <= thrust_table[i]) {
+            pwm = pwm_start + ((float)(i - 1) +
+                  (thrust - thrust_table[i - 1]) /
+                  (thrust_table[i] - thrust_table[i - 1])) * 6.25f;
+            return direction * pwm;
+        }
     }
-    return pwm;
+
+    return 0.0f;
 }
 
 static void TAM_Mixer(const Bot_Wrench_t *wrench_out, float *thruster_pwm, const bot_tam_t *tam_config)
