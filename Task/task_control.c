@@ -248,6 +248,26 @@ static void Normalize_Thruster_Outputs(float *thruster_pwm, uint8_t count, float
     }
 }
 
+static float Thruster_Map_Legacy(float total_thrust)
+{
+    float pwm;
+
+    if (total_thrust < 0.0f) {
+        pwm = total_thrust * 10.0f;
+    } else {
+        pwm = total_thrust * 8.0f;
+    }
+
+    if (pwm > 100.0f) {
+        pwm = 100.0f;
+    }
+    if (pwm < -100.0f) {
+        pwm = -100.0f;
+    }
+
+    return pwm;
+}
+
 static float Thruster_Map(float total_thrust)
 {
     /* 26V calibration, thrust magnitudes in kgf; each step is 25us (6.25 PWM). */
@@ -305,7 +325,10 @@ static float Thruster_Map(float total_thrust)
     return 0.0f;
 }
 
-static void TAM_Mixer(const Bot_Wrench_t *wrench_out, float *thruster_pwm, const bot_tam_t *tam_config)
+static void TAM_Mixer(const Bot_Wrench_t *wrench_out,
+                      float *thruster_pwm,
+                      const bot_tam_t *tam_config,
+                      bot_run_mode_e motion_mode)
 {
     float wrench_array[TAM_MAX_DOF];
     int t;
@@ -323,7 +346,11 @@ static void TAM_Mixer(const Bot_Wrench_t *wrench_out, float *thruster_pwm, const
         for (dof = 0; dof < TAM_MAX_DOF; dof++) {
             total_thrust += tam_config->matrix[t][dof] * wrench_array[dof];
         }
-        thruster_pwm[t] = Thruster_Map(total_thrust);
+        if (motion_mode == MOTION_STATE_AUTO) {
+            thruster_pwm[t] = Thruster_Map(total_thrust);
+        } else {
+            thruster_pwm[t] = Thruster_Map_Legacy(total_thrust);
+        }
     }
 
     Normalize_Thruster_Outputs(&thruster_pwm[0], 4u, 100.0f);
@@ -758,10 +785,23 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
 
         case MOTION_STATE_AUTO:
             /* 预留：自动模式控制逻辑 */
+            ctx->wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
+                                                          0.0f,
+                                                          ctx->euler_roll,
+                                                          ctx->state.gyro_x,
+                                                          TASK_CONTROL_PERIOD_S,
+                                                          0u);
+            ctx->wrench_out.torque_z = ctx->target.cmd.stab_cmd.target_yaw;
+            ctx->wrench_out.force_z = Depth_Control_Update(ctx);
+            ctx->wrench_out.force_x = ctx->target.cmd.stab_cmd.surge;
+            ctx->wrench_out.force_y = ctx->target.cmd.stab_cmd.sway;
             break;
     }
 
-    TAM_Mixer(&ctx->wrench_out, ctx->thruster_pwm, &ctx->params->tam_config);
+    TAM_Mixer(&ctx->wrench_out,
+              ctx->thruster_pwm,
+              &ctx->params->tam_config,
+              ctx->current_motion_mode);
 
     for (i = 0; i < THRUSTER_COUNT; i++) {
         Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), ctx->thruster_pwm[i]);
