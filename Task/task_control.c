@@ -343,11 +343,21 @@ static void TAM_Mixer(const Bot_Wrench_t *wrench_out,
 
     for (t = 0; t < (int)tam_config->active_thrusters; t++) {
         float total_thrust = 0.0f;
+        float roll_thrust = 0.0f;
+
         for (dof = 0; dof < TAM_MAX_DOF; dof++) {
-            total_thrust += tam_config->matrix[t][dof] * wrench_array[dof];
+            float thrust = tam_config->matrix[t][dof] * wrench_array[dof];
+
+            /* AUTO maps the roll contribution separately using the legacy curve. */
+            if ((motion_mode == MOTION_STATE_AUTO) && (dof == 3)) {
+                roll_thrust = thrust;
+            } else {
+                total_thrust += thrust;
+            }
         }
         if (motion_mode == MOTION_STATE_AUTO) {
-            thruster_pwm[t] = Thruster_Map(total_thrust);
+            thruster_pwm[t] = Thruster_Map(total_thrust)
+                            + Thruster_Map_Legacy(roll_thrust);
         } else {
             thruster_pwm[t] = Thruster_Map_Legacy(total_thrust);
         }
