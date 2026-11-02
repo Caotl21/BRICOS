@@ -37,6 +37,9 @@
 #define ARMED_ENTRY_SPIN_DURATION_MS     (200u)
 #define ARMED_ENTRY_SPIN_SLICE_MS  (50u)
 #define ARMED_ENTRY_SPIN_SPEED           (8.0f)
+#define THRUSTER_INIT_SETTLE_MS          (1000u)
+#define CONTROL_CHECKIN_SLICE_MS         (50u)
+#define DEPTH_CONTROL_MIN_TARGET         (20.0f)
 
 /* 控制器实例 */
 Cascade_PID_t pid_roll, pid_pitch, pid_yaw;
@@ -180,6 +183,34 @@ static float PID_Update(PID_Controller_t *pid, float target, float measurement, 
     return output;
 }
 
+static float Depth_Control_Update(control_fsm_ctx_t *ctx)
+{
+    float target_depth;
+
+    if ((ctx == NULL) || (ctx->params == NULL)) {
+        return 0.0f;
+    }
+
+    target_depth = ctx->target.depth_target_m;
+    if (target_depth < 0.0f) {
+        target_depth = 0.0f;
+    }
+    if (target_depth > ctx->params->failsafe_max_depth) {
+        target_depth = ctx->params->failsafe_max_depth;
+    }
+
+    if (target_depth < DEPTH_CONTROL_MIN_TARGET) {
+        Reset_PID(&pid_depth);
+        return 0.0f;
+    }
+
+    return PID_Update(&pid_depth,
+                      target_depth,
+                      ctx->state.depth_m,
+                      TASK_CONTROL_PERIOD_S,
+                      0u);
+}
+
 static float Cascade_PID_Update(Cascade_PID_t *pid,
                                 float angle_target,
                                 float angle_measurement,
@@ -217,7 +248,7 @@ static void Normalize_Thruster_Outputs(float *thruster_pwm, uint8_t count, float
     }
 }
 
-static float Thruster_Map(float total_thrust)
+static float Thruster_Map_Legacy(float total_thrust)
 {
     float pwm;
 
@@ -233,10 +264,71 @@ static float Thruster_Map(float total_thrust)
     if (pwm < -100.0f) {
         pwm = -100.0f;
     }
+
     return pwm;
 }
 
-static void TAM_Mixer(const Bot_Wrench_t *wrench_out, float *thruster_pwm, const bot_tam_t *tam_config)
+static float Thruster_Map(float total_thrust)
+{
+    /* 26V calibration, thrust magnitudes in kgf; each step is 25us (6.25 PWM). */
+    /* Forward: 1525us (zero thrust), then 1550us through 1900us. */
+    static const float forward_thrust[] = {
+        0.0f, 0.2f, 0.4f, 0.8f, 1.2f, 1.7f, 2.1f, 2.7f,
+        3.3f, 3.8f, 4.5f, 4.9f, 5.5f, 5.9f, 6.5f, 6.6f
+    };
+    /* Reverse: 1450us (zero thrust), then 1425us through 1100us. */
+    static const float reverse_thrust[] = {
+        0.0f, 0.1f, 0.3f, 0.5f, 0.8f, 1.1f, 1.5f, 1.9f,
+        2.4f, 2.9f, 3.5f, 3.9f, 4.4f, 4.9f, 5.6f
+    };
+    const float thrust_scale = 1.0f; /* 1.0f: input in kgf; 9.8f: input in N. */
+    const float *thrust_table;
+    float thrust;
+    float direction;
+    float pwm_start;
+    float pwm;
+    int point_count;
+    int i;
+
+    /* Zero demand stays at 1500us, inside the 1450us-1525us deadband. */
+    if (total_thrust == 0.0f) {
+        return 0.0f;
+    }
+
+    thrust = total_thrust / thrust_scale;
+    if (thrust > 0.0f) {
+        thrust_table = forward_thrust;
+        point_count = (int)(sizeof(forward_thrust) / sizeof(forward_thrust[0]));
+        direction = 1.0f;
+        pwm_start = 6.25f;
+    } else {
+        thrust = -thrust;
+        thrust_table = reverse_thrust;
+        point_count = (int)(sizeof(reverse_thrust) / sizeof(reverse_thrust[0]));
+        direction = -1.0f;
+        pwm_start = 12.5f;
+    }
+
+    if (thrust >= thrust_table[point_count - 1]) {
+        return direction * 100.0f;
+    }
+
+    for (i = 1; i < point_count; i++) {
+        if (thrust <= thrust_table[i]) {
+            pwm = pwm_start + ((float)(i - 1) +
+                  (thrust - thrust_table[i - 1]) /
+                  (thrust_table[i] - thrust_table[i - 1])) * 6.25f;
+            return direction * pwm;
+        }
+    }
+
+    return 0.0f;
+}
+
+static void TAM_Mixer(const Bot_Wrench_t *wrench_out,
+                      float *thruster_pwm,
+                      const bot_tam_t *tam_config,
+                      bot_run_mode_e motion_mode)
 {
     float wrench_array[TAM_MAX_DOF];
     int t;
@@ -254,7 +346,11 @@ static void TAM_Mixer(const Bot_Wrench_t *wrench_out, float *thruster_pwm, const
         for (dof = 0; dof < TAM_MAX_DOF; dof++) {
             total_thrust += tam_config->matrix[t][dof] * wrench_array[dof];
         }
-        thruster_pwm[t] = Thruster_Map(total_thrust);
+        if (motion_mode == MOTION_STATE_AUTO) {
+            thruster_pwm[t] = Thruster_Map(total_thrust);
+        } else {
+            thruster_pwm[t] = Thruster_Map_Legacy(total_thrust);
+        }
     }
 
     Normalize_Thruster_Outputs(&thruster_pwm[0], 4u, 100.0f);
@@ -359,6 +455,28 @@ static void Report_Thruster_State_To_OrangePi(const uint16_t *pulse_us)
 static void prv_set_idle_output(void)
 {
     Driver_Thruster_Set_Idle();
+}
+
+static void prv_control_delay_with_checkin(uint32_t delay_ms)
+{
+    TickType_t remain = pdMS_TO_TICKS(delay_ms);
+    TickType_t slice_ticks = pdMS_TO_TICKS(CONTROL_CHECKIN_SLICE_MS);
+
+    if (remain == 0u) {
+        remain = 1u;
+    }
+    if (slice_ticks == 0u) {
+        slice_ticks = 1u;
+    }
+
+    while (remain > 0u) {
+        TickType_t step = (remain > slice_ticks) ? slice_ticks : remain;
+        Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
+        vTaskDelay(step);
+        remain -= step;
+    }
+
+    Bot_Task_CheckIn_Monitor(TASK_ID_CONTROL);
 }
 
 static void prv_armed_entry_spin_once(void)
@@ -570,9 +688,13 @@ static void prv_armed_enter(control_fsm_ctx_t *ctx)
 {
     Reset_All_Controllers();
     ctx->last_armed_motion_mode = ctx->current_motion_mode;
-    //Task_LED_SetArmingEffect();
+    Task_LED_SetArmingEffect();
     Driver_PSWITCH_ON();
-    //Driver_Thruster_Init();
+    Driver_Thruster_Init();
+    prv_control_delay_with_checkin(THRUSTER_INIT_SETTLE_MS);
+    bsp_pwm_set_pulse_us((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + 4), THRUSTER_PWM_STOP);
+    bsp_pwm_set_pulse_us((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + 5), THRUSTER_PWM_STOP);
+    prv_control_delay_with_checkin(THRUSTER_INIT_SETTLE_MS);
 
 //    LOG_INFO("ARMED entry spin start");
 //    prv_armed_entry_spin_once();
@@ -615,7 +737,7 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
         case MOTION_STATE_MANUAL:
             ctx->wrench_out.force_x = ctx->target.cmd.manual_cmd.surge;
             ctx->wrench_out.force_y = ctx->target.cmd.manual_cmd.sway;
-            ctx->wrench_out.force_z = ctx->target.cmd.manual_cmd.heave;
+            ctx->wrench_out.force_z = Depth_Control_Update(ctx);
             // ctx->wrench_out.torque_z = ctx->target.cmd.manual_cmd.yaw_cmd;
             ctx->wrench_out.torque_z = PID_Update(&pid_yaw.inner,
                                       ctx->target.cmd.manual_cmd.yaw_cmd,
@@ -638,34 +760,24 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
                                                           ctx->state.gyro_x,
                                                           TASK_CONTROL_PERIOD_S,
                                                           0u);
-            ctx->wrench_out.torque_y = Cascade_PID_Update(&pid_pitch,
-                                                          0.0f,
-                                                          ctx->euler_pitch,
-                                                          ctx->state.gyro_y,
-                                                          TASK_CONTROL_PERIOD_S,
-                                                          0u);
-            ctx->wrench_out.torque_z = Cascade_PID_Update(&pid_yaw,
-                                                          ctx->target.cmd.stab_cmd.target_yaw,
-                                                          ctx->euler_yaw,
-                                                          ctx->state.gyro_z,
-                                                          TASK_CONTROL_PERIOD_S,
-                                                          1u);
-
-            {
-                float target_depth = ctx->target.cmd.stab_cmd.target_depth;
-                if (target_depth < 0.0f) {
-                    target_depth = 0.0f;
-                }
-                if (target_depth > ctx->params->failsafe_max_depth) {
-                    target_depth = ctx->params->failsafe_max_depth;
-                }
-
-                ctx->wrench_out.force_z = PID_Update(&pid_depth,
-                                                     target_depth,
-                                                     ctx->state.depth_m,
-                                                     TASK_CONTROL_PERIOD_S,
-                                                     0u);
-            }
+            // ctx->wrench_out.torque_y = Cascade_PID_Update(&pid_pitch,
+            //                                               0.0f,
+            //                                               ctx->euler_pitch,
+            //                                               ctx->state.gyro_y,
+            //                                               TASK_CONTROL_PERIOD_S,
+            //                                               0u);
+            // ctx->wrench_out.torque_z = Cascade_PID_Update(&pid_yaw,
+            //                                               ctx->target.cmd.stab_cmd.target_yaw,
+            //                                               ctx->euler_yaw,
+            //                                               ctx->state.gyro_z,
+            //                                               TASK_CONTROL_PERIOD_S,
+            //                                               1u);
+            ctx->wrench_out.torque_z = PID_Update(&pid_yaw.inner,
+                                                ctx->target.cmd.stab_cmd.target_yaw,
+                                                ctx->state.gyro_z,
+                                                TASK_CONTROL_PERIOD_S,
+                                                0u);
+            ctx->wrench_out.force_z = Depth_Control_Update(ctx);
 
             ctx->wrench_out.force_x = ctx->target.cmd.stab_cmd.surge;
             ctx->wrench_out.force_y = ctx->target.cmd.stab_cmd.sway;
@@ -673,10 +785,23 @@ static void prv_armed_run(control_fsm_ctx_t *ctx)
 
         case MOTION_STATE_AUTO:
             /* 预留：自动模式控制逻辑 */
+            ctx->wrench_out.torque_x = Cascade_PID_Update(&pid_roll,
+                                                          0.0f,
+                                                          ctx->euler_roll,
+                                                          ctx->state.gyro_x,
+                                                          TASK_CONTROL_PERIOD_S,
+                                                          0u);
+            ctx->wrench_out.torque_z = ctx->target.cmd.stab_cmd.target_yaw;
+            ctx->wrench_out.force_z = Depth_Control_Update(ctx);
+            ctx->wrench_out.force_x = ctx->target.cmd.stab_cmd.surge;
+            ctx->wrench_out.force_y = ctx->target.cmd.stab_cmd.sway;
             break;
     }
 
-    TAM_Mixer(&ctx->wrench_out, ctx->thruster_pwm, &ctx->params->tam_config);
+    TAM_Mixer(&ctx->wrench_out,
+              ctx->thruster_pwm,
+              &ctx->params->tam_config,
+              ctx->current_motion_mode);
 
     for (i = 0; i < THRUSTER_COUNT; i++) {
         Driver_Thruster_SetSpeed((bsp_pwm_ch_t)(BSP_PWM_THRUSTER_1 + i), ctx->thruster_pwm[i]);

@@ -186,6 +186,9 @@ UART5 RX transport 资源：
 | `sysmode set standby|disarmed|armed|failsafe` | 请求系统模式切换；failsafe 走本地故障入口 |
 | `momode request` | 查询当前 MotionMode |
 | `momode set manual|stabilize|auto` | 请求运动模式切换 |
+| `params failsafe request` | 查询最大深度阈值和低压阈值 |
+| `params failsafe depth_max <depth_max_m>` | 在 `STANDBY` 下设置最大深度阈值、写入 Flash 并重启；范围 0.01~10000 m |
+| `params failsafe voltage_low <voltage_low_v>` | 在 `STANDBY` 下设置低压阈值、写入 Flash 并重启；范围 1.01~100 V |
 | `fault` | 打印当前故障位 |
 | `reboot` | 触发 MCU 软件复位 |
 

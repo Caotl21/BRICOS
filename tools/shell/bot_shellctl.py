@@ -126,10 +126,13 @@ class AttachClient:
         "cabin",
         "chip",
         "task_stack",
+        "params",
     ]
     QUERY_COMMANDS = ["euler", "depthtemp", "power", "cabin", "chip", "task_stack"]
     SYSMODE_TARGETS = ["standby", "disarmed", "armed", "failsafe"]
     MOMODE_TARGETS = ["manual", "stabilize", "auto"]
+    PARAMS_SECTIONS = ["failsafe"]
+    FAILSAFE_ACTIONS = ["request", "depth_max", "voltage_low"]
     THRUSTER_ACTIONS = ["request", "idle", "stop", "all", "set", "pulse"]
     LED_ACTIONS = ["auto", "solid", "breath", "chase", "warn", "clearwarn"]
     WS2812_ACTIONS = ["request", "clear", "all", "color", "set", "pixel", "refresh"]
@@ -277,6 +280,11 @@ class AttachClient:
                 pool = ["request", "set"]
             elif (arg_index == 2) and args_before and (args_before[0].lower() == "set"):
                 pool = self.MOMODE_TARGETS
+        elif cmd == "params":
+            if arg_index == 1:
+                pool = self.PARAMS_SECTIONS
+            elif (arg_index == 2) and args_before and (args_before[0].lower() == "failsafe"):
+                pool = self.FAILSAFE_ACTIONS
         elif cmd == "fault":
             if arg_index == 1:
                 pool = ["clear_overflow"]

@@ -105,6 +105,9 @@ typedef struct {
 typedef struct {
     uint8_t target_mode;  /* 与 motion mode 枚举值对齐 */
 
+    /* MANUAL/STABILIZE 共用的绝对深度目标（m） */
+    float depth_target_m;
+
     union {
         payload_manual_t manual_cmd;
         payload_stabilize_t stab_cmd;
@@ -165,6 +168,8 @@ void Bot_State_Push_SysStatus(float cpu_usage, float chip_temp);
 void Bot_StackWatermark_Push(const bot_stack_watermark_t *new_stack_wm);
 
 void Bot_Target_Push(const bot_target_t *new_target);
+void Bot_Target_Push_Manual(const bot_target_t *new_target);
+void Bot_Target_Push_Stabilize(const bot_target_t *new_target);
 
 /* 兼容接口：当前仓内暂未实现，保留声明供后续按需扩展。 */
 void Bot_Params_Push_PID(uint8_t pid_id, float p, float i, float d);

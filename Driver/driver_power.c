@@ -51,5 +51,5 @@ float Driver_Power_GetCurrent(void)
     float voltage_i = ((float)s_adc_raw_values[1] / 4096.0f) * 3.3f;
     
     // 电流解算公式：10 * (测量电压 - 2.5V 偏移)
-    return 500.0f * (voltage_i);
+    return 25.0f * (voltage_i - 0.124f);
 }
