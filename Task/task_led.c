@@ -84,7 +84,8 @@ static led_effect_t prv_mode_to_base_effect(bot_sys_mode_e mode)
             effect.period_ms = LED_BREATH_MS;
             break;
         case SYS_MODE_MOTION_ARMED:
-            effect.color = WS2812_COLOR_BLUE;
+            /* 橙色常亮：避开可见光通信使用的蓝/绿符号，通信期间由上层经 0x18 接管灯带 */
+            effect.color = WS2812_COLOR_ORANGE;
             break;
         case SYS_MODE_FAILSAFE:
             effect.color = WS2812_COLOR_BLACK;
