@@ -379,7 +379,7 @@ void Task_LED_SetArmingEffect(void)
     memset(&effect, 0, sizeof(effect));
     effect.enabled = 1u;
     effect.type = LED_EFFECT_CHASE;
-    effect.color = WS2812_COLOR_CYAN;
+    effect.color = WS2812_COLOR_ORANGE;
     effect.period_ms = LED_ARMING_CHASE_MS;
 
     Task_LED_SetBaseEffect(&effect);
