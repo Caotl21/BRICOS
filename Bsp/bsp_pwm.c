@@ -583,10 +583,17 @@ bool bsp_pwm_start_dma_waveform(bsp_pwm_ch_t ch, const uint16_t *ccr_buf, uint16
     DMA_ITConfig(hw->dma_stream, DMA_IT_TC | DMA_IT_TE, ENABLE);
 
     // 第一个点位先手动写入 CCR，后续更新由 DMA 接管
+    // 注意：不能在定时器停止时就把 buf[0] 装进影子寄存器（UG），
+    // 否则 CNT=0 < CCR 会让输出在“停表 -> 重新使能”这段空档里提前拉高，
+    // 第一个 bit 的高电平被拉长，WS2812 会把它识别成 1（表现为第一颗灯常亮绿色 G=0x80）。
+    // 做法：影子寄存器先清 0 保持低电平，buf[0] 只写进预装载，
+    // 计数器停在 ARR，使能后第一个溢出事件才把 buf[0] 装入，与周期起点严格对齐。
     TIM_Cmd(hw->tim, DISABLE);
-    prv_pwm_write_ccr(hw, ccr_buf[0]);
-    TIM_SetCounter(hw->tim, 0U);
+    prv_pwm_write_ccr(hw, 0U);
     TIM_GenerateEvent(hw->tim, TIM_EventSource_Update);
+    prv_pwm_write_ccr(hw, ccr_buf[0]);
+    TIM_SetCounter(hw->tim, hw->period);
+    TIM_ClearFlag(hw->tim, (uint16_t)(TIM_FLAG_CC1 << (hw->ch - 1U)));
 
     TIM_DMACmd(hw->tim, hw->tim_dma_src, ENABLE);
     DMA_Cmd(hw->dma_stream, ENABLE);
